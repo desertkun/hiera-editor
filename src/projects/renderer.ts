@@ -1,7 +1,7 @@
 
 import { ipc } from "../ipc/client";
 
-const $ = require("jquery")
+const $ = require("jquery");
 const ellipsis = require('text-ellipsis');
 const remote = require('electron').remote;
 

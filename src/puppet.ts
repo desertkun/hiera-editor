@@ -1,7 +1,5 @@
 import * as process from "process";
 import * as path from "path";
-import * as fs from "fs";
-import * as stream from "stream";
 
 import * as async from "./async";
 
@@ -13,20 +11,17 @@ export module puppet
         {
             if (process.platform == "darwin")
             {
-                const rubyPath = require('traveling-ruby-osx');
-                return rubyPath;
+                return require('traveling-ruby-osx');
             }
 
             if (process.platform == "win32")
             {
-                const rubyPath = require('traveling-ruby-win32');
-                return rubyPath;
+                return require('traveling-ruby-win32');
             }
             
             if (process.platform == "linux")
             {
-                const rubyPath = require('traveling-ruby-linux-x86_64');
-                return rubyPath;
+                return require('traveling-ruby-linux-x86_64');
             }
 
             return null;
@@ -36,7 +31,7 @@ export module puppet
         {
             const rubyScript = require('app-root-path').resolve(path.join("ruby", script));
 
-            const argsTotal = new Array<string>();
+            const argsTotal = [];
 
             argsTotal.push(rubyScript);
 

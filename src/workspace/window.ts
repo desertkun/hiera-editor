@@ -1,5 +1,6 @@
 
 import { Window } from "../window"
+import { puppet } from "../puppet";
 
 export class WorkspaceWindow extends Window
 {
@@ -24,14 +25,20 @@ export class WorkspaceWindow extends Window
             "minHeight": 400
         });
 
-        this.browserWindow.webContents.toggleDevTools();
+        this.generate();
     }
 
     private init()
     {
-        //const a = JSON.stringify(["*/manifests/**/*.pp", "*/functions/**/*.pp", "*/types/**/*.pp", "*/lib/**/*.rb"])
-        //const b = "out.json"
-        //puppet.Ruby.Call("puppet-strings.rb", [a, b], "/Users/desertkun/Documents/Work/anthill-puppet-dev/modules")
 
+    }
+
+    private async generate()
+    {
+        const a = JSON.stringify(["*/manifests/**/*.pp", "*/functions/**/*.pp", "*/types/**/*.pp", "*/lib/**/*.rb"])
+        const b = "out.json";
+        await puppet.Ruby.Call("puppet-strings.rb", [a, b], "C:\\Work\\puppet-anthill-dev\\modules");
+
+        const fe = 1;
     }
 }

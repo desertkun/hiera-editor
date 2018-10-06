@@ -9,7 +9,7 @@ export interface IDictionary<K, V> {
   
   export class Dictionary<K extends string, V> implements IDictionary<K, V> {
   
-    private internalDict: Partial<Record<K, V>>;
+    readonly internalDict: Partial<Record<K, V>>;
   
     constructor() {
       this.internalDict = {};
@@ -20,7 +20,6 @@ export interface IDictionary<K, V> {
       for(let key in this.internalDict) {
         keys.push(key);
       }
-  
       return keys;
     }
   
@@ -28,6 +27,7 @@ export interface IDictionary<K, V> {
       let vals: V[] = [];
   
       for(let key in this.internalDict) {
+        // @ts-ignore
         vals.push(this.internalDict[key]);
       }
   
@@ -35,6 +35,7 @@ export interface IDictionary<K, V> {
     }
   
     public get(key: K): V {
+      // @ts-ignore
       return this.internalDict[key];
     }
 
@@ -43,6 +44,7 @@ export interface IDictionary<K, V> {
     }
   
     public put(key: K, val: V): void {
+      // @ts-ignore
       this.internalDict[key] = val;
     }
   

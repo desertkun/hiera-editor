@@ -1,14 +1,16 @@
 {
-  "name": "electron-quick-start",
-  "version": "1.0.0",
-  "description": "A minimal Electron application",
-  "main": "main.js",
+  "name": "hiera-editor",
+  "version": "0.1.0",
+  "description": "Hiera editor",
+  "main": "ts/main.js",
   "scripts": {
     "start": "electron .",
+    "start:debug": "electron %NODE_DEBUG_OPTION% .",
     "postinstall": "npmpd && run-script-os",
-    "install:darwin": "BUNDLE_GEMFILE=./ruby/Gemfile ./node_modules/traveling-ruby-osx/bin/bundle install"
+    "install:darwin": "BUNDLE_GEMFILE=./ruby/Gemfile ./node_modules/traveling-ruby-osx/bin/bundle install",
+    "install:win32": "cmd /C \"set BUNDLE_GEMFILE=ruby\\Gemfile && node_modules\\traveling-ruby-win32\\bin\\gem install --bindir node_modules\\traveling-ruby-win32\\bin.real --no-ri --no-rdoc bundler && node_modules\\traveling-ruby-win32\\bin\\bundle install\""
   },
-  "repository": "https://github.com/electron/electron-quick-start",
+  "repository": "https://github.com/desertkun/hiera-editor",
   "keywords": [
     "Electron",
     "quick",
@@ -20,7 +22,8 @@
   "license": "CC0-1.0",
   "devDependencies": {
     "electron": "~1.7.8",
-    "run-script-os": "^1.0.2"
+    "npm-platform-dependencies": "0.0.13",
+    "run-script-os": "^1.0.3"
   },
   "dependencies": {
     "app-root-path": "^2.0.1",
@@ -29,9 +32,8 @@
     "install": "^0.10.2",
     "jquery": "^3.2.1",
     "npm": "^5.6.0",
-    "npm-platform-dependencies": "0.0.13",
     "text-ellipsis": "^1.0.3",
-    "traveling-ruby-osx": "^2.2.1"
+    "traveling-ruby-win32": "^2.2.1"
   },
   "darwinDependencies": {
     "traveling-ruby-osx": "latest"
