@@ -5,7 +5,8 @@
   "main": "ts/main.js",
   "scripts": {
     "start": "electron .",
-    "start:debug": "electron %NODE_DEBUG_OPTION% .",
+    "debug:win32": "electron %NODE_DEBUG_OPTION% .",
+    "debug:osx": "electron $NODE_DEBUG_OPTION .",
     "postinstall": "npmpd && run-script-os",
     "install:darwin": "BUNDLE_GEMFILE=./ruby/Gemfile ./node_modules/traveling-ruby-osx/bin/bundle install",
     "install:win32": "cmd /C \"set BUNDLE_GEMFILE=ruby\\Gemfile && node_modules\\traveling-ruby-win32\\bin\\gem install --bindir node_modules\\traveling-ruby-win32\\bin.real --no-ri --no-rdoc bundler && node_modules\\traveling-ruby-win32\\bin\\bundle install\""
