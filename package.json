@@ -1,0 +1,45 @@
+{
+  "name": "electron-quick-start",
+  "version": "1.0.0",
+  "description": "A minimal Electron application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "postinstall": "npmpd && run-script-os",
+    "install:darwin": "BUNDLE_GEMFILE=./ruby/Gemfile ./node_modules/traveling-ruby-osx/bin/bundle install"
+  },
+  "repository": "https://github.com/electron/electron-quick-start",
+  "keywords": [
+    "Electron",
+    "quick",
+    "start",
+    "tutorial",
+    "demo"
+  ],
+  "author": "GitHub",
+  "license": "CC0-1.0",
+  "devDependencies": {
+    "electron": "~1.7.8",
+    "run-script-os": "^1.0.2"
+  },
+  "dependencies": {
+    "app-root-path": "^2.0.1",
+    "electron-ipc-tunnel": "^3.1.0",
+    "electron-window-state": "^4.1.1",
+    "install": "^0.10.2",
+    "jquery": "^3.2.1",
+    "npm": "^5.6.0",
+    "npm-platform-dependencies": "0.0.13",
+    "text-ellipsis": "^1.0.3",
+    "traveling-ruby-osx": "^2.2.1"
+  },
+  "darwinDependencies": {
+    "traveling-ruby-osx": "latest"
+  },
+  "win32Dependencies": {
+    "traveling-ruby-win32": "latest"
+  },
+  "linuxDependencies": {
+    "traveling-ruby-linux-x86_64": "latest"
+  }
+}

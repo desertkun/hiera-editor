@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Workspace</title>
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-reboot.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/font-awesome.min.css">
+    <link rel="stylesheet" href="../css/proton.css">
+    <link rel="stylesheet" href="../css/jstree.min.css">
+    <link rel="stylesheet" href="../css/workspace.css">
+    <script type="text/javascript">
+      window.$ = window.jQuery = require('jquery');
+    </script>
+    <script src="../js/jstree.min.js"></script>
+    <script src="../js/tether.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+    <script src="../js/jquery-resizable.min.js"></script>
+  </head>
+  <body>
+
+      <div class="workspace-container">
+
+          <div class="workspace-left">
+              <div id="tree">
+                <ul>
+                  <li>Root node 1
+                    <ul>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li><a href="#">Child node 2</a></li>
+                    </ul>
+                  </li>
+                  <li>Root node 1
+                    <ul>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li><a href="#">Child node 2</a></li>
+                    </ul>
+                  </li>
+                  <li>Root node 1
+                    <ul>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li>Child node 1</li>
+                      <li><a href="#">Child node 2</a></li>
+                    </ul>
+                  </li>
+                </ul>
+              </div>
+          </div>
+
+          <div class="splitter">
+          </div>
+
+          <div class="workspace-content">
+              right panel
+          </div>
+      </div>
+
+      <!--
+
+      <div id="sidebar"> 
+          <div id="split-bar"></div>
+          <div>
+            
+          </div>
+      </div>
+      <div id="main">main</div> 
+
+
+      !-->
+
+    <script>
+      require('../ts/workspace/renderer.js')
+    </script>
+
+  </body>
+</html>

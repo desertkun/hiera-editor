@@ -1,0 +1,36 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    CFPropertyList (2.3.6)
+    facter (2.5.1)
+      CFPropertyList (~> 2.2)
+    fast_gettext (1.1.0)
+    gettext (3.2.6)
+      locale (>= 2.0.5)
+      text (>= 1.3.0)
+    gettext-setup (0.29)
+      fast_gettext (~> 1.1.0)
+      gettext (>= 3.0.2)
+      locale
+    hiera (3.4.2)
+    locale (2.1.2)
+    puppet (5.3.3)
+      CFPropertyList (~> 2.2)
+      facter (> 2.0, < 4)
+      gettext-setup (>= 0.10, < 1)
+      hiera (>= 3.2.1, < 4)
+      locale (~> 2.1)
+    puppet-strings (1.1.1)
+      yard (~> 0.9.5)
+    rdoc (6.0.1)
+    text (1.3.1)
+    yard (0.9.12)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  puppet
+  puppet-strings
+  rdoc
+  yard

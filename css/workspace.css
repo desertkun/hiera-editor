@@ -1,0 +1,54 @@
+html,
+body {
+  height: 100%;
+  font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+  padding: 0;
+  margin: 0;
+  overflow: auto;
+}
+
+/* horizontal panel*/
+
+.workspace-container {
+  height: 100%;
+  display: -ms-flexbox;
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-box;
+  display: box;
+  
+  -ms-flex-direction: row;
+  -webkit-box-orient: horizontal;
+  -moz-box-orient: horizontal;
+  -ms-box-orient: horizontal;
+  box-orient: horizontal;
+
+}
+
+.workspace-left {
+  width: 200px;
+  min-height: 200px;
+  min-width: 200px;
+  white-space: nowrap;
+  -ms-flex: 0 100px;
+  -webkit-box-flex:  0;
+  -moz-box-flex:  0;
+  -ms-box-flex:  0;
+  box-flex:  0; 
+  overflow: scroll;
+}
+
+.splitter {
+  flex: 0 0 auto;
+  width: 8px;
+  min-height: 200px;
+  cursor: col-resize;  
+}
+
+.workspace-content {
+  -ms-flex: 1;
+  -webkit-box-flex: 1;
+  -moz-box-flex: 1;
+  -ms-box-flex: 1;
+  box-flex: 1;  
+}

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Welcome to Hiera Editor</title>
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-reboot.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/font-awesome.min.css">
+    <link rel="stylesheet" href="../css/tether.min.css">
+    <link rel="stylesheet" href="../css/tether-theme-basic.min.css">
+    <script type="text/javascript">
+      window.$ = window.jQuery = require('jquery');
+    </script>
+    <script src="../js/tether.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+  </head>
+  <body>
+    
+    <div class="container container-full">
+      <div class="row h-100">
+          <div class="col" style="padding-left: 0px !important;">
+            <table class="table table-hover table-striped table-sm">
+              <tbody id="projects-list">
+              </tbody>
+            </table>
+            <div class="w-100" id="no-projects" style="display: none;">
+              <p class="text-center">
+                <span class="text text-muted">No recent projects,<br>please open or create one.</span>
+              </p>
+            </div>
+          </div>
+          <div class="col d-flex align-items-center">
+            <div class="w-100">
+                <p class="text-center">
+                  <img src="../images/editor.png" width="128" height="128">
+                </p>
+                <!--
+                <p class="text-center">
+                  <i class="fa fa-plus" aria-hidden="true"></i> <a href="#" id="btn-new-project">New Project</a>
+                </p>
+                !-->
+                <p class="text-center">
+                  <i class="fa fa-folder-open-o" aria-hidden="true"></i> <a href="#" id="btn-open-project">Open Project</a>
+                </p>
+            </div>
+          </div>
+        </div>
+    </div>
+    
+
+    <script>
+      // You can also require other files to run in this process
+      require('../ts/projects/renderer.js')
+    </script>
+  </body>
+</html>
