@@ -1,9 +1,5 @@
 
 import { puppet } from "./puppet";
-import { Dictionary } from "./dictionary"
-
-import * as path from "path";
-import * as fs from "fs";
 import * as async from "./async"
 
 export class ProjectModel
@@ -60,11 +56,11 @@ export class ProjectModel
 
 export class ProjectsModel
 {
-    private _projects: Array<ProjectModel>;
+    private readonly _projects: Array<ProjectModel>;
 
     constructor ()
     {
-        this._projects = new Array<ProjectModel>();
+        this._projects = [];
     }
 
     public get list(): Array<ProjectModel>

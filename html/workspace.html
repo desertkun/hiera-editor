@@ -3,114 +3,62 @@
   <head>
     <meta charset="UTF-8">
     <title>Workspace</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'">
     <link rel="stylesheet" href="../css/bootstrap.min.css">
     <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
     <link rel="stylesheet" href="../css/bootstrap-reboot.min.css">
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/font-awesome.min.css">
-    <link rel="stylesheet" href="../css/proton.css">
-    <link rel="stylesheet" href="../css/jstree.min.css">
     <link rel="stylesheet" href="../css/workspace.css">
+    <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
     <script type="text/javascript">
       window.$ = window.jQuery = require('jquery');
     </script>
-    <script src="../js/jstree.min.js"></script>
     <script src="../js/tether.min.js"></script>
     <script src="../js/bootstrap.min.js"></script>
-    <script src="../js/jquery-resizable.min.js"></script>
+    <script>
+      require('../dist/workspace/renderer.js')
+    </script>
   </head>
   <body>
+    <div class="workspace-sidebar">
+      <div class="split-bar"></div>
 
-      <div class="workspace-container">
-
-          <div class="workspace-left">
-              <div id="tree">
-                <ul>
-                  <li>Root node 1
-                    <ul>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li><a href="#">Child node 2</a></li>
-                    </ul>
-                  </li>
-                  <li>Root node 1
-                    <ul>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li><a href="#">Child node 2</a></li>
-                    </ul>
-                  </li>
-                  <li>Root node 1
-                    <ul>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li>Child node 1</li>
-                      <li><a href="#">Child node 2</a></li>
-                    </ul>
-                  </li>
-                </ul>
-              </div>
+      <div class="workspace-environment">
+        <div class="workspace-environment-header">
+          <span class="collapse-icon"><i class="fa fa-angle-right"></i></span><i class="fab fa-envira"></i> <span class="workspace-environment-text">production</span>
+          <span class="workspace-environment-button"><i class="fas fa-plus"></i></span>
+        </div>
+        <div class="workspace-nodes" style="display: none;">
+          <div class="workspace-node">
+            <span><i class="fa fa-server"></i> vm8.anthillplatform.org</span>
           </div>
-
-          <div class="splitter">
+          <div class="workspace-node">
+            <span><i class="fa fa-server"></i> vm9.anthillplatform.org</span>
           </div>
-
-          <div class="workspace-content">
-              right panel
-          </div>
+        </div>
       </div>
 
-      <!--
 
-      <div id="sidebar"> 
-          <div id="split-bar"></div>
-          <div>
-            
+      <div class="workspace-environment">
+        <div class="workspace-environment-header">
+          <span class="collapse-icon"><i class="fa fa-angle-right"></i></span><i class="fab fa-envira"></i> <span class="workspace-environment-text">vm</span>
+          <span class="workspace-environment-button"><i class="fas fa-plus"></i></span>
+        </div>
+        <div class="workspace-nodes" style="display: none;">
+          <div class="workspace-node">
+            <span><i class="fa fa-server"></i> vm8.anthillplatform.org</span>
           </div>
+          <div class="workspace-node">
+            <span><i class="fa fa-server"></i> vm9.anthillplatform.org</span>
+          </div>
+        </div>
       </div>
-      <div id="main">main</div> 
 
 
-      !-->
-
-    <script>
-      require('../ts/workspace/renderer.js')
-    </script>
-
+    </div>
+    <div class="workspace-contents">
+        main
+    </div>
   </body>
 </html>

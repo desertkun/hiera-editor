@@ -83,6 +83,11 @@ class ProjectsRenderer
     
 }
 
+// @ts-ignore
+window.eval = global.eval = function () {
+    throw new Error(`Sorry, this app does not support window.eval().`)
+};
+
 $(() =>
 {
     renderer = new ProjectsRenderer();

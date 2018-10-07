@@ -26,3 +26,36 @@ html, body {
     min-height:100%;
 }
 
+.workspace-contents {
+    background-color: #f0f0f0;
+    margin-left: 200px;
+    height:100%;
+}
+
+.workspace-sidebar {
+    background-color: #ffffff;
+    width: 350px;
+    float: left;
+    height:100%;
+}
+
+.split-bar {
+    background-color: #c0c0c0;
+    height:100%;
+    float: right;
+    width: 1px;
+    border-right: 6px solid #f0f0f0;
+    cursor: col-resize;
+}
+
+.collapse-icon {
+    display: inline-block;
+    text-align: center;
+    width: 20px;
+    height: 20px;
+}
+
+.selected-item {
+    background-color: #1A7DC4;
+    color: #ffffff;
+}

@@ -2,6 +2,8 @@
 import { Window } from "../window"
 import { puppet } from "../puppet";
 
+const $ = require("jquery");
+
 export class WorkspaceWindow extends Window
 {
     private _workspacePath: string;
@@ -13,6 +15,7 @@ export class WorkspaceWindow extends Window
         this._workspacePath = "";
 
         this.init();
+
     }
 
     public show(workspacePath: string)
@@ -25,7 +28,9 @@ export class WorkspaceWindow extends Window
             "minHeight": 400
         });
 
-        this.generate();
+        this.browserWindow.webContents.toggleDevTools();
+
+        //this.generate();
     }
 
     private init()

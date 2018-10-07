@@ -7,48 +7,55 @@ body {
   overflow: auto;
 }
 
-/* horizontal panel*/
-
-.workspace-container {
-  height: 100%;
-  display: -ms-flexbox;
-  display: -webkit-box;
-  display: -moz-box;
-  display: -ms-box;
-  display: box;
-  
-  -ms-flex-direction: row;
-  -webkit-box-orient: horizontal;
-  -moz-box-orient: horizontal;
-  -ms-box-orient: horizontal;
-  box-orient: horizontal;
-
+.workspace-environment {
+  width: 100%;
+  font-size: 14px;
+  cursor: default;
+  user-select: none;
 }
 
-.workspace-left {
-  width: 200px;
-  min-height: 200px;
-  min-width: 200px;
+.workspace-environment-header {
   white-space: nowrap;
-  -ms-flex: 0 100px;
-  -webkit-box-flex:  0;
-  -moz-box-flex:  0;
-  -ms-box-flex:  0;
-  box-flex:  0; 
-  overflow: scroll;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.splitter {
-  flex: 0 0 auto;
-  width: 8px;
-  min-height: 200px;
-  cursor: col-resize;  
+.workspace-environment-text {
+  font-weight: bold;
 }
 
-.workspace-content {
-  -ms-flex: 1;
-  -webkit-box-flex: 1;
-  -moz-box-flex: 1;
-  -ms-box-flex: 1;
-  box-flex: 1;  
+.workspace-environment-button {
+  float: right;
+  padding: 0 5px;
+  display: none;
+}
+
+.workspace-environment-button:hover {
+  background-color: #dce9ff;
+}
+
+.workspace-environment-header:hover {
+  background-color: #EFF8FF;
+}
+
+.workspace-environment-header:hover .workspace-environment-button {
+  display: inline-block;
+}
+
+.workspace-nodes {
+}
+
+.workspace-node {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 20px;
+}
+
+.workspace-node:hover {
+  background-color: #EFF8FF;
+}
+
+.workspace-environment-opened .workspace-environment-header {
+  border-bottom: 1px solid rgba(15, 49, 81, 0.46);
 }

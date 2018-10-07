@@ -12,7 +12,7 @@ export class ProjectsWindow extends Window
 
     public show()
     {
-        this.openWindow(600, 400, "projects.html", "projects-window.json", {
+        this.openWindow(600, 400, "projects.html", null, {
             "resizable": false
         });
     }

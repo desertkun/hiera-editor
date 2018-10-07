@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <title>Welcome to Hiera Editor</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'">
     <link rel="stylesheet" href="../css/bootstrap.min.css">
     <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
     <link rel="stylesheet" href="../css/bootstrap-reboot.min.css">
@@ -52,7 +53,7 @@
 
     <script>
       // You can also require other files to run in this process
-      require('../ts/projects/renderer.js')
+      require('../dist/projects/renderer.js')
     </script>
   </body>
 </html>

@@ -4,6 +4,7 @@ import { app } from "electron";
 import * as fs from "fs";
 import * as path from "path";
 import * as child_process from "child_process";
+const storage = require('electron-json-storage');
 
 export function fileExists(path: string): Promise<boolean>
 {
