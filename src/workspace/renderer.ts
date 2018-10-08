@@ -8,33 +8,47 @@ const remote = require('electron').remote;
 const storage = require('electron-json-storage');
 
 let renderer: WorkspaceRenderer;
+let selectedNode: any = null;
 
 class NodeRenderer
 {
     private name: string;
+    private path: string;
+    private localPath: string;
 
     private readonly n_parent: any;
     private n_node: any;
+    private n_header: any;
 
-    constructor(name: string, parentNode: any)
+    constructor(name: string, path: string, localPath: string, parentNode: any)
     {
         this.name = name;
+        this.path = path;
+        this.localPath = localPath;
         this.n_parent = parentNode;
         this.render();
     }
 
-    private headerClick()
-    {
-        const i = $(this).find('.workspace-node-text');
-
-        i.addClass('workspace-node-selected');
-    }
-
-
     private render()
     {
-        this.n_node = $('<div class="workspace-node"></div>').appendTo(this.n_parent).click(this.headerClick);
-        const header = $('<span class="workspace-node-text"><i class="fa fa-server"></i> ' +
+        const zis = this;
+
+        this.n_node = $('<div class="workspace-node"></div>').appendTo(this.n_parent).click(() =>
+        {
+            if (selectedNode)
+            {
+                selectedNode.removeClass('workspace-node-selected');
+            }
+
+            selectedNode = zis.n_header;
+            selectedNode.addClass('workspace-node-selected');
+
+            WorkspaceRenderer.OpenPanel("workspace/node.html", {
+                "node": zis.localPath
+            });
+        });
+
+        this.n_header = $('<span class="workspace-node-text"><i class="fa fa-server"></i> ' +
             this.name + '</span>').appendTo(this.n_node);
     }
 }
@@ -108,9 +122,9 @@ class FolderRenderer
 
     }
 
-    public addNode(name: string): NodeRenderer
+    public addNode(name: string, path: string, localPath: string): NodeRenderer
     {
-        const node = new NodeRenderer(name, this.n_nodes);
+        const node = new NodeRenderer(name, path, localPath, this.n_nodes);
         this.nodes.put(name, node);
         return node;
     }
@@ -131,9 +145,9 @@ class FolderRenderer
             await folder.populate(folderEntry);
         }
 
-        for (const nodeName of tree.nodes)
+        for (const nodeEntry of tree.nodes)
         {
-            this.addNode(nodeName);
+            this.addNode(nodeEntry.name, nodeEntry.path, nodeEntry.localPath);
         }
     }
 }
@@ -237,6 +251,10 @@ class WorkspaceRenderer
         {
             this.addEnvironment(environment);
         }
+
+        await ipc.refreshWorkspace();
+
+        WorkspaceRenderer.Enable();
     }
 
     public addEnvironment(name: string): EnvironmentRenderer
@@ -244,6 +262,21 @@ class WorkspaceRenderer
         const environment = new EnvironmentRenderer(name, this.n_workspace);
         this.environments.put(name, environment);
         return environment;
+    }
+
+    static OpenPanel(url: string, data: any = null)
+    {
+        $('#workspace-panel').one("load", function() {
+            const window = $('#workspace-panel')[0].contentWindow;
+            const setup = window.setup;
+            if (setup) setup(data);
+        }).attr("src", url);
+    }
+
+    private static Enable()
+    {
+        $('#workspace').removeClass('disabled');
+        WorkspaceRenderer.OpenPanel("workspace/intro.html");
     }
 
     private initSidebar()
@@ -264,12 +297,13 @@ class WorkspaceRenderer
             }
 
             // noinspection TypeScriptValidateJSTypes
-            $('.split-bar').mousedown(function (e: MouseEvent)
+            $('.split-bar').mousedown(function (e: any)
             {
                 e.preventDefault();
 
-                // noinspection TypeScriptValidateJSTypes
-                $(document).mousemove(function (e: MouseEvent)
+                $('#workspace-panel').addClass('workspace-frame-dragging');
+
+                const move = function (e: any)
                 {
                     e.preventDefault();
 
@@ -279,12 +313,14 @@ class WorkspaceRenderer
                         WorkspaceRenderer.applyWorkspaceSettings(x);
                         zis.saveWorkspaceSettings(x);
                     }
-                })
-            });
+                };
 
-            // noinspection TypeScriptValidateJSTypes
-            $(document).mouseup(function (e: MouseEvent) {
-                $(document).unbind('mousemove');
+                // noinspection TypeScriptValidateJSTypes
+                $(document).on('mousemove', move).mouseup(function (e: any)
+                {
+                    $('#workspace-panel').removeClass('workspace-frame-dragging');
+                    $(document).unbind('mousemove', move);
+                });
             });
         });
     }

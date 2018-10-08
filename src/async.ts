@@ -5,12 +5,132 @@ import * as fs from "fs";
 import * as path from "path";
 import * as child_process from "child_process";
 const storage = require('electron-json-storage');
+const YAML = require('yamljs');
 
 export function fileExists(path: string): Promise<boolean>
 {
     return new Promise<boolean>((resolve, reject) =>
     {
-        fs.stat(path, (err) => 
+        fs.stat(path, (err) =>
+        {
+            resolve(err == null);
+        })
+    });
+}
+
+export function fileStat(path: string): Promise<any>
+{
+    return new Promise<any>((resolve, reject) =>
+    {
+        fs.stat(path, (err, stats) =>
+        {
+            if (err == null)
+            {
+                resolve(stats);
+            }
+            else
+            {
+                resolve(null);
+            }
+        })
+    });
+}
+
+export function readDir(path: string): Promise<any>
+{
+    return new Promise<any>((resolve, reject) =>
+    {
+        fs.readdir(path, function (err, files)
+        {
+            if (err == null)
+            {
+                resolve(files);
+            }
+            else
+            {
+                resolve(null);
+            }
+        });
+    });
+}
+
+
+export async function walk(start: string, callback: any)
+{
+    const stat = await fileStat(start);
+
+    if (!stat.isDirectory())
+    {
+        throw new Error("path: " + start + " is not a directory");
+    }
+
+    const files = await readDir(start);
+
+    for (const fileName of files)
+    {
+        const fullFileName = path.join(start, fileName);
+        const stat = await fileStat(fullFileName);
+
+        if (stat.isDirectory())
+        {
+            await walk(fullFileName, callback);
+        }
+        else
+        {
+            callback(fullFileName, stat);
+        }
+    }
+}
+
+export async function mostRecentFileTime(start: string): Promise<Number>
+{
+    let lastModifiedTime: Number = 0;
+
+    const stat = await fileStat(start);
+
+    if (!stat.isDirectory())
+    {
+        throw new Error("path: " + start + " is not a directory");
+    }
+
+    const files = await readDir(start);
+    const directories: Array<Promise<Number>> = [];
+
+    for (const fileName of files)
+    {
+        const fullFileName = path.join(start, fileName);
+        const stat = await fileStat(fullFileName);
+
+        if (stat.isDirectory())
+        {
+            directories.push(mostRecentFileTime(fullFileName));
+        }
+        else
+        {
+            if (stat.mtimeMs > lastModifiedTime)
+            {
+                lastModifiedTime = stat.mtimeMs;
+            }
+        }
+    }
+
+    const resolved: Array<Number> = await Promise.all(directories);
+    for (const en of resolved)
+    {
+        if (en > lastModifiedTime)
+        {
+            lastModifiedTime = en;
+        }
+    }
+
+    return lastModifiedTime;
+}
+
+export function makeDirectory(path: string): Promise<boolean>
+{
+    return new Promise<boolean>((resolve, reject) =>
+    {
+        fs.mkdir(path, (err) =>
         {
             resolve(err == null);
         })
@@ -21,17 +141,27 @@ export function isDirectory(path: string): Promise<boolean>
 {
     return new Promise<boolean>((resolve, reject) =>
     {
-        fs.lstat(path, (err, stats) => 
+        fs.stat(path, (err) =>
         {
-            if (err)
+            if (err == null)
             {
-                reject(err);
+                fs.lstat(path, (err, stats) =>
+                {
+                    if (err)
+                    {
+                        reject(err);
+                    }
+                    else
+                    {
+                        resolve(stats.isDirectory());
+                    }
+                });
             }
             else
             {
-                resolve(stats.isDirectory());
+                resolve(false);
             }
-        })
+        });
     });
 }
 
@@ -39,17 +169,27 @@ export function isFile(path: string): Promise<boolean>
 {
     return new Promise<boolean>((resolve, reject) =>
     {
-        fs.lstat(path, (err, stats) => 
+        fs.stat(path, (err) =>
         {
-            if (err)
+            if (err == null)
             {
-                reject(err);
+                fs.lstat(path, (err, stats) =>
+                {
+                    if (err)
+                    {
+                        reject(err);
+                    }
+                    else
+                    {
+                        resolve(stats.isFile());
+                    }
+                })
             }
             else
             {
-                resolve(stats.isFile());
+                resolve(false);
             }
-        })
+        });
     });
 }
 
@@ -83,6 +223,34 @@ export function execFile(path: string, args: Array<string>, cwd: string): Promis
         {
             resolve(error == null);
         });
+    });
+}
+
+export function readYAML(filePath: string): Promise<any>
+{
+    return new Promise<any>((resolve, reject) =>
+    {
+        fs.readFile(filePath, "UTF-8", (error, data) =>
+        {
+            if (error)
+            {
+                reject(error)
+            }
+            else
+            {
+
+                let parsed;
+                try
+                {
+                    parsed = YAML.parse(data);
+                    resolve(parsed);
+                }
+                catch (e)
+                {
+                    reject(e);
+                }
+            }
+        })
     });
 }
 
@@ -137,6 +305,36 @@ export function writeJSON(filePath: string, data: any): Promise<any>
                 reject(error)
             } 
             else 
+            {
+                resolve();
+            }
+        })
+    });
+}
+
+export function writeYAML(filePath: string, data: any): Promise<any>
+{
+    return new Promise<any>((resolve, reject) =>
+    {
+        let dumped;
+
+        try
+        {
+            dumped = YAML.stringify(data);
+        }
+        catch (e)
+        {
+            reject(e);
+            return;
+        }
+
+        fs.writeFile(filePath, dumped, "UTF-8", (error) =>
+        {
+            if (error)
+            {
+                reject(error)
+            }
+            else
             {
                 resolve();
             }

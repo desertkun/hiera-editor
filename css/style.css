@@ -59,3 +59,14 @@ html, body {
     background-color: #1A7DC4;
     color: #ffffff;
 }
+
+.vertical-center {
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.disabled {
+    pointer-events: none;
+    opacity: 0.4;
+}

@@ -2,6 +2,8 @@ import * as process from "process";
 import * as path from "path";
 
 import * as async from "./async";
+import {Dictionary} from "./dictionary";
+const slash = require('slash');
 
 export module puppet
 {
@@ -44,10 +46,35 @@ export module puppet
         }
     }
 
+    export class PuppetClassInfo
+    {
+        private _classes: Dictionary<string, any>;
+        private _definedTypes: Dictionary<string, any>;
+
+        constructor(data: any)
+        {
+            this._classes = new Dictionary();
+            this._definedTypes = new Dictionary();
+
+            for (const puppetClass of data["puppet_classes"])
+            {
+                const name: string = puppetClass["name"];
+                this._classes.put(name, puppetClass);
+            }
+
+            for (const definedType of data["defined_types"])
+            {
+                const name: string = definedType["name"];
+                this._definedTypes.put(name, definedType);
+            }
+        }
+    }
+
     export class Workspace
     {
         private readonly _path: string;
         private _name: string;
+        private _puppetClassInfo: PuppetClassInfo;
 
         constructor(path: string)
         {
@@ -59,9 +86,80 @@ export module puppet
             return this._path;
         }
 
+        public async findNode(path: string): Promise<Node>
+        {
+            const entries = path.split("/");
+
+            if (entries.length < 2)
+                return null;
+
+            const environment = entries[0];
+            const env: Environment = await this.getEnvironment(environment);
+            if (env == null)
+                return null;
+            entries.splice(0, 1);
+            return await env.root.findNode(entries);
+        }
+
+        public get cachePath(): string
+        {
+            return path.join(this._path, ".pe-cache");
+        }
+
+        public get modulesPath(): string
+        {
+            return path.join(this._path, "modules");
+        }
+
+        public get cacheModulesFilePath(): string
+        {
+            return path.join(this.cachePath, "modules.json");
+        }
+
         public get name():string 
         {
             return this._name;
+        }
+
+        public async refresh(): Promise<any>
+        {
+            if (!await async.isDirectory(this.cachePath))
+            {
+                if (!await async.makeDirectory(this.cachePath))
+                {
+                    throw "Failed to create cache directory";
+                }
+            }
+
+            const b = this.cacheModulesFilePath;
+            const bStat = await async.fileStat(b);
+            if (bStat)
+            {
+                const mTime: Number = bStat.mtimeMs;
+                const recentTime: Number = await async.mostRecentFileTime(this.modulesPath);
+
+                if (recentTime <= mTime)
+                {
+                    // cache is up to date
+                    await this.loadPuppetClassInfo();
+                    return;
+                }
+
+            }
+
+            const a = JSON.stringify([
+                "*/manifests/**/*.pp", "*/functions/**/*.pp", "*/types/**/*.pp", "*/lib/**/*.rb"
+            ]);
+
+            await puppet.Ruby.Call("puppet-strings.rb", [a, b], this.modulesPath);
+            await this.loadPuppetClassInfo();
+        }
+
+        private async loadPuppetClassInfo(): Promise<PuppetClassInfo>
+        {
+            const data: any = await async.readJSON(this.cacheModulesFilePath);
+            this._puppetClassInfo = new PuppetClassInfo(data);
+            return this._puppetClassInfo;
         }
 
         public async getEnvironment(name: string): Promise<Environment>
@@ -180,7 +278,7 @@ export module puppet
         {
             this._name = name;
             this._path = path;
-            this._root = new Folder("data", this.dataPath);
+            this._root = new Folder("data", this.dataPath, name);
         }
 
         public get root(): Folder
@@ -208,11 +306,25 @@ export module puppet
     {
         private readonly _name: string;
         private readonly _path: string;
+        private readonly _localPath: string;
 
-        constructor(name: string, path: string)
+        constructor(name: string, path: string, localPath: string)
         {
             this._name = name;
             this._path = path;
+            this._localPath = localPath;
+        }
+
+        public async findNode(localPath: Array<string>): Promise<Node>
+        {
+            if (localPath.length > 1)
+            {
+                const dir = await this.getFolder(localPath[0]);
+                localPath.splice(0, 1);
+                return await dir.findNode(localPath);
+            }
+
+            return await this.getNode(localPath[0]);
         }
 
         public async tree(): Promise<any>
@@ -228,7 +340,11 @@ export module puppet
 
             for (const node of await this.getNodes())
             {
-                nodes.push(node.name);
+                nodes.push({
+                    "name": node.name,
+                    "path": node.path,
+                    "localPath": node.localPath
+                });
             }
 
             return {
@@ -238,6 +354,29 @@ export module puppet
             };
         }
 
+        public async getNode(name: string): Promise<Node>
+        {
+            const entryPath = path.join(this._path, Node.NodePath(name));
+
+            if (!await async.isFile(entryPath))
+            {
+                return null;
+            }
+
+            return new Node(name, entryPath, slash(path.join(this._localPath, name)));
+        }
+
+        public async getFolder(name: string): Promise<Folder>
+        {
+            const entryPath = path.join(this._path, name);
+
+            if (!await async.isDirectory(entryPath))
+            {
+                return null;
+            }
+
+            return new Folder(name, entryPath, slash(path.join(this._localPath, name)));
+        }
 
         public async getFolders(): Promise<Array<Folder>>
         {
@@ -259,7 +398,7 @@ export module puppet
 
                 if (await async.isDirectory(entryPath))
                 {
-                    result.push(new Folder(entry, entryPath));
+                    result.push(new Folder(entry, entryPath, slash(path.join(this._localPath, entry))));
                 }
             }
 
@@ -291,7 +430,7 @@ export module puppet
 
                 if (await async.isFile(entryPath))
                 {
-                    result.push(new Node(nodeName, entryPath));
+                    result.push(new Node(nodeName, entryPath, slash(path.join(this._localPath, nodeName))));
                 }
             }
 
@@ -307,17 +446,30 @@ export module puppet
         {
             return this._path;
         }
+
+        public get localPath():string
+        {
+            return this._localPath;
+        }
     }
 
     export class Node
     {
         private readonly _name: string;
         private readonly _path: string;
+        private readonly _localPath: string;
+        private _config: any;
         
-        constructor(name: string, path: string)
+        constructor(name: string, path: string, localPath: string)
         {
             this._name = name;
             this._path = path;
+            this._localPath = localPath;
+        }
+
+        static NodePath(name: string): string
+        {
+            return name + ".yaml";
         }
 
         static ValidatePath(pathName: string): string
@@ -328,6 +480,12 @@ export module puppet
             return pathName.substr(0, pathName.length - 5);
         }
 
+        public async refresh()
+        {
+            this._config = await async.readYAML(this.path);
+            const a = 0;
+        }
+
         public get name():string 
         {
             return this._name;
@@ -336,6 +494,11 @@ export module puppet
         public get path():string
         {
             return this._path;
+        }
+
+        public get localPath():string
+        {
+            return this._localPath;
         }
     }
 

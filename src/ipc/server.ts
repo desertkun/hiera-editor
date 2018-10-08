@@ -79,6 +79,38 @@ register("get-environment-tree", async function(reply: any, name: string): Promi
     return await environment.root.tree();
 });
 
+register("find-node", async function(reply: any, localPath: string): Promise<any>
+{
+    const workspace: puppet.Workspace = getCurrentWorkspace();
+
+    if (workspace == null)
+    {
+        return null;
+    }
+
+    const node = await workspace.findNode(localPath);
+
+    if (node == null)
+    {
+        return null;
+    }
+
+    await node.refresh();
+
+});
+
+register("refresh-workspace", async function(reply: any): Promise<any>
+{
+    const workspace: puppet.Workspace = getCurrentWorkspace();
+
+    if (workspace == null)
+    {
+        return null;
+    }
+
+    await workspace.refresh();
+});
+
 register("show-open-directory-dialog", function(reply: any, defaultPath?: string)
 {
     return new Promise<string>((resolve, reject) => 

@@ -28,22 +28,11 @@ export class WorkspaceWindow extends Window
             "minHeight": 400
         });
 
-        this.browserWindow.webContents.toggleDevTools();
-
-        //this.generate();
+        //this.browserWindow.webContents.toggleDevTools();
     }
 
     private init()
     {
 
-    }
-
-    private async generate()
-    {
-        const a = JSON.stringify(["*/manifests/**/*.pp", "*/functions/**/*.pp", "*/types/**/*.pp", "*/lib/**/*.rb"])
-        const b = "out.json";
-        await puppet.Ruby.Call("puppet-strings.rb", [a, b], "C:\\Work\\puppet-anthill-dev\\modules");
-
-        const fe = 1;
     }
 }
