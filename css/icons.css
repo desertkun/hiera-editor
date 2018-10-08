@@ -1,0 +1,12 @@
+
+.ic-environment {
+  background: url("../images/environment.png");
+}
+
+.ic {
+  display: inline-block;
+  background-size: cover;
+  vertical-align: middle;
+  width: 16px;
+  height: 16px;
+}

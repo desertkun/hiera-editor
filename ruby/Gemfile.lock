@@ -58,6 +58,3 @@ DEPENDENCIES
   puppet-strings
   rdoc
   yard
-
-BUNDLED WITH
-   1.16.6

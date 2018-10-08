@@ -7,7 +7,7 @@
     "start": "electron .",
     "debug:win32": "electron %NODE_DEBUG_OPTION% .",
     "debug:osx": "electron $NODE_DEBUG_OPTION .",
-    "postinstall": "npmpd && run-script-os",
+    "postinstall": "npmpd && npx run-script-os",
     "install:darwin": "BUNDLE_GEMFILE=./ruby/Gemfile ./node_modules/traveling-ruby-osx/bin/bundle install",
     "install:win32": "cmd /C \"set BUNDLE_GEMFILE=ruby\\Gemfile && node_modules\\traveling-ruby-win32\\bin\\gem install --bindir node_modules\\traveling-ruby-win32\\bin.real --no-ri --no-rdoc bundler && node_modules\\traveling-ruby-win32\\bin\\bundle install\""
   },
@@ -33,8 +33,7 @@
     "install": "^0.10.2",
     "jquery": "^3.2.1",
     "npm": "^5.6.0",
-    "text-ellipsis": "^1.0.3",
-    "traveling-ruby-win32": "^2.2.1"
+    "text-ellipsis": "^1.0.3"
   },
   "darwinDependencies": {
     "traveling-ruby-osx": "latest"

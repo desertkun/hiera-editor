@@ -20,8 +20,38 @@ body {
   text-overflow: ellipsis;
 }
 
+.workspace-folder {
+  padding-left: 18px;
+  width: 100%;
+  font-size: 14px;
+  cursor: default;
+  user-select: none;
+}
+
+.workspace-folder-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.workspace-folder-text {
+  padding: 6px;
+}
+
+.workspace-folder-header:hover .workspace-folder-text {
+  background-color: #DBF1FF;
+  border-radius: 6px;
+}
+
+.workspace-folder-header {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
 .workspace-environment-text {
   font-weight: bold;
+  padding: 6px;
 }
 
 .workspace-environment-button {
@@ -34,12 +64,22 @@ body {
   background-color: #dce9ff;
 }
 
-.workspace-environment-header:hover {
-  background-color: #EFF8FF;
+.workspace-environment-header:hover .workspace-environment-text {
+  background-color: #DBF1FF;
+  border-radius: 6px;
 }
 
 .workspace-environment-header:hover .workspace-environment-button {
   display: inline-block;
+}
+
+div.workspace-nodes-empty {
+  display: none;
+  padding-left: 24px;
+}
+
+div.workspace-nodes-empty:only-child {
+  display: block;
 }
 
 .workspace-nodes {
@@ -52,10 +92,24 @@ body {
   padding-left: 20px;
 }
 
-.workspace-node:hover {
-  background-color: #EFF8FF;
+.workspace-node-text {
+  padding: 6px;
+}
+
+.workspace-node:hover .workspace-node-text {
+  background-color: #DBF1FF;
+  border-radius: 6px;
 }
 
 .workspace-environment-opened .workspace-environment-header {
-  border-bottom: 1px solid rgba(15, 49, 81, 0.46);
+  /* border-bottom: 1px solid rgb(239, 239, 239); */
+}
+
+.workspace-folder-opened .workspace-folder-header {
+}
+
+.workspace-node-selected {
+  background-color: #2082ff !important;
+  color: #fff;
+  border-radius: 6px;
 }

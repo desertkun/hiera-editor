@@ -46,7 +46,7 @@ export module puppet
 
     export class Workspace
     {
-        private _path: string;
+        private readonly _path: string;
         private _name: string;
 
         constructor(path: string)
@@ -64,7 +64,26 @@ export module puppet
             return this._name;
         }
 
-        public async listEnvironments(): Promise<Array<string>>
+        public async getEnvironment(name: string): Promise<Environment>
+        {
+            const environmentsPath = path.join(this._path, "environments");
+
+            if (!await async.isDirectory(environmentsPath))
+            {
+                return null;
+            }
+
+            const environmentPath = path.join(environmentsPath, name);
+
+            if (!await async.isDirectory(environmentsPath))
+            {
+                return null;
+            }
+
+            return new Environment(name, environmentPath);
+        }
+
+        public async listEnvironments(): Promise<Array<Environment>>
         {
             const environmentsPath = path.join(this._path, "environments");
 
@@ -74,16 +93,17 @@ export module puppet
             }
 
             const dirs: string[] = await async.listFiles(environmentsPath);
-            const result: Array<string> = [];
+            const result: Array<Environment> = [];
 
-            for (const dirname of dirs)
+            for (const directoryName of dirs)
             {
-                const dir: string = path.join(environmentsPath, dirname);
+                const dir: string = path.join(environmentsPath, directoryName);
 
                 if (!await async.isDirectory(dir))
                     continue;
-                
-                result.push(dirname);
+
+                const env: Environment = new Environment(directoryName, dir);
+                result.push(env);
             }
 
             return result;
@@ -152,13 +172,25 @@ export module puppet
 
     export class Environment
     {
-        private _name: string;
-        private _path: string;
+        private readonly _name: string;
+        private readonly _path: string;
+        private readonly _root: Folder;
         
         constructor(name: string, path: string)
         {
             this._name = name;
             this._path = path;
+            this._root = new Folder("data", this.dataPath);
+        }
+
+        public get root(): Folder
+        {
+            return this._root;
+        }
+
+        public get dataPath(): string
+        {
+            return path.join(this._path, "data");
         }
 
         public get name():string 
@@ -172,24 +204,144 @@ export module puppet
         }
     }
 
-    export class Node
+    export class Folder
     {
-        private _name: string;
-        
-        constructor(name: string)
+        private readonly _name: string;
+        private readonly _path: string;
+
+        constructor(name: string, path: string)
         {
             this._name = name;
+            this._path = path;
+        }
+
+        public async tree(): Promise<any>
+        {
+            const folders: any = [];
+
+            for (const folder of await this.getFolders())
+            {
+                folders.push(await folder.tree());
+            }
+
+            const nodes: any = [];
+
+            for (const node of await this.getNodes())
+            {
+                nodes.push(node.name);
+            }
+
+            return {
+                "name": this._name,
+                "folders": folders,
+                "nodes": nodes
+            };
+        }
+
+
+        public async getFolders(): Promise<Array<Folder>>
+        {
+            if (!await async.fileExists(this._path))
+            {
+                return [];
+            }
+
+            if (!await async.isDirectory(this._path))
+            {
+                return [];
+            }
+
+            const result:Array<Folder> = [];
+
+            for (const entry of await async.listFiles(this._path))
+            {
+                const entryPath = path.join(this._path, entry);
+
+                if (await async.isDirectory(entryPath))
+                {
+                    result.push(new Folder(entry, entryPath));
+                }
+            }
+
+            return result;
+        }
+
+        public async getNodes(): Promise<Array<Node>>
+        {
+            if (!await async.fileExists(this._path))
+            {
+                return [];
+            }
+
+            if (!await async.isDirectory(this._path))
+            {
+                return [];
+            }
+
+            const result:Array<Node> = [];
+
+            for (const entry of await async.listFiles(this._path))
+            {
+                const nodeName = Node.ValidatePath(entry);
+
+                if (nodeName == null)
+                    continue;
+
+                const entryPath = path.join(this._path, entry);
+
+                if (await async.isFile(entryPath))
+                {
+                    result.push(new Node(nodeName, entryPath));
+                }
+            }
+
+            return result;
+        }
+
+        public get name():string
+        {
+            return this._name;
+        }
+
+        public get path():string
+        {
+            return this._path;
+        }
+    }
+
+    export class Node
+    {
+        private readonly _name: string;
+        private readonly _path: string;
+        
+        constructor(name: string, path: string)
+        {
+            this._name = name;
+            this._path = path;
+        }
+
+        static ValidatePath(pathName: string): string
+        {
+            if (!pathName.endsWith(".yaml"))
+                return null;
+
+            return pathName.substr(0, pathName.length - 5);
         }
 
         public get name():string 
         {
             return this._name;
         }
+
+        public get path():string
+        {
+            return this._path;
+        }
     }
 
     export class Class
     {
-        private _name: string;
+        private readonly _name: string;
 
         constructor(name: string)
         {

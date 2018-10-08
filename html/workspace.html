@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/font-awesome.min.css">
     <link rel="stylesheet" href="../css/workspace.css">
+    <link rel="stylesheet" href="../css/icons.css">
     <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
     <script type="text/javascript">
       window.$ = window.jQuery = require('jquery');
@@ -24,37 +25,7 @@
     <div class="workspace-sidebar">
       <div class="split-bar"></div>
 
-      <div class="workspace-environment">
-        <div class="workspace-environment-header">
-          <span class="collapse-icon"><i class="fa fa-angle-right"></i></span><i class="fab fa-envira"></i> <span class="workspace-environment-text">production</span>
-          <span class="workspace-environment-button"><i class="fas fa-plus"></i></span>
-        </div>
-        <div class="workspace-nodes" style="display: none;">
-          <div class="workspace-node">
-            <span><i class="fa fa-server"></i> vm8.anthillplatform.org</span>
-          </div>
-          <div class="workspace-node">
-            <span><i class="fa fa-server"></i> vm9.anthillplatform.org</span>
-          </div>
-        </div>
-      </div>
-
-
-      <div class="workspace-environment">
-        <div class="workspace-environment-header">
-          <span class="collapse-icon"><i class="fa fa-angle-right"></i></span><i class="fab fa-envira"></i> <span class="workspace-environment-text">vm</span>
-          <span class="workspace-environment-button"><i class="fas fa-plus"></i></span>
-        </div>
-        <div class="workspace-nodes" style="display: none;">
-          <div class="workspace-node">
-            <span><i class="fa fa-server"></i> vm8.anthillplatform.org</span>
-          </div>
-          <div class="workspace-node">
-            <span><i class="fa fa-server"></i> vm9.anthillplatform.org</span>
-          </div>
-        </div>
-      </div>
-
+      <div id="workspace"></div>
 
     </div>
     <div class="workspace-contents">

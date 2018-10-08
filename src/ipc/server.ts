@@ -41,7 +41,7 @@ register("get-projects-list", async function(reply: any)
     return result
 });
 
-register("get-environments-list", async function(reply: any, path: string)
+register("get-environments-list", async function(reply: any)
 {
     const workspace: puppet.Workspace = getCurrentWorkspace();
 
@@ -50,7 +50,33 @@ register("get-environments-list", async function(reply: any, path: string)
         return [];
     }
 
-    return await workspace.listEnvironments();
+    const names: string[] = [];
+
+    for (const env of await workspace.listEnvironments())
+    {
+        names.push(env.name);
+    }
+
+    return names;
+});
+
+register("get-environment-tree", async function(reply: any, name: string): Promise<any>
+{
+    const workspace: puppet.Workspace = getCurrentWorkspace();
+
+    if (workspace == null)
+    {
+        return null;
+    }
+
+    const environment: puppet.Environment = await workspace.getEnvironment(name);
+
+    if (environment == null)
+    {
+        return null;
+    }
+
+    return await environment.root.tree();
 });
 
 register("show-open-directory-dialog", function(reply: any, defaultPath?: string)

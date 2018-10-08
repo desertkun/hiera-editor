@@ -22,6 +22,11 @@ export class Ipc extends IpcClient
         return this.send("get-environments-list");
     }
 
+    public getEnvironmentTree(environment: string): Promise<any>
+    {
+        return this.send("get-environment-tree", environment);
+    }
+
     public getCurrentWorkspacePath(): Promise<string>
     {
         return this.send("get-current-workspace-path");
