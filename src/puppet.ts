@@ -480,6 +480,13 @@ export module puppet
             return pathName.substr(0, pathName.length - 5);
         }
 
+        public dump()
+        {
+            return {
+                "classes": this._config["classes"] || []
+            }
+        }
+
         public async refresh()
         {
             this._config = await async.readYAML(this.path);

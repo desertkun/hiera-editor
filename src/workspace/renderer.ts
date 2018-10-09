@@ -269,7 +269,7 @@ class WorkspaceRenderer
         $('#workspace-panel').one("load", function() {
             const window = $('#workspace-panel')[0].contentWindow;
             const setup = window.setup;
-            if (setup) setup(data);
+            if (setup) setup(window, data);
         }).attr("src", url);
     }
 

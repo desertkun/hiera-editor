@@ -29,6 +29,7 @@ html, body {
 .workspace-contents {
     background-color: #f0f0f0;
     margin-left: 200px;
+    padding: 6px 6px 6px 0;
     height:100%;
 }
 

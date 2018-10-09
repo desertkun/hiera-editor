@@ -97,6 +97,7 @@ register("find-node", async function(reply: any, localPath: string): Promise<any
 
     await node.refresh();
 
+    return node.dump();
 });
 
 register("refresh-workspace", async function(reply: any): Promise<any>
