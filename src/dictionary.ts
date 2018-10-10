@@ -9,29 +9,28 @@ export interface IDictionary<K, V> {
   
   export class Dictionary<K extends string, V> implements IDictionary<K, V> {
   
-    readonly internalDict: Partial<Record<K, V>>;
+    readonly internalDict: any;
   
     constructor() {
       this.internalDict = {};
     }
   
     public getKeys(): K[] {
-      let keys: K[] = [];
-      for(let key in this.internalDict) {
-        keys.push(key);
-      }
-      return keys;
+      // @ts-ignore
+      return Object.keys(this.internalDict);
     }
   
     public getValues(): V[] {
-      let vals: V[] = [];
-  
-      for(let key in this.internalDict) {
-        // @ts-ignore
-        vals.push(this.internalDict[key]);
-      }
-  
-      return vals;
+      // @ts-ignore
+      return Object.values(this.internalDict);
+    }
+
+    *[Symbol.iterator]()
+    {
+        for (let i of this.internalDict)
+        {
+            yield i;
+        }
     }
   
     public get(key: K): V {

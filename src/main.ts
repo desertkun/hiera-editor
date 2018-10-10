@@ -8,8 +8,6 @@ import "./ipc/server";
 import { ProjectsModel } from "./projects"
 import { init, projects_window } from "./global"
 
-//app.commandLine.appendSwitch('remote-debugging-port', '9229');
-
 function initialize() 
 {
     init();

@@ -226,6 +226,32 @@ export function execFile(path: string, args: Array<string>, cwd: string): Promis
     });
 }
 
+export function execFileInOut(path: string, args: Array<string>, cwd: string, data: string): Promise<string>
+{
+    return new Promise<string>((resolve, reject) =>
+    {
+        const options: child_process.ExecFileOptions = {
+            'cwd': cwd,
+            'maxBuffer': 1024000
+        };
+
+        const process = child_process.execFile(path, args, options, (error: Error, stdout: string, stderr: string) =>
+        {
+            if (error != null)
+            {
+                reject(error);
+            }
+            else
+            {
+                resolve(stdout);
+            }
+        });
+
+        process.stdin.end(data, 'utf-8');
+    });
+}
+
+
 export function readYAML(filePath: string): Promise<any>
 {
     return new Promise<any>((resolve, reject) =>

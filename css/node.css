@@ -1,17 +1,22 @@
 
 .node-entry {
-    width: 192px;
-    height: 96px;
     margin: 4px;
-    text-align: center;
-    border: 1px solid #d6d6d6;
-    background-color: #e2e2e2;
-    border-radius: 2px;
+}
+
+.node-entry-icon {
+    margin-right: 8px;
+    margin-left: 4px;
 }
 
 .node-entry-header {
-    font-size: 15px;
-    color: #080808;
+    display: flex;
+    align-items: center;
+    text-align: left;
+    width: 100%;
+}
+
+.node-entry-class-name {
+    color: #979797;
 }
 
 .node-entry:hover {
@@ -19,7 +24,8 @@
 
 .class-group {
     margin: 4px;
-    border: 6px solid #e6e6e6;
+    /* border: 6px solid #e6e6e6; */
+    /* padding-left: 32px; */
 }
 
 .class-group h4 {
@@ -27,8 +33,6 @@
     background-color: #e6e6e6;
 }
 
-.class-group-entries {
-    display:                 flex;
-    flex-wrap:               wrap;
-    justify-content:         center;
-}
+.class-group-entries {}
+
+.class-group-subgroups {}

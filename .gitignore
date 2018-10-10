@@ -2,3 +2,4 @@ node_modules
 wrappers
 dist
 /ts
+/.idea/workspace.xml

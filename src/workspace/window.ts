@@ -27,8 +27,6 @@ export class WorkspaceWindow extends Window
             "minWidth": 600,
             "minHeight": 400
         });
-
-        //this.browserWindow.webContents.toggleDevTools();
     }
 
     private init()

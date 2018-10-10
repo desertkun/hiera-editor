@@ -21,6 +21,13 @@ class ClassRenderer
         return this._name;
     }
 
+    public get humanName()
+    {
+        return this._name.replace(/_/g, " ").replace(/\w\S*/g, function(txt){
+            return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+        });
+    }
+
     public get fullName()
     {
         return this._fullName;
@@ -76,6 +83,21 @@ class ClassGroupRenderer
         this.classes.push(clazz);
     }
 
+    public isRoot(): boolean
+    {
+        return this.name == "";
+    }
+
+    public get humanName(): string
+    {
+        if (this.parent != null && !this.parent.isRoot())
+        {
+            return this.parent.humanName + "/" + this.name;
+        }
+
+        return this.name;
+    }
+
     public render(rows: any)
     {
         if (this.name == "")
@@ -85,10 +107,11 @@ class ClassGroupRenderer
         else
         {
             this.n_node = $('<div class="class-group"></div>').appendTo(rows);
-            const header = $('<h4><i class="far fa-folder"></i> ' + this.name + '</h4>').appendTo(this.n_node);
+            const header = $('<h4><i class="far fa-folder"></i> ' + this.humanName + '</h4>').appendTo(this.n_node);
         }
 
-        const n_classes = $('<div class="class-group-entries"></div>').appendTo(this.n_node);
+        const n_classes = $('<table class="table table-borderless table-sm class-group-entries"></table>').appendTo(this.n_node);
+        const n_entries = $('<tbody></tbody>').appendTo(n_classes);
 
         this.classes.sort((a: ClassRenderer, b: ClassRenderer) => {
             return a.name.localeCompare(b.name);
@@ -96,10 +119,20 @@ class ClassGroupRenderer
 
         for (const clazz of this.classes)
         {
-            const entry = $('<div class="node-entry"></div>').appendTo(n_classes);
+            const entry = $('<tr></tr>').appendTo(n_entries);
 
-            const icon = $('<span class="node-entry-icon"></span>').appendTo(entry);
-            const header = $('<span class="node-entry-header">' + clazz.name + '</span>').appendTo(entry);
+            {
+                const name = $('<td class="node-entry-header"></td>').appendTo(entry);
+
+                const defaultIcon = $('<span class="node-entry-icon">' +
+                    '<i class="fas fa-puzzle-piece"></i></span>').appendTo(name);
+                const link = $('<a href="#" class="nav-link btn-sm">' + clazz.humanName + '</a>').appendTo(name);
+            }
+
+            {
+                const className = $('<td class="node-entry-class-name">' +  clazz.fullName + '</td>').appendTo(entry);
+
+            }
         }
 
         const n_groups = $('<div class="class-group-subgroups"></div>').appendTo(this.n_node);
