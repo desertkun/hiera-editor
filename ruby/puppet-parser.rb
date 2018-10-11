@@ -1,5 +1,6 @@
 require 'puppet'
 require 'puppet/pops'
+require 'fileutils'
 
 def dump_parse(source, filename, options, show_filename = true)
   output = ""
@@ -24,4 +25,10 @@ def dump_parse(source, filename, options, show_filename = true)
   return output
 end
 
-puts dump_parse(STDIN.read, 'stdin', {}, false)
+export_filename = ARGV[0]
+dirname = File.dirname(export_filename)
+unless File.directory?(dirname)
+  FileUtils.mkdir_p(dirname)
+end
+
+File.open(export_filename, 'w') { |file| file.write(dump_parse(STDIN.read, 'stdin', {}, false)) }

@@ -64,6 +64,7 @@ class PuppetASTBlock extends PuppetASTObject
 class PuppetASTClass extends PuppetASTObject
 {
     private readonly _name: string;
+    private readonly _params: any;
     private readonly _body: PuppetASTObject;
 
     constructor(args: Array<PuppetASTObject>)
@@ -74,6 +75,7 @@ class PuppetASTClass extends PuppetASTObject
 
         this._name = metaData["name"].value;
         this._body = metaData["body"];
+        this._params = metaData["params"] || {};
     }
 
 
@@ -85,6 +87,11 @@ class PuppetASTClass extends PuppetASTObject
     public get body(): PuppetASTObject
     {
         return this._body;
+    }
+
+    public get params(): any
+    {
+        return this._params;
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject

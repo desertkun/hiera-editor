@@ -236,6 +236,8 @@ class WorkspaceRenderer
     {
         this.initSidebar();
 
+        WorkspaceRenderer.OpenPanel("workspace/loading.html");
+
         const path: string = await ipc.getCurrentWorkspacePath();
 
         if (path != null)

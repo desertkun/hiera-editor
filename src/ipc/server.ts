@@ -109,7 +109,9 @@ register("refresh-workspace", async function(reply: any): Promise<any>
         return null;
     }
 
-    await workspace.refresh();
+    await workspace.refresh((progress: number) => {
+        workspace_window.browserWindow.webContents.send("refresh-workspace-progress", progress);
+    });
 });
 
 register("show-open-directory-dialog", function(reply: any, defaultPath?: string)

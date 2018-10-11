@@ -1,9 +1,11 @@
 import * as process from "process";
 import * as path from "path";
+import * as os from "os";
 
 import * as async from "./async";
 import {Dictionary} from "./dictionary";
 const slash = require('slash');
+const PromisePool = require('es6-promise-pool');
 import {PuppetASTParser} from "./puppet/ast";
 
 export module puppet
@@ -30,7 +32,7 @@ export module puppet
             return null;
         }
 
-        public static Call(script: string, args: Array<string>, cwd: string): Promise<boolean>
+        public static async Call(script: string, args: Array<string>, cwd: string): Promise<boolean>
         {
             const rubyScript = require('app-root-path').resolve(path.join("ruby", script));
 
@@ -43,7 +45,16 @@ export module puppet
                 argsTotal.push(arg);
             }
         
-            return async.execFile(Ruby.Path(), argsTotal, cwd);
+            try
+            {
+                await async.execFile(Ruby.Path(), argsTotal, cwd);
+                return true;
+            }
+            catch (e)
+            {
+                console.log("Failed to execute " + script + ": " + e);
+                return false;
+            }
         }
 
         public static CallInOut(script: string, args: Array<string>, cwd: string, data: string): Promise<string>
@@ -74,13 +85,22 @@ export module puppet
             this.info = info;
         }
 
+        public get file(): string
+        {
+            return this.info["file"];
+        }
+
+        public get source(): string
+        {
+            return this.info["source"];
+        }
+
         public dump()
         {
             return {
                 "name": this.name,
                 "file": this.info["file"],
-                "inherits": this.info["inherits"],
-                "defaults": this.info[""]
+                "inherits": this.info["inherits"]
             }
         }
     }
@@ -95,15 +115,40 @@ export module puppet
             this.name = name;
             this.info = info;
         }
+
+        public get source(): string
+        {
+            return this.info["source"];
+        }
+
+        public get file(): string
+        {
+            return this.info["file"];
+        }
+    }
+
+    class CompiledPromisesCallback
+    {
+        public callback: any;
+        public done: number;
+
+        constructor()
+        {
+            this.done = 0;
+        }
     }
 
     export class PuppetModulesInfo
     {
-        private _classes: Dictionary<string, PuppetClassInfo>;
-        private _definedTypes: Dictionary<string, PuppetDefinedTypeInfo>;
+        private readonly _cachePath: string;
+        private readonly _modulesPath: string;
+        private readonly _classes: Dictionary<string, PuppetClassInfo>;
+        private readonly _definedTypes: Dictionary<string, PuppetDefinedTypeInfo>;
 
-        constructor(data: any)
+        constructor(modulesPath: string, cachePath: string, data: any)
         {
+            this._modulesPath = modulesPath;
+            this._cachePath = cachePath;
             this._classes = new Dictionary();
             this._definedTypes = new Dictionary();
 
@@ -118,6 +163,86 @@ export module puppet
                 const name: string = definedType["name"];
                 this._definedTypes.put(name, new PuppetDefinedTypeInfo(name, definedType));
             }
+        }
+
+        public async generateCompilePromises(cb: CompiledPromisesCallback): Promise<Array<any>>
+        {
+            const result: Array<any> = [];
+            const classes = this.classes.getValues();
+
+            const _cachedStats: any = {};
+            const _realStats: any = {};
+
+            for (let clazz of classes)
+            {
+                const file = path.join(this._cachePath, "obj", clazz.file + ".o");
+                const realFile = path.join(this._modulesPath, clazz.file);
+
+                _cachedStats[clazz.file] = async.fileStat(file);
+                _realStats[clazz.file] = async.fileStat(realFile);
+            }
+
+            const cachedStats = await async.PromiseAllObject(_cachedStats);
+            const realStats = await async.PromiseAllObject(_realStats);
+
+            for (let clazz of classes)
+            {
+                const file = path.join(this._cachePath, "obj", clazz.file + ".o");
+                const realFile = path.join(this._modulesPath, clazz.file);
+
+                if (cachedStats[clazz.file])
+                {
+                    const cachedStat = cachedStats[clazz.file];
+                    const cachedTime: Number = cachedStat.mtimeMs;
+
+                    const realStat = realStats[clazz.file];
+                    const realTime: Number = realStat.mtimeMs;
+
+                    if (cachedTime >= realTime)
+                    {
+                        // compiled file is up-to-date
+                        continue;
+                    }
+                }
+
+                try
+                {
+                    async function compile(file: string, modulesPath: string, source: string)
+                    {
+                        console.log("Compiling " + file + "...");
+
+                        try
+                        {
+                            await puppet.Ruby.CallInOut("puppet-parser.rb", [file], modulesPath, source);
+                            console.log("Compiling " + file + " done!");
+                        }
+                        catch (e)
+                        {
+                            console.log("Failed to compile " + file + ": " + e);
+                        }
+
+                        cb.done += 1;
+                        cb.callback(cb.done);
+                    }
+
+                    result.push([compile, file, this._modulesPath, clazz.source]);
+                }
+                catch (e) {
+                    console.log(e);
+                }
+            }
+
+            return result;
+        }
+
+        public get classes(): Dictionary<string, PuppetClassInfo>
+        {
+            return this._classes;
+        }
+
+        public get definedTypes(): Dictionary<string, PuppetDefinedTypeInfo>
+        {
+            return this._definedTypes;
         }
 
         public dump()
@@ -200,7 +325,7 @@ export module puppet
             return this._name;
         }
 
-        public async refresh(): Promise<any>
+        public async refresh(progressCallback: any): Promise<any>
         {
             if (!await async.isDirectory(this.cachePath))
             {
@@ -212,8 +337,7 @@ export module puppet
 
             let upToDate: boolean = false;
 
-            const b = this.cacheModulesFilePath;
-            const bStat = await async.fileStat(b);
+            const bStat = await async.fileStat(this.cacheModulesFilePath);
             if (bStat)
             {
                 const mTime: Number = bStat.mtimeMs;
@@ -227,21 +351,43 @@ export module puppet
 
             }
 
-            const parsedJSONText: string = await puppet.Ruby.CallInOut("puppet-parser.rb", [],
-                this.modulesPath, "class test2 { $kkk = 20} \n  class test ($opt = $test2::kkk) { $kek = 1 }");
-            const parsedObj = JSON.parse(parsedJSONText);
-            const compiledObj = PuppetASTParser.Parse(parsedObj);
-
             if (!upToDate)
             {
                 const a = JSON.stringify([
                     "*/manifests/**/*.pp", "*/functions/**/*.pp", "*/types/**/*.pp", "*/lib/**/*.rb"
                 ]);
 
-                await puppet.Ruby.Call("puppet-strings.rb", [a, b], this.modulesPath);
+                await puppet.Ruby.Call("puppet-strings.rb", [a, this.cacheModulesFilePath], this.modulesPath);
             }
 
-            await this.loadModulesInfo();
+
+            const modulesInfo = await this.loadModulesInfo();
+            const promiseCallback = new CompiledPromisesCallback();
+            const modulesInfoPromises = await modulesInfo.generateCompilePromises(promiseCallback);
+            const originalPoolSize: number = modulesInfoPromises.length;
+
+            function* promiseProducer()
+            {
+                for (const p of modulesInfoPromises)
+                {
+                    yield p[0](p[1], p[2], p[3]);
+                }
+            }
+
+            const logicalCpuCount = Math.max(os.cpus().length - 1, 1);
+
+            const pool = new PromisePool(promiseProducer, logicalCpuCount);
+
+            promiseCallback.callback = (done: number) =>
+            {
+                if (originalPoolSize != 0)
+                {
+                    const progress: number = done / originalPoolSize;
+                    progressCallback(progress);
+                }
+            };
+
+            await pool.start();
 
             const promises: Array<Promise<any>> = [];
             for (const env of await this.listEnvironments())
@@ -255,7 +401,7 @@ export module puppet
         private async loadModulesInfo(): Promise<PuppetModulesInfo>
         {
             const data: any = await async.readJSON(this.cacheModulesFilePath);
-            this._modulesInfo = new PuppetModulesInfo(data);
+            this._modulesInfo = new PuppetModulesInfo(this.modulesPath, this.cachePath, data);
             return this._modulesInfo;
         }
 
@@ -482,7 +628,7 @@ export module puppet
             }
 
             const data: any = await async.readJSON(this.cacheModulesFilePath);
-            this._modulesInfo = new PuppetModulesInfo(data);
+            this._modulesInfo = new PuppetModulesInfo(this.modulesPath, this.cachePath, data);
             return this._modulesInfo;
         }
     }

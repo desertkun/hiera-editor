@@ -165,6 +165,25 @@ export function isDirectory(path: string): Promise<boolean>
     });
 }
 
+export function PromiseAllObject(object: any)
+{
+
+  let promisedProperties: Array<any> = [];
+  const objectKeys = Object.keys(object);
+
+  objectKeys.forEach((key) => promisedProperties.push(object[key]));
+
+  return Promise.all(promisedProperties)
+    .then((resolvedValues) => {
+      return resolvedValues.reduce((resolvedObject, property, index) =>
+      {
+        resolvedObject[objectKeys[index]] = property;
+        return resolvedObject;
+      }, object);
+    });
+
+}
+
 export function isFile(path: string): Promise<boolean>
 {
     return new Promise<boolean>((resolve, reject) =>
@@ -210,7 +229,7 @@ export function listFiles(path: string): Promise<string[]>
     });
 }
 
-export function execFile(path: string, args: Array<string>, cwd: string): Promise<boolean>
+export function execFile(path: string, args: Array<string>, cwd: string): Promise<any>
 {
     return new Promise<boolean>((resolve, reject) =>
     {
@@ -219,9 +238,16 @@ export function execFile(path: string, args: Array<string>, cwd: string): Promis
             'maxBuffer': 1024000
         };
 
-        child_process.execFile(path, args, options, (error: Error, stdout: string, stderr: string) => 
+        child_process.execFile(path, args, options, (error: Error, stdout: string, stderr: string) =>
         {
-            resolve(error == null);
+            if (error != null)
+            {
+                reject(error);
+            }
+            else
+            {
+                resolve();
+            }
         });
     });
 }
