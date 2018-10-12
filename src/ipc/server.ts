@@ -100,6 +100,25 @@ register("find-node", async function(reply: any, localPath: string): Promise<any
     return node.dump();
 });
 
+register("get-class-info", async function(reply: any, env: string): Promise<any>
+{
+    const workspace: puppet.Workspace = getCurrentWorkspace();
+
+    if (workspace == null)
+    {
+        return null;
+    }
+
+    const environment = await workspace.getEnvironment(env);
+
+    if (environment == null)
+    {
+        return null;
+    }
+
+    return environment.getClassInfo();
+});
+
 register("refresh-workspace", async function(reply: any): Promise<any>
 {
     const workspace: puppet.Workspace = getCurrentWorkspace();
@@ -111,6 +130,8 @@ register("refresh-workspace", async function(reply: any): Promise<any>
 
     await workspace.refresh((progress: number) => {
         workspace_window.browserWindow.webContents.send("refresh-workspace-progress", progress);
+    }, (text: string) => {
+        workspace_window.browserWindow.webContents.send("refresh-workspace-category", text);
     });
 });
 

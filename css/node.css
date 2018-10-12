@@ -16,7 +16,22 @@
 }
 
 .node-entry-class-name {
-    color: #979797;
+    color: #b0b0b0;
+    font-family: "Courier New";
+    font-size: 12px;
+    padding-left: 8px;
+}
+
+.node-entry-description {
+    color: #453e41;
+    padding-left: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.node-entry-class-name:hover {
+    color: #000000;
 }
 
 .node-entry:hover {

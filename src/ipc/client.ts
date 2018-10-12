@@ -32,6 +32,11 @@ export class Ipc extends IpcClient
         return this.send("find-node", nodePath);
     }
 
+    public getClassInfo(env: string): Promise<any>
+    {
+        return this.send("get-class-info", env);
+    }
+
     public getEnvironmentTree(environment: string): Promise<any>
     {
         return this.send("get-environment-tree", environment);

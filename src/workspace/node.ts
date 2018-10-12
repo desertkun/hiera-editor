@@ -119,20 +119,29 @@ class ClassGroupRenderer
 
         for (const clazz of this.classes)
         {
+            const classInfo = renderer.classInfo.classes[clazz.fullName];
+
+            if (classInfo == null)
+                continue;
+
             const entry = $('<tr></tr>').appendTo(n_entries);
+            const name = $('<td class="node-entry-header"></td>').appendTo(entry);
 
+            const icon = $('<span class="node-entry-icon"></span>').appendTo(name);
+
+            const iconData = classInfo.options.icon;
+            if (iconData != null)
             {
-                const name = $('<td class="node-entry-header"></td>').appendTo(entry);
-
-                const defaultIcon = $('<span class="node-entry-icon">' +
-                    '<i class="fas fa-puzzle-piece"></i></span>').appendTo(name);
-                const link = $('<a href="#" class="nav-link btn-sm">' + clazz.humanName + '</a>').appendTo(name);
+                $('<img src="' + iconData + '" style="width: 16px; height: 16px;">').appendTo(icon);
+            }
+            else
+            {
+                $('<i class="fas fa-puzzle-piece"></i>').appendTo(icon);
             }
 
-            {
-                const className = $('<td class="node-entry-class-name">' +  clazz.fullName + '</td>').appendTo(entry);
-
-            }
+            $('<a href="#" class="nav-link btn-sm">' + clazz.humanName + '</a>').appendTo(name);
+            $('<span class="node-entry-class-name">' + clazz.fullName + '</span>').appendTo(name);
+            $('<span class="node-entry-description">' + classInfo.description + '</span>').appendTo(name);
         }
 
         const n_groups = $('<div class="class-group-subgroups"></div>').appendTo(this.n_node);
@@ -151,6 +160,7 @@ class NodeRenderer
 {
     private readonly nodePath: string;
     private info: any;
+    private _classInfo: any;
     private window: Window;
     private root: ClassGroupRenderer;
 
@@ -173,11 +183,17 @@ class NodeRenderer
         this.rows.empty();
     }
 
+    public get classInfo()
+    {
+        return this._classInfo
+    }
+
     private async init()
     {
         this.info = await ipc.findNode(this.nodePath);
+        this._classInfo = await ipc.getClassInfo(this.info.env);
 
-        for (const className of this.info["classes"])
+        for (const className of this.info.classes)
         {
             this.root.addClass(new ClassRenderer(className, className));
         }

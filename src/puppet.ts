@@ -78,16 +78,49 @@ export module puppet
     {
         public readonly name: string;
         private readonly info: any;
+        private readonly _options: any;
+        private readonly _description: string;
 
         constructor(name: string, info: any)
         {
             this.name = name;
             this.info = info;
+            this._options = {};
+
+            const docstring = info["docstring"];
+            if (docstring)
+            {
+                this._description = docstring["text"];
+
+                const tags = docstring["tags"];
+                if (tags)
+                {
+                    for (const tag of tags)
+                    {
+                        const tag_name = tag["tag_name"];
+
+                        if (tag_name == "option")
+                        {
+                            this._options[tag["name"]] = tag["opt_name"];
+                        }
+                    }
+                }
+            }
         }
 
         public get file(): string
         {
             return this.info["file"];
+        }
+
+        public get description(): string
+        {
+            return this._description;
+        }
+
+        public get options(): any
+        {
+            return this._options;
         }
 
         public get source(): string
@@ -100,7 +133,9 @@ export module puppet
             return {
                 "name": this.name,
                 "file": this.info["file"],
-                "inherits": this.info["inherits"]
+                "inherits": this.info["inherits"],
+                "description": this.description,
+                "options": this.options
             }
         }
     }
@@ -124,6 +159,14 @@ export module puppet
         public get file(): string
         {
             return this.info["file"];
+        }
+
+        public dump()
+        {
+            return {
+                "name": this.name,
+                "file": this.info["file"]
+            }
         }
     }
 
@@ -245,24 +288,16 @@ export module puppet
             return this._definedTypes;
         }
 
-        public dump()
+        public dump(classes: any, types: any)
         {
-            const classes: any = {};
-            const types: any = {};
-
-            for (const _c of this._classes)
+            for (const _c of this._classes.getValues())
             {
                 classes[_c.name] = _c.dump();
             }
 
-            for (const _t of this._definedTypes)
+            for (const _t of this._definedTypes.getValues())
             {
                 types[_t.name] = _t.dump();
-            }
-
-            return {
-                "classes": classes,
-                "types": types,
             }
         }
     }
@@ -285,9 +320,9 @@ export module puppet
             return this._path;
         }
 
-        public getClassInfo()
+        public getClassInfo(classes: any, types: any)
         {
-            return this._modulesInfo.dump();
+            this._modulesInfo.dump(classes, types);
         }
 
         public async findNode(path: string): Promise<Node>
@@ -325,7 +360,7 @@ export module puppet
             return this._name;
         }
 
-        public async refresh(progressCallback: any): Promise<any>
+        public async refresh(progressCallback: any, updateProgressCategory: any): Promise<any>
         {
             if (!await async.isDirectory(this.cachePath))
             {
@@ -336,6 +371,8 @@ export module puppet
             }
 
             let upToDate: boolean = false;
+
+            updateProgressCategory("Processing classes...");
 
             const bStat = await async.fileStat(this.cacheModulesFilePath);
             if (bStat)
@@ -353,6 +390,8 @@ export module puppet
 
             if (!upToDate)
             {
+                updateProgressCategory("Extracting class info...");
+
                 const a = JSON.stringify([
                     "*/manifests/**/*.pp", "*/functions/**/*.pp", "*/types/**/*.pp", "*/lib/**/*.rb"
                 ]);
@@ -360,46 +399,52 @@ export module puppet
                 await puppet.Ruby.Call("puppet-strings.rb", [a, this.cacheModulesFilePath], this.modulesPath);
             }
 
-
             const modulesInfo = await this.loadModulesInfo();
-            const promiseCallback = new CompiledPromisesCallback();
-            const modulesInfoPromises = await modulesInfo.generateCompilePromises(promiseCallback);
-            const originalPoolSize: number = modulesInfoPromises.length;
 
-            function* promiseProducer()
+            if (modulesInfo != null)
             {
-                for (const p of modulesInfoPromises)
+                const promiseCallback = new CompiledPromisesCallback();
+                const modulesInfoPromises = await modulesInfo.generateCompilePromises(promiseCallback);
+                const originalPoolSize: number = modulesInfoPromises.length;
+
+                function* promiseProducer()
                 {
-                    yield p[0](p[1], p[2], p[3]);
+                    for (const p of modulesInfoPromises)
+                    {
+                        yield p[0](p[1], p[2], p[3]);
+                    }
                 }
+
+                const logicalCpuCount = Math.max(os.cpus().length - 1, 1);
+                const pool = new PromisePool(promiseProducer, logicalCpuCount);
+                promiseCallback.callback = (done: number) =>
+                {
+                    if (originalPoolSize != 0)
+                    {
+                        const progress: number = done / originalPoolSize;
+                        progressCallback(progress);
+                    }
+                };
+
+                updateProgressCategory("Compiling classes...");
+
+                await pool.start();
             }
 
-            const logicalCpuCount = Math.max(os.cpus().length - 1, 1);
-
-            const pool = new PromisePool(promiseProducer, logicalCpuCount);
-
-            promiseCallback.callback = (done: number) =>
-            {
-                if (originalPoolSize != 0)
-                {
-                    const progress: number = done / originalPoolSize;
-                    progressCallback(progress);
-                }
-            };
-
-            await pool.start();
-
-            const promises: Array<Promise<any>> = [];
             for (const env of await this.listEnvironments())
             {
-                promises.push(env.refresh());
+                updateProgressCategory("Processing environment: " + env.name);
+                await env.refresh(progressCallback)
             }
-
-            await Promise.all(promises);
         }
 
         private async loadModulesInfo(): Promise<PuppetModulesInfo>
         {
+            if (!await async.isFile(this.cacheModulesFilePath))
+            {
+                return null;
+            }
+
             const data: any = await async.readJSON(this.cacheModulesFilePath);
             this._modulesInfo = new PuppetModulesInfo(this.modulesPath, this.cachePath, data);
             return this._modulesInfo;
@@ -538,7 +583,7 @@ export module puppet
             this._workspace = workspace;
             this._path = path;
             this._cachePath = cachePath;
-            this._root = new Folder("data", this.dataPath, name);
+            this._root = new Folder(this, "data", this.dataPath, name);
         }
 
         public get root(): Folder
@@ -576,12 +621,21 @@ export module puppet
             return path.join(this.path, "modules");
         }
 
-        public async getClassInfo(): Promise<any>
+        public getClassInfo(): any
         {
-            const globalClassInfo = await this._workspace.getClassInfo();
+            const classes: any = {};
+            const types: any = {};
+
+            const globalClassInfo = this._workspace.getClassInfo(classes, types);
+            const classInfo = this._modulesInfo.dump(classes, types);
+
+            return {
+                "classes": classes,
+                "types": types
+            }
         }
 
-        public async refresh(): Promise<any>
+        public async refresh(progressCallback: any): Promise<any>
         {
             if (!await async.isDirectory(this.cachePath))
             {
@@ -617,14 +671,39 @@ export module puppet
                 }
             }
 
-            await this.loadModuleInfo();
+            const modulesInfo = await this.loadModulesInfo();
+            if (modulesInfo != null)
+            {
+                const promiseCallback = new CompiledPromisesCallback();
+                const modulesInfoPromises = await modulesInfo.generateCompilePromises(promiseCallback);
+                const originalPoolSize: number = modulesInfoPromises.length;
+
+                function* promiseProducer()
+                {
+                    for (const p of modulesInfoPromises)
+                    {
+                        yield p[0](p[1], p[2], p[3]);
+                    }
+                }
+
+                const logicalCpuCount = Math.max(os.cpus().length - 1, 1);
+                const pool = new PromisePool(promiseProducer, logicalCpuCount);
+                promiseCallback.callback = (done: number) =>
+                {
+                    if (originalPoolSize != 0)
+                    {
+                        const progress: number = done / originalPoolSize;
+                        progressCallback(progress);
+                    }
+                };
+            }
         }
 
-        private async loadModuleInfo(): Promise<PuppetModulesInfo>
+        private async loadModulesInfo(): Promise<PuppetModulesInfo>
         {
             if (!await async.isFile(this.cacheModulesFilePath))
             {
-                return;
+                return null;
             }
 
             const data: any = await async.readJSON(this.cacheModulesFilePath);
@@ -633,14 +712,17 @@ export module puppet
         }
     }
 
+
     export class Folder
     {
         private readonly _name: string;
         private readonly _path: string;
+        private readonly _env: Environment;
         private readonly _localPath: string;
 
-        constructor(name: string, path: string, localPath: string)
+        constructor(env: Environment, name: string, path: string, localPath: string)
         {
+            this._env = env;
             this._name = name;
             this._path = path;
             this._localPath = localPath;
@@ -694,7 +776,7 @@ export module puppet
                 return null;
             }
 
-            return new Node(name, entryPath, slash(path.join(this._localPath, name)));
+            return new Node(this._env, name, entryPath, slash(path.join(this._localPath, name)));
         }
 
         public async getFolder(name: string): Promise<Folder>
@@ -706,7 +788,7 @@ export module puppet
                 return null;
             }
 
-            return new Folder(name, entryPath, slash(path.join(this._localPath, name)));
+            return new Folder(this._env, name, entryPath, slash(path.join(this._localPath, name)));
         }
 
         public async getFolders(): Promise<Array<Folder>>
@@ -729,7 +811,7 @@ export module puppet
 
                 if (await async.isDirectory(entryPath))
                 {
-                    result.push(new Folder(entry, entryPath, slash(path.join(this._localPath, entry))));
+                    result.push(new Folder(this._env, entry, entryPath, slash(path.join(this._localPath, entry))));
                 }
             }
 
@@ -761,7 +843,7 @@ export module puppet
 
                 if (await async.isFile(entryPath))
                 {
-                    result.push(new Node(nodeName, entryPath, slash(path.join(this._localPath, nodeName))));
+                    result.push(new Node(this._env, nodeName, entryPath, slash(path.join(this._localPath, nodeName))));
                 }
             }
 
@@ -789,10 +871,12 @@ export module puppet
         private readonly _name: string;
         private readonly _path: string;
         private readonly _localPath: string;
+        private readonly _env: Environment;
         private _config: any;
         
-        constructor(name: string, path: string, localPath: string)
+        constructor(env: Environment, name: string, path: string, localPath: string)
         {
+            this._env = env;
             this._name = name;
             this._path = path;
             this._localPath = localPath;
@@ -814,6 +898,7 @@ export module puppet
         public dump()
         {
             return {
+                "env": this._env.name,
                 "classes": this._config["classes"] || []
             }
         }
