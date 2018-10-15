@@ -7,29 +7,25 @@ body {
   overflow: auto;
 }
 
-.workspace-frame {
-  font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
-  vertical-align:bottom;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  padding: 0;
-  margin: 0;
-}
-
-.workspace-frame-contents {
-    background-color: #f0f0f0;
-}
-
-.workspace-frame-dragging {
-  pointer-events: none;
-}
-
 .workspace-environment {
   width: 100%;
   font-size: 14px;
   cursor: default;
   user-select: none;
+}
+
+.workspace-contents {
+    /* background-color: #f0f0f0; */
+    margin-left: 200px;
+    /* padding: 0 6px 6px 0; */
+    height:100%;
+}
+
+.workspace-sidebar {
+    background-color: #ffffff;
+    width: 350px;
+    float: left;
+    height:100%;
 }
 
 .workspace-environment-header {

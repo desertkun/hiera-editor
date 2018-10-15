@@ -100,6 +100,25 @@ register("find-node", async function(reply: any, localPath: string): Promise<any
     return node.dump();
 });
 
+register("open-node-class", async function(reply: any, nodePath: string, className: string): Promise<any>
+{
+    const workspace: puppet.Workspace = getCurrentWorkspace();
+
+    if (workspace == null)
+    {
+        return null;
+    }
+
+    const node = await workspace.findNode(nodePath);
+
+    if (node == null)
+    {
+        return null;
+    }
+
+    node.openNodeClassWindow(className);
+});
+
 register("get-class-info", async function(reply: any, env: string): Promise<any>
 {
     const workspace: puppet.Workspace = getCurrentWorkspace();

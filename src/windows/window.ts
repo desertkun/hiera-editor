@@ -3,7 +3,7 @@
 import { BrowserWindow, BrowserView } from "electron";
 
 // globals
-import { ipcMain, dialog } from "electron";
+import { app } from "electron";
 
 import * as path from "path";
 import * as url from "url";
@@ -68,7 +68,7 @@ export abstract class Window
     public load(htmlName: string)
     {
         this._window.loadURL(url.format({
-            pathname: path.join(__dirname, "../html/" + htmlName),
+            pathname: path.join(app.getAppPath(), "html", htmlName),
             protocol: "file:",
             slashes: true,
         }));

@@ -1,7 +1,7 @@
 
 import { ProjectsModel } from "./projects"
-import { ProjectsWindow } from "./projects/window"
-import { WorkspaceWindow } from "./workspace/window"
+import { ProjectsWindow } from "./windows/projects/window"
+import { WorkspaceWindow } from "./windows/workspace/window"
 import { puppet } from "./puppet"
 
 export const projects_list: ProjectsModel = new ProjectsModel();

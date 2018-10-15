@@ -1,9 +1,8 @@
-import {ipc} from "../ipc/client";
-import {Dictionary} from "../dictionary";
+import {ipc} from "../../../ipc/client";
+import {Dictionary} from "../../../dictionary";
+import {WorkspaceTab} from "./tab";
 
 const $ = require("jquery");
-
-let renderer: NodeRenderer;
 
 class ClassRenderer
 {
@@ -39,18 +38,18 @@ class ClassGroupRenderer
     private readonly name: string;
     private child: Dictionary<string, ClassGroupRenderer>;
 
-    private node: NodeRenderer;
+    private tab: NodeTab;
     private parent: ClassGroupRenderer;
     private classes: Array<ClassRenderer>;
 
     private n_classes: any;
     private n_node: any;
 
-    constructor(name: string, node: NodeRenderer, parent: ClassGroupRenderer = null)
+    constructor(name: string, tab: NodeTab, parent: ClassGroupRenderer = null)
     {
         this.name = name;
         this.child = new Dictionary();
-        this.node = node;
+        this.tab = tab;
         this.parent = parent;
         this.classes = [];
     }
@@ -62,7 +61,7 @@ class ClassGroupRenderer
             return this.child.get(name);
         }
 
-        const newGroup = new ClassGroupRenderer(name, this.node, this);
+        const newGroup = new ClassGroupRenderer(name, this.tab, this);
         this.child.put(name, newGroup);
         return newGroup;
     }
@@ -110,8 +109,7 @@ class ClassGroupRenderer
             const header = $('<h4><i class="far fa-folder"></i> ' + this.humanName + '</h4>').appendTo(this.n_node);
         }
 
-        const n_classes = $('<table class="table table-borderless table-sm class-group-entries"></table>').appendTo(this.n_node);
-        const n_entries = $('<tbody></tbody>').appendTo(n_classes);
+        const n_entries = $('<div class="class-group-entries"></div>').appendTo(this.n_node);
 
         this.classes.sort((a: ClassRenderer, b: ClassRenderer) => {
             return a.name.localeCompare(b.name);
@@ -119,29 +117,30 @@ class ClassGroupRenderer
 
         for (const clazz of this.classes)
         {
-            const classInfo = renderer.classInfo.classes[clazz.fullName];
+            const classInfo = this.tab.classInfo.classes[clazz.fullName];
 
             if (classInfo == null)
                 continue;
 
-            const entry = $('<tr></tr>').appendTo(n_entries);
-            const name = $('<td class="node-entry-header"></td>').appendTo(entry);
-
-            const icon = $('<span class="node-entry-icon"></span>').appendTo(name);
+            const entry = $('<div class="node-entry"></div>').appendTo(n_entries);
+            const btn = $('<a href="#" class="node-entry-btn btn btn-sm">' +
+                clazz.humanName + '</a>').appendTo(entry).click(async () =>
+            {
+                const result = await ipc.openNodeClass(this.tab.path, clazz.fullName);
+            });
 
             const iconData = classInfo.options.icon;
             if (iconData != null)
             {
-                $('<img src="' + iconData + '" style="width: 16px; height: 16px;">').appendTo(icon);
+                $('<img class="node-entry-icon" src="' + iconData + '" style="width: 16px; height: 16px;">').prependTo(btn);
             }
             else
             {
-                $('<i class="fas fa-puzzle-piece"></i>').appendTo(icon);
+                $('<i class="node-entry-icon fas fa-puzzle-piece"></i>').prependTo(btn);
             }
 
-            $('<a href="#" class="nav-link btn-sm">' + clazz.humanName + '</a>').appendTo(name);
-            $('<span class="node-entry-class-name">' + clazz.fullName + '</span>').appendTo(name);
-            $('<span class="node-entry-description">' + classInfo.description + '</span>').appendTo(name);
+            $('<span class="node-entry-class-name">' + clazz.fullName + '</span>').appendTo(entry);
+            $('<span class="node-entry-description">' + classInfo.description + '</span>').appendTo(entry);
         }
 
         const n_groups = $('<div class="class-group-subgroups"></div>').appendTo(this.n_node);
@@ -156,31 +155,23 @@ class ClassGroupRenderer
     }
 }
 
-class NodeRenderer
+export class NodeTab extends WorkspaceTab
 {
-    private readonly nodePath: string;
     private info: any;
     private _classInfo: any;
-    private window: Window;
+    private _rows: any;
     private root: ClassGroupRenderer;
 
-    constructor(window: Window, nodePath: string)
+    public constructor(path: string, buttonNode: any, contentNode: any)
     {
-        this.nodePath = nodePath;
-        this.window = window;
-        this.root = new ClassGroupRenderer("", this);
+        super(path, buttonNode, contentNode);
 
-        this.init();
+        this.root = new ClassGroupRenderer("", this);
     }
 
     public get rows(): any
     {
-        return $(this.window.document).find('#class-list');
-    }
-
-    private clear()
-    {
-        this.rows.empty();
+        return this._rows;
     }
 
     public get classInfo()
@@ -188,28 +179,42 @@ class NodeRenderer
         return this._classInfo
     }
 
-    private async init()
+    public async init(): Promise<any>
     {
-        this.info = await ipc.findNode(this.nodePath);
+        this.info = await ipc.findNode(this.path);
         this._classInfo = await ipc.getClassInfo(this.info.env);
 
         for (const className of this.info.classes)
         {
             this.root.addClass(new ClassRenderer(className, className));
         }
-
-        this.render();
     }
 
-    private render()
+    public async release(): Promise<any>
     {
-        this.clear();
+
+    }
+
+    public getIcon(): any
+    {
+        return $('<i class="fa fa-server"></i>');
+    }
+
+    public render(): any
+    {
+        this._rows = $('<div class="w-100"></div>').appendTo(this.contentNode);
 
         this.root.render(this.rows);
     }
-}
 
-export async function setup(window: Window, data: any)
-{
-    renderer = new NodeRenderer(window, data.node);
+    public get fullTitle(): string
+    {
+        return this.path;
+    }
+
+    public get shortTitle(): string
+    {
+        const p = this.path.split("/");
+        return p[p.length - 1];
+    }
 }

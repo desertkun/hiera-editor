@@ -6,6 +6,8 @@ import * as async from "./async";
 import {Dictionary} from "./dictionary";
 const slash = require('slash');
 const PromisePool = require('es6-promise-pool');
+
+import {NodeClassWindow} from "./windows/node_class/window";
 import {PuppetASTParser} from "./puppet/ast";
 
 export module puppet
@@ -98,10 +100,11 @@ export module puppet
                     for (const tag of tags)
                     {
                         const tag_name = tag["tag_name"];
+                        const name = tag["name"];
 
-                        if (tag_name == "option")
+                        if (tag_name == "option" && name == "editor")
                         {
-                            this._options[tag["name"]] = tag["opt_name"];
+                            this._options[tag["opt_name"]] = tag["opt_text"];
                         }
                     }
                 }
@@ -720,12 +723,18 @@ export module puppet
         private readonly _env: Environment;
         private readonly _localPath: string;
 
+        private readonly _nodes: Dictionary<string, Node>;
+        private readonly _folders: Dictionary<string, Folder>;
+
         constructor(env: Environment, name: string, path: string, localPath: string)
         {
             this._env = env;
             this._name = name;
             this._path = path;
             this._localPath = localPath;
+
+            this._nodes = new Dictionary();
+            this._folders = new Dictionary();
         }
 
         public async findNode(localPath: Array<string>): Promise<Node>
@@ -767,6 +776,30 @@ export module puppet
             };
         }
 
+        private acquireFolder(env: Environment, name: string, path: string, localPath: string): Folder
+        {
+            if (this._folders.has(name))
+            {
+                return this._folders.get(name);
+            }
+
+            const newFolder = new Folder(env, name, path, localPath);
+            this._folders.put(name, newFolder);
+            return newFolder;
+        }
+
+        private acquireNode(env: Environment, name: string, filePath: string, nodePath: string): Node
+        {
+            if (this._nodes.has(name))
+            {
+                return this._nodes.get(name);
+            }
+
+            const newNode = new Node(env, name, filePath, nodePath);
+            this._nodes.put(name, newNode);
+            return newNode;
+        }
+
         public async getNode(name: string): Promise<Node>
         {
             const entryPath = path.join(this._path, Node.NodePath(name));
@@ -776,7 +809,7 @@ export module puppet
                 return null;
             }
 
-            return new Node(this._env, name, entryPath, slash(path.join(this._localPath, name)));
+            return this.acquireNode(this._env, name, entryPath, slash(path.join(this._localPath, name)));
         }
 
         public async getFolder(name: string): Promise<Folder>
@@ -788,7 +821,7 @@ export module puppet
                 return null;
             }
 
-            return new Folder(this._env, name, entryPath, slash(path.join(this._localPath, name)));
+            return this.acquireFolder(this._env, name, entryPath, slash(path.join(this._localPath, name)));
         }
 
         public async getFolders(): Promise<Array<Folder>>
@@ -811,7 +844,8 @@ export module puppet
 
                 if (await async.isDirectory(entryPath))
                 {
-                    result.push(new Folder(this._env, entry, entryPath, slash(path.join(this._localPath, entry))));
+                    result.push(this.acquireFolder(
+                        this._env, entry, entryPath, slash(path.join(this._localPath, entry))));
                 }
             }
 
@@ -843,7 +877,8 @@ export module puppet
 
                 if (await async.isFile(entryPath))
                 {
-                    result.push(new Node(this._env, nodeName, entryPath, slash(path.join(this._localPath, nodeName))));
+                    result.push(this.acquireNode(
+                        this._env, nodeName, entryPath, slash(path.join(this._localPath, nodeName))));
                 }
             }
 
@@ -869,17 +904,17 @@ export module puppet
     export class Node
     {
         private readonly _name: string;
-        private readonly _path: string;
-        private readonly _localPath: string;
+        private readonly _filePath: string;
+        private readonly _nodePath: string;
         private readonly _env: Environment;
         private _config: any;
-        
-        constructor(env: Environment, name: string, path: string, localPath: string)
+
+        constructor(env: Environment, name: string, filePath: string, nodePath: string)
         {
             this._env = env;
             this._name = name;
-            this._path = path;
-            this._localPath = localPath;
+            this._filePath = filePath;
+            this._nodePath = nodePath;
         }
 
         static NodePath(name: string): string
@@ -909,19 +944,33 @@ export module puppet
             const a = 0;
         }
 
-        public get name():string 
+        public get name():string
         {
             return this._name;
         }
 
         public get path():string
         {
-            return this._path;
+            return this._filePath;
         }
 
         public get localPath():string
         {
-            return this._localPath;
+            return this._nodePath;
+        }
+
+        public hasClass(className: string): boolean
+        {
+            return this._config["classes"].indexOf(className) >= 0
+        }
+
+        public openNodeClassWindow(className: string)
+        {
+            if (!this.hasClass(className))
+                return;
+
+            const window = new NodeClassWindow(this._env.name, this._nodePath, className);
+            window.show();
         }
     }
 

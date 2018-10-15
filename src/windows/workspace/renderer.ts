@@ -1,16 +1,22 @@
-import {ipc} from "../ipc/client";
+import {ipc} from "../../ipc/client";
 
-import {Dictionary} from "../dictionary";
+import {Dictionary} from "../../dictionary";
 
 const $ = require("jquery");
 const ellipsis = require('text-ellipsis');
 const remote = require('electron').remote;
+const electron = require('electron');
 const storage = require('electron-json-storage');
+
+import {NodeTab} from "./tabs/node"
+import {WorkspaceTab, WorkspaceTabConstructor} from "./tabs/tab";
+import {puppet} from "../../puppet";
+import {DefaultTab} from "./tabs/default";
 
 let renderer: WorkspaceRenderer;
 let selectedNode: any = null;
 
-class NodeRenderer
+class NodeTreeItemRenderer
 {
     private name: string;
     private path: string;
@@ -43,9 +49,7 @@ class NodeRenderer
             selectedNode = zis.n_header;
             selectedNode.addClass('workspace-node-selected');
 
-            WorkspaceRenderer.OpenPanel("workspace/node.html", {
-                "node": zis.localPath
-            });
+            renderer.openTab("node:" + zis.localPath);
         });
 
         this.n_header = $('<span class="workspace-node-text"><i class="fa fa-server"></i> ' +
@@ -53,10 +57,10 @@ class NodeRenderer
     }
 }
 
-class FolderRenderer
+class FolderTreeItemRenderer
 {
-    private nodes: Dictionary<string, NodeRenderer>;
-    private folders: Dictionary<string, FolderRenderer>;
+    private nodes: Dictionary<string, NodeTreeItemRenderer>;
+    private folders: Dictionary<string, FolderTreeItemRenderer>;
     private name: string;
     private root: boolean;
 
@@ -122,16 +126,16 @@ class FolderRenderer
 
     }
 
-    public addNode(name: string, path: string, localPath: string): NodeRenderer
+    public addNode(name: string, path: string, localPath: string): NodeTreeItemRenderer
     {
-        const node = new NodeRenderer(name, path, localPath, this.n_nodes);
+        const node = new NodeTreeItemRenderer(name, path, localPath, this.n_nodes);
         this.nodes.put(name, node);
         return node;
     }
 
-    public addFolder(name: string): FolderRenderer
+    public addFolder(name: string): FolderTreeItemRenderer
     {
-        const folder = new FolderRenderer(name, this.n_nodes, false);
+        const folder = new FolderTreeItemRenderer(name, this.n_nodes, false);
         this.folders.put(name, folder);
         return folder;
     }
@@ -141,7 +145,7 @@ class FolderRenderer
         for (const folderEntry of tree.folders)
         {
             const name: string = folderEntry.name;
-            const folder: FolderRenderer = this.addFolder(name);
+            const folder: FolderTreeItemRenderer = this.addFolder(name);
             await folder.populate(folderEntry);
         }
 
@@ -152,9 +156,9 @@ class FolderRenderer
     }
 }
 
-class EnvironmentRenderer
+class EnvironmentTreeItemRenderer
 {
-    private root: FolderRenderer;
+    private root: FolderTreeItemRenderer;
     private name: string;
 
     private n_environment: any;
@@ -169,7 +173,7 @@ class EnvironmentRenderer
 
         this.render();
 
-        this.root = new FolderRenderer("root", this.n_nodes, true);
+        this.root = new FolderTreeItemRenderer("root", this.n_nodes, true);
 
         this.init();
     }
@@ -213,6 +217,17 @@ class EnvironmentRenderer
 
     private async init()
     {
+        electron.ipcRenderer.on('refresh-workspace-category', function(event: any, text: number)
+        {
+            $('#loading-category').text(text);
+        });
+
+        electron.ipcRenderer.on('refresh-workspace-progress', function(event: any, progress: number)
+        {
+            const p = Math.floor(progress * 100);
+            $('#loading-progress').css('width', "" + p + "%");
+        });
+
         const tree = await ipc.getEnvironmentTree(this.name);
         await this.root.populate(tree);
     }
@@ -221,8 +236,12 @@ class EnvironmentRenderer
 class WorkspaceRenderer
 {
     settingsTimer: NodeJS.Timer;
-    environments: Dictionary<string, EnvironmentRenderer>;
+    environments: Dictionary<string, EnvironmentTreeItemRenderer>;
+    tabs: Dictionary<string, WorkspaceTab>;
 
+    private readonly tabClasses: Dictionary<string, WorkspaceTabConstructor>;
+    n_editorTabs: any;
+    n_editorContent: any;
     n_workspace: any;
 
     constructor()
@@ -230,13 +249,18 @@ class WorkspaceRenderer
         this.init();
 
         this.environments = new Dictionary();
+        this.tabs = new Dictionary();
+
+        this.tabClasses = new Dictionary();
+        this.tabClasses.put("node", NodeTab);
+        this.tabClasses.put("default", DefaultTab);
     }
 
     private async init()
     {
         this.initSidebar();
 
-        WorkspaceRenderer.OpenPanel("workspace/loading.html");
+        WorkspaceRenderer.OpenLoading();
 
         const path: string = await ipc.getCurrentWorkspacePath();
 
@@ -256,29 +280,181 @@ class WorkspaceRenderer
 
         await ipc.refreshWorkspace();
 
-        WorkspaceRenderer.Enable();
+        await this.enable();
     }
 
-    public addEnvironment(name: string): EnvironmentRenderer
+    public addEnvironment(name: string): EnvironmentTreeItemRenderer
     {
-        const environment = new EnvironmentRenderer(name, this.n_workspace);
+        const environment = new EnvironmentTreeItemRenderer(name, this.n_workspace);
         this.environments.put(name, environment);
         return environment;
     }
 
-    static OpenPanel(url: string, data: any = null)
+    private static OpenLoading()
     {
-        $('#workspace-panel').one("load", function() {
-            const window = $('#workspace-panel')[0].contentWindow;
-            const setup = window.setup;
-            if (setup) setup(window, data);
-        }).attr("src", url);
+        $('#workspace-contents').html('<div class="vertical-center h-100"><div><p class="text-center">' +
+            '<span class="text text-muted"><i class="fas fa-cog fa-4x fa-spin"></i></span></p>' +
+            '<p class="text-center"><span class="text text-muted" id="loading-category">' +
+            'Please wait while the workspace is updating cache</span></p>' +
+            '<p class="text-center"><div class="progress" style="width: 300px;">' +
+            '<div class="progress-bar progress-bar-striped progress-bar-animated" ' +
+            'id="loading-progress" role="progressbar" aria-valuenow="0" ' +
+            'aria-valuemin="0" aria-valuemax="100" style="width:0">' +
+            '</div></div></p></div></div>');
     }
 
-    private static Enable()
+    private openEditor()
+    {
+        const root = $('#workspace-contents');
+        root.html('');
+        const contents = $('<div class="h-100 h-100" style="display: flex; overflow: hidden; ' +
+            'flex-direction: column;"></div>').appendTo(root);
+
+        this.n_editorTabs = $('<ul class="nav nav-tabs compact" role="tablist"></ul>').appendTo(contents);
+        this.n_editorContent = $('<div class="tab-content w-100 h-100" style="overflow-y: auto;"></div>').appendTo(contents);
+    }
+
+    private async checkEmpty()
+    {
+        const keys = this.tabs.getKeys();
+        if (keys.length == 0)
+        {
+            await this.openTab("default:");
+        }
+        else if (keys.length > 0)
+        {
+            const hasDefault = keys.indexOf("default:") >= 0;
+
+            if (hasDefault && keys.length > 1)
+            {
+                await this.closeTab("default:");
+            }
+        }
+    }
+
+    public async openTab(path: string): Promise<any>
+    {
+        if (this.tabs.has(path))
+        {
+            const tab = this.tabs.get(path);
+
+            $(tab.buttonNode).find('a').tab('show');
+            return;
+        }
+
+        const split = path.split(":");
+        if (split.length != 2)
+            return;
+
+        const fixedPath = split.join("_");
+
+        const _className = split[0];
+        const _path = split[1];
+
+        const _class: WorkspaceTabConstructor = this.tabClasses.get(_className);
+        if (!_class)
+            return;
+
+        const tabButton = $('<li class="nav-item">' +
+            '<a class="nav-link" id="' + fixedPath + '-tab" data-toggle="tab" href="#' + fixedPath + '" ' +
+            'role="tab" aria-controls="' + fixedPath + '" aria-selected="false"></a>' +
+            '</li>').appendTo(this.n_editorTabs);
+
+        const tabContents = $('<div class="tab-pane h-100" id="' + fixedPath +
+            '" role="tabpanel" aria-labelledby="' + fixedPath + '-tab">' +
+            '</div>').appendTo(this.n_editorContent);
+
+        const _tab = new _class(_path, tabButton, tabContents);
+
+        await _tab.init();
+        _tab.render();
+        const _a = $(tabButton).find('a');
+
+        const _icon = _tab.getIcon();
+        if (_icon)
+        {
+            _icon.addClass('tab-icon').appendTo(_a);
+        }
+
+        const shortTitle = _tab.shortTitle;
+        let foundOtherTabWithSameTitle = false;
+
+        for (const otherTab of this.tabs.getValues())
+        {
+            if (otherTab.shortTitle == shortTitle)
+            {
+                otherTab.changeTitle(otherTab.fullTitle);
+                foundOtherTabWithSameTitle = true;
+                break;
+            }
+        }
+
+        $('<span>' + (foundOtherTabWithSameTitle ? _tab.fullTitle : _tab.shortTitle) + '</span>').appendTo(_a);
+
+        if (_tab.canBeClosed)
+        {
+            const _i = $('<i class="fas fa-times close-btn"></i>').appendTo(_a).click(() => {
+                this.closeTab(path);
+            });
+        }
+
+        _a.tab('show');
+
+        this.tabs.put(path, _tab);
+
+        await this.checkEmpty();
+    }
+
+    public async closeTab(path: string): Promise<any>
+    {
+        if (!this.tabs.has(path))
+            return;
+
+        const tab = this.tabs.get(path);
+        await tab.release();
+
+        const btn = tab.buttonNode;
+
+        if (btn.prev().length)
+        {
+            btn.prev().find('a').tab('show');
+        }
+        else if (btn.next().length)
+        {
+            btn.next().find('a').tab('show');
+        }
+
+        btn.remove();
+        tab.contentNode.remove();
+
+        const shortTitle = tab.shortTitle;
+        let cnt = 0;
+        let otherFoundTab = null;
+
+        this.tabs.remove(path);
+
+        for (const otherTab of this.tabs.getValues())
+        {
+            if (otherTab.shortTitle == shortTitle)
+            {
+                cnt++;
+                otherFoundTab = otherTab;
+            }
+        }
+
+        if (cnt == 1)
+        {
+            otherFoundTab.changeTitle(otherFoundTab.shortTitle);
+        }
+
+        await this.checkEmpty();
+    }
+
+    private async enable()
     {
         $('#workspace').removeClass('disabled');
-        WorkspaceRenderer.OpenPanel("workspace/intro.html");
+        this.openEditor();
+        await this.checkEmpty();
     }
 
     private initSidebar()

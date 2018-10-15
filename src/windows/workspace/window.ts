@@ -1,6 +1,6 @@
 
 import { Window } from "../window"
-import { puppet } from "../puppet";
+import { puppet } from "../../puppet";
 
 const $ = require("jquery");
 

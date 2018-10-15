@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <title>Workspace</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src * 'self' data: https:;">
     <link rel="stylesheet" href="../css/bootstrap.min.css">
     <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
     <link rel="stylesheet" href="../css/bootstrap-reboot.min.css">
@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="../css/font-awesome.min.css">
     <link rel="stylesheet" href="../css/workspace.css">
     <link rel="stylesheet" href="../css/icons.css">
+    <link rel="stylesheet" href="../css/node.css">
     <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
     <script type="text/javascript">
       window.$ = window.jQuery = require('jquery');
@@ -18,7 +19,7 @@
     <script src="../js/tether.min.js"></script>
     <script src="../js/bootstrap.min.js"></script>
     <script>
-      require('../dist/workspace/renderer.js')
+      require('../dist/windows/workspace/renderer.js')
     </script>
   </head>
   <body>
@@ -28,9 +29,7 @@
       <div id="workspace" class="disabled"></div>
 
     </div>
-    <div class="workspace-contents">
-        <iframe class="workspace-frame" id="workspace-panel">
-        </iframe>
+    <div class="workspace-contents" id="workspace-contents">
     </div>
   </body>
 </html>

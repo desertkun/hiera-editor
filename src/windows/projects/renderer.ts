@@ -1,5 +1,5 @@
 
-import { ipc } from "../ipc/client";
+import { ipc } from "../../ipc/client";
 
 const $ = require("jquery");
 const ellipsis = require('text-ellipsis');

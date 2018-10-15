@@ -1,18 +1,23 @@
 
 .node-entry {
-    margin: 4px;
-}
-
-.node-entry-icon {
-    margin-right: 8px;
-    margin-left: 4px;
-}
-
-.node-entry-header {
     display: flex;
     align-items: center;
     text-align: left;
     width: 100%;
+    padding: 2px;
+}
+
+.node-entry-btn {
+    color: #007bff;
+}
+
+.node-entry-btn:hover {
+    border-color: #007bff;
+}
+
+.node-entry-icon {
+    margin-right: 8px;
+    color: #000000;
 }
 
 .node-entry-class-name {
@@ -28,6 +33,10 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    position: relative;
+    display: inline;
+    float: left;
+    width: 100%;
 }
 
 .node-entry-class-name:hover {
@@ -48,6 +57,8 @@
     background-color: #e6e6e6;
 }
 
-.class-group-entries {}
+.class-group-entries {
+    width: 100%;
+}
 
 .class-group-subgroups {}
