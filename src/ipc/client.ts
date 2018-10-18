@@ -32,9 +32,9 @@ export class Ipc extends IpcClient
         return this.send("find-node", nodePath);
     }
 
-    public openNodeClass(nodePath: string, className: string): Promise<any>
+    public acquireNodeClass(nodePath: string, className: string): Promise<any>
     {
-        return this.send("open-node-class", nodePath, className);
+        return this.send("acquire-node-class", nodePath, className);
     }
 
     public getClassInfo(env: string): Promise<any>

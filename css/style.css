@@ -63,7 +63,6 @@ html, body {
     padding-bottom: 1px;
     padding-left: 6px;
     padding-right: 6px;
-    overflow-x: auto;
 }
 
 .nav-tabs.compact > li > a {
@@ -97,4 +96,5 @@ html, body {
 }
 
 .nav-tabs.compact .nav-link.active {
+    border-bottom: 1px solid #ffffff;
 }

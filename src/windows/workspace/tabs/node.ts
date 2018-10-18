@@ -1,6 +1,7 @@
 import {ipc} from "../../../ipc/client";
 import {Dictionary} from "../../../dictionary";
 import {WorkspaceTab} from "./tab";
+import {WorkspaceRenderer} from "../renderer";
 
 const $ = require("jquery");
 
@@ -126,7 +127,7 @@ class ClassGroupRenderer
             const btn = $('<a href="#" class="node-entry-btn btn btn-sm">' +
                 clazz.humanName + '</a>').appendTo(entry).click(async () =>
             {
-                const result = await ipc.openNodeClass(this.tab.path, clazz.fullName);
+                const result = await this.tab.renderer.openTab("class", [this.tab.nodePath, clazz.fullName]);
             });
 
             const iconData = classInfo.options.icon;
@@ -162,9 +163,9 @@ export class NodeTab extends WorkspaceTab
     private _rows: any;
     private root: ClassGroupRenderer;
 
-    public constructor(path: string, buttonNode: any, contentNode: any)
+    public constructor(path: Array<string>, buttonNode: any, contentNode: any, renderer: WorkspaceRenderer)
     {
-        super(path, buttonNode, contentNode);
+        super(path, buttonNode, contentNode, renderer);
 
         this.root = new ClassGroupRenderer("", this);
     }
@@ -179,9 +180,14 @@ export class NodeTab extends WorkspaceTab
         return this._classInfo
     }
 
+    public get nodePath()
+    {
+        return this.path[0];
+    }
+
     public async init(): Promise<any>
     {
-        this.info = await ipc.findNode(this.path);
+        this.info = await ipc.findNode(this.nodePath);
         this._classInfo = await ipc.getClassInfo(this.info.env);
 
         for (const className of this.info.classes)
@@ -209,12 +215,12 @@ export class NodeTab extends WorkspaceTab
 
     public get fullTitle(): string
     {
-        return this.path;
+        return this.nodePath;
     }
 
     public get shortTitle(): string
     {
-        const p = this.path.split("/");
+        const p = this.nodePath.split("/");
         return p[p.length - 1];
     }
 }

@@ -7,8 +7,7 @@ import {Dictionary} from "./dictionary";
 const slash = require('slash');
 const PromisePool = require('es6-promise-pool');
 
-import {NodeClassWindow} from "./windows/node_class/window";
-import {PuppetASTParser} from "./puppet/ast";
+import {PuppetASTParser, PuppetASTClass} from "./puppet/ast";
 
 export module puppet
 {
@@ -82,11 +81,13 @@ export module puppet
         private readonly info: any;
         private readonly _options: any;
         private readonly _description: string;
+        private readonly _modules: PuppetModulesInfo;
 
-        constructor(name: string, info: any)
+        constructor(name: string, info: any, modules: PuppetModulesInfo)
         {
             this.name = name;
             this.info = info;
+            this._modules = modules;
             this._options = {};
 
             const docstring = info["docstring"];
@@ -131,6 +132,11 @@ export module puppet
             return this.info["source"];
         }
 
+        public get modulesInfo(): PuppetModulesInfo
+        {
+            return this._modules;
+        }
+
         public dump()
         {
             return {
@@ -147,11 +153,18 @@ export module puppet
     {
         public readonly name: string;
         private readonly info: any;
+        private readonly _modules: PuppetModulesInfo;
 
-        constructor(name: string, info: any)
+        constructor(name: string, info: any, modules: PuppetModulesInfo)
         {
             this.name = name;
             this.info = info;
+            this._modules = modules;
+        }
+
+        public get modulesInfo(): PuppetModulesInfo
+        {
+            return this._modules;
         }
 
         public get source(): string
@@ -201,14 +214,19 @@ export module puppet
             for (const puppetClass of data["puppet_classes"])
             {
                 const name: string = puppetClass["name"];
-                this._classes.put(name, new PuppetClassInfo(name, puppetClass));
+                this._classes.put(name, new PuppetClassInfo(name, puppetClass, this));
             }
 
             for (const definedType of data["defined_types"])
             {
                 const name: string = definedType["name"];
-                this._definedTypes.put(name, new PuppetDefinedTypeInfo(name, definedType));
+                this._definedTypes.put(name, new PuppetDefinedTypeInfo(name, definedType, this));
             }
+        }
+
+        public getCompiledClassPath(fileName: string)
+        {
+            return path.join(this._cachePath, "obj", fileName + ".o");
         }
 
         public async generateCompilePromises(cb: CompiledPromisesCallback): Promise<Array<any>>
@@ -221,7 +239,7 @@ export module puppet
 
             for (let clazz of classes)
             {
-                const file = path.join(this._cachePath, "obj", clazz.file + ".o");
+                const file = this.getCompiledClassPath(clazz.file);
                 const realFile = path.join(this._modulesPath, clazz.file);
 
                 _cachedStats[clazz.file] = async.fileStat(file);
@@ -291,6 +309,21 @@ export module puppet
             return this._definedTypes;
         }
 
+        public get modulesPath(): string
+        {
+            return this._modulesPath;
+        }
+
+        public get cachePath(): string
+        {
+            return this._cachePath;
+        }
+
+        public findClass(className: string): PuppetClassInfo
+        {
+            return this._classes.get(className);
+        }
+
         public dump(classes: any, types: any)
         {
             for (const _c of this._classes.getValues())
@@ -323,9 +356,9 @@ export module puppet
             return this._path;
         }
 
-        public getClassInfo(classes: any, types: any)
+        public get modulesInfo(): PuppetModulesInfo
         {
-            this._modulesInfo.dump(classes, types);
+            return this._modulesInfo;
         }
 
         public async findNode(path: string): Promise<Node>
@@ -577,8 +610,9 @@ export module puppet
         private readonly _path: string;
         private readonly _cachePath: string;
         private readonly _root: Folder;
+        private readonly _workspace: Workspace;
+        private readonly _compiledClasses: Dictionary<string, PuppetASTClass>;
         private _modulesInfo: PuppetModulesInfo;
-        private _workspace: Workspace;
 
         constructor(workspace: Workspace, name: string, path: string, cachePath: string)
         {
@@ -587,11 +621,69 @@ export module puppet
             this._path = path;
             this._cachePath = cachePath;
             this._root = new Folder(this, "data", this.dataPath, name);
+            this._compiledClasses = new Dictionary();
         }
 
         public get root(): Folder
         {
             return this._root;
+        }
+
+        public get workspace(): Workspace
+        {
+            return this._workspace;
+        }
+
+        public async resolveClass(className: string): Promise<PuppetASTClass>
+        {
+            if (this._compiledClasses.has(className))
+            {
+                return this._compiledClasses.get(className);
+            }
+
+            const zis = this;
+            console.log("Compiling class " + className + " (for environment " + this._name + ")");
+
+            const classInfo = this.findClassInfo(className);
+
+            if (classInfo == null)
+                throw Error("No such class info: " + className);
+
+            const compiledPath = classInfo.modulesInfo.getCompiledClassPath(classInfo.file);
+            let parsedJSON = null;
+
+            try
+            {
+                parsedJSON = await async.readJSON(compiledPath);
+            }
+            catch (e)
+            {
+                console.log("Failed to parse class " + className);
+                throw e;
+            }
+
+            const obj = PuppetASTParser.Parse(parsedJSON);
+
+            if (!(obj instanceof PuppetASTClass))
+                throw "Not a class";
+
+            const clazz: PuppetASTClass = obj;
+            await clazz.resolve((className: string) => {
+                return zis.resolveClass(className);
+            });
+
+            this._compiledClasses.put(className, clazz);
+            return clazz;
+        }
+
+        public findClassInfo(className: string): PuppetClassInfo
+        {
+            const localClassInfo = this._modulesInfo.findClass(className);
+
+            if (localClassInfo)
+                return localClassInfo;
+
+            return this._workspace.modulesInfo.findClass(className);
         }
 
         public get dataPath(): string
@@ -629,7 +721,7 @@ export module puppet
             const classes: any = {};
             const types: any = {};
 
-            const globalClassInfo = this._workspace.getClassInfo(classes, types);
+            const globalClassInfo = this._workspace.modulesInfo.dump(classes, types);
             const classInfo = this._modulesInfo.dump(classes, types);
 
             return {
@@ -964,13 +1056,19 @@ export module puppet
             return this._config["classes"].indexOf(className) >= 0
         }
 
-        public openNodeClassWindow(className: string)
+        public async compileClass(className: string)
         {
             if (!this.hasClass(className))
-                return;
+                throw Error("No such class: " + className);
 
-            const window = new NodeClassWindow(this._env.name, this._nodePath, className);
-            window.show();
+            const compiled = await this._env.resolveClass(className);
+            return compiled;
+        }
+
+        public async acquireClass(className: string)
+        {
+            const compiled = await this.compileClass(className);
+            return compiled;
         }
     }
 

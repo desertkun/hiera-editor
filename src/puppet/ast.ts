@@ -1,6 +1,71 @@
+import {WorkspaceRenderer} from "../windows/workspace/renderer";
+import {WorkspaceTab} from "../windows/workspace/tabs/tab";
+import {Dictionary} from "../dictionary";
+
+export type PuppetASTClassResolveCallback = (className: string) => Promise<PuppetASTClass>;
 
 class PuppetASTObject
 {
+    protected _resolved: any;
+    private _beingResolved: boolean;
+
+    public toString(): string
+    {
+        return "" + this._resolved;
+    }
+
+    public async resolve(classResolver: PuppetASTClassResolveCallback): Promise<any>
+    {
+        if (this._resolved || this._beingResolved)
+            return this._resolved;
+
+        this._beingResolved = true;
+
+        try
+        {
+            this._resolved = await this._resolve(classResolver);
+        }
+        finally
+        {
+            this._beingResolved = false;
+        }
+
+        return this._resolved;
+    }
+
+    protected async _resolve(classResolver: PuppetASTClassResolveCallback): Promise<any>
+    {
+        throw "Not implemented";
+    }
+}
+
+class PuppetASTUnknown extends PuppetASTObject
+{
+    private readonly _kind: string;
+    private readonly _args: Array<PuppetASTObject>;
+
+    constructor(kind: string, args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._kind = kind;
+        this._args = args;
+    }
+
+    protected async _resolve(classResolver: PuppetASTClassResolveCallback): Promise<any>
+    {
+        throw "Unknown object of kind " + this._kind;
+    }
+
+    public get kind(): string
+    {
+        return this._kind;
+    }
+
+    public get args(): Array<PuppetASTObject>
+    {
+        return this._args;
+    }
 }
 
 class PuppetASTPrimitive extends PuppetASTObject
@@ -19,12 +84,16 @@ class PuppetASTPrimitive extends PuppetASTObject
         return this._value;
     }
 
+    protected async _resolve(classResolver: PuppetASTClassResolveCallback): Promise<any>
+    {
+        return this._value;
+    }
+
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
     {
         return new PuppetASTPrimitive(args);
     }
 }
-
 
 class PuppetASTList extends PuppetASTObject
 {
@@ -48,6 +117,33 @@ class PuppetASTList extends PuppetASTObject
     }
 }
 
+class PuppetASTType extends PuppetASTObject
+{
+    private readonly _type: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._type = args[0];
+    }
+
+    protected async _resolve(classResolver: PuppetASTClassResolveCallback): Promise<any>
+    {
+        return await this._type.resolve(classResolver)
+    }
+
+    public get type(): PuppetASTObject
+    {
+        return this._type;
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTType(args);
+    }
+}
+
 class PuppetASTBlock extends PuppetASTObject
 {
     constructor(args: Array<PuppetASTObject>)
@@ -61,11 +157,34 @@ class PuppetASTBlock extends PuppetASTObject
     }
 }
 
-class PuppetASTClass extends PuppetASTObject
+class PuppetASTResolvedProperty
+{
+    private readonly _type: string;
+    private readonly _value: string;
+
+    constructor (type: string, value: string)
+    {
+        this._type = type;
+        this._value = value;
+    }
+
+    public get type(): string
+    {
+        return this._type;
+    }
+
+    public get value(): string
+    {
+        return this._value;
+    }
+}
+
+export class PuppetASTClass extends PuppetASTObject
 {
     private readonly _name: string;
     private readonly _params: any;
     private readonly _body: PuppetASTObject;
+    private readonly _resolvedProperties: Dictionary<string, PuppetASTResolvedProperty>;
 
     constructor(args: Array<PuppetASTObject>)
     {
@@ -76,8 +195,8 @@ class PuppetASTClass extends PuppetASTObject
         this._name = metaData["name"].value;
         this._body = metaData["body"];
         this._params = metaData["params"] || {};
+        this._resolvedProperties = new Dictionary();
     }
-
 
     public get name(): any
     {
@@ -89,9 +208,104 @@ class PuppetASTClass extends PuppetASTObject
         return this._body;
     }
 
+    public get resolvedProperties(): Dictionary<string, PuppetASTResolvedProperty>
+    {
+        return this._resolvedProperties;
+    }
+
+    public getResolvedProperty(name: string): PuppetASTResolvedProperty
+    {
+        return this._resolvedProperties.get(name);
+    }
+
     public get params(): any
     {
         return this._params;
+    }
+
+    protected async _resolve(classResolver: PuppetASTClassResolveCallback): Promise<any>
+    {
+        console.log("Resolving class " + this._name);
+
+        for (const paramName in this._params)
+        {
+            const param = this._params[paramName];
+            let type = param.type;
+            const value = param.value;
+
+            if (type instanceof PuppetASTObject)
+            {
+                try
+                {
+                    await type.resolve(classResolver);
+                    type = type.toString();
+                }
+                catch (e)
+                {
+                    console.log("Failed to resolve type for param " + paramName + " (" + type.constructor.name + "): " + e);
+                    type = null;
+                }
+            }
+
+            if (!(value instanceof PuppetASTObject))
+            {
+                continue;
+            }
+
+            let asString: string;
+
+            try
+            {
+                await value.resolve(classResolver);
+                asString = value.toString();
+            }
+            catch (e)
+            {
+                console.log("Failed to resolve param " + paramName + " (" + value.constructor.name + "): " + e);
+                continue;
+            }
+
+            this._resolvedProperties.put(paramName, new PuppetASTResolvedProperty(type, asString));
+        }
+
+        if (this._body instanceof PuppetASTList)
+        {
+            for (const bodyEntry of this._body.entries)
+            {
+                if (bodyEntry instanceof PuppetASTSetInstruction)
+                {
+                    const receiver = bodyEntry.receiver;
+
+                    if (!(receiver instanceof PuppetASTVariable))
+                    {
+                        continue;
+                    }
+
+                    if (receiver.className != "")
+                    {
+                        continue;
+                    }
+
+                    const paramName = receiver.name;
+
+                    const provider = bodyEntry.provider;
+
+                    let asString: string;
+
+                    try
+                    {
+                        await provider.resolve(classResolver);
+                        asString = provider.toString();
+                    }
+                    catch (e)
+                    {
+                        continue;
+                    }
+
+                    this._resolvedProperties.put(paramName, new PuppetASTResolvedProperty(null, asString));
+                }
+            }
+        }
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
@@ -113,6 +327,16 @@ class PuppetASTSetInstruction extends PuppetASTObject
         this._provider = args[1];
     }
 
+    public get receiver(): PuppetASTObject
+    {
+        return this._receiver;
+    }
+
+    public get provider(): PuppetASTObject
+    {
+        return this._provider;
+    }
+
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
     {
         return new PuppetASTSetInstruction(args);
@@ -121,18 +345,42 @@ class PuppetASTSetInstruction extends PuppetASTObject
 
 class PuppetASTVariable extends PuppetASTObject
 {
+    private readonly _fullName: string;
     private readonly _name: string;
+    private readonly _className: string;
 
     constructor(args: Array<PuppetASTObject>)
     {
         super();
 
-        this._name = (<PuppetASTPrimitive>args[0]).value;
+        this._fullName = (<PuppetASTPrimitive>args[0]).value;
+
+        const split = this._fullName.split("::");
+        this._name = split[split.length - 1];
+        split.splice(split.length - 1, 1);
+        this._className = split.join("::");
+    }
+
+    public get fullName(): string
+    {
+        return this._fullName;
     }
 
     public get name(): string
     {
         return this._name;
+    }
+
+    public get className(): string
+    {
+        return this._className;
+    }
+
+    protected async _resolve(classResolver: PuppetASTClassResolveCallback): Promise<any>
+    {
+        const class_:PuppetASTClass = await classResolver(this._className);
+        const resolvedVariable = class_.getResolvedProperty(this._name);
+        return resolvedVariable.value;
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
@@ -152,7 +400,8 @@ export class PuppetASTParser
             "block": PuppetASTBlock.Create,
             "class": PuppetASTClass.Create,
             "=": PuppetASTSetInstruction.Create,
-            "var": PuppetASTVariable.Create
+            "var": PuppetASTVariable.Create,
+            "qr": PuppetASTType.Create
         };
     }
 
@@ -177,8 +426,14 @@ export class PuppetASTParser
                 }
                 else
                 {
+                    isCall.splice(0, 1);
+                    const args = [];
+                    for (const arg of isCall)
+                    {
+                        args.push(this.parse(arg));
+                    }
                     console.log("Warning: unsupported kind of call: " + kind);
-                    return null;
+                    return new PuppetASTUnknown(kind, args);
                 }
             }
             else if (obj.hasOwnProperty("#"))

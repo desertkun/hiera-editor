@@ -100,7 +100,7 @@ register("find-node", async function(reply: any, localPath: string): Promise<any
     return node.dump();
 });
 
-register("open-node-class", async function(reply: any, nodePath: string, className: string): Promise<any>
+register("acquire-node-class", async function(reply: any, nodePath: string, className: string): Promise<any>
 {
     const workspace: puppet.Workspace = getCurrentWorkspace();
 
@@ -116,7 +116,7 @@ register("open-node-class", async function(reply: any, nodePath: string, classNa
         return null;
     }
 
-    node.openNodeClassWindow(className);
+    return await node.acquireClass(className);
 });
 
 register("get-class-info", async function(reply: any, env: string): Promise<any>

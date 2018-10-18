@@ -1,22 +1,26 @@
+import {WorkspaceRenderer} from "../renderer";
 
 const $ = require("jquery");
 
-export type WorkspaceTabConstructor = new (path: string, button_node: any, content_node: any) => WorkspaceTab;
+export type WorkspaceTabConstructor = new (path: Array<string>, button_node: any, content_node: any,
+                                           renderer: WorkspaceRenderer) => WorkspaceTab;
 
 export abstract class WorkspaceTab
 {
-    private readonly _path: string;
+    private readonly _path: Array<string>;
     private readonly _buttonNode: any;
     private readonly _contentNode: any;
+    private readonly _renderer: WorkspaceRenderer;
 
-    public constructor(path: string, buttonNode: any, contentNode: any)
+    public constructor(path: Array<string>, buttonNode: any, contentNode: any, renderer: WorkspaceRenderer)
     {
         this._path = path;
         this._buttonNode = buttonNode;
         this._contentNode = contentNode;
+        this._renderer = renderer;
     }
 
-    public get path(): string
+    public get path(): Array<string>
     {
         return this._path;
     }
@@ -29,6 +33,11 @@ export abstract class WorkspaceTab
     public get contentNode(): any
     {
         return this._contentNode;
+    }
+
+    public get renderer(): WorkspaceRenderer
+    {
+        return this._renderer;
     }
 
     public get canBeClosed()

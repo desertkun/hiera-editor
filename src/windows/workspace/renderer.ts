@@ -10,8 +10,10 @@ const storage = require('electron-json-storage');
 
 import {NodeTab} from "./tabs/node"
 import {WorkspaceTab, WorkspaceTabConstructor} from "./tabs/tab";
-import {puppet} from "../../puppet";
 import {DefaultTab} from "./tabs/default";
+import {NodeClassTab} from "./tabs/class";
+
+import {puppet} from "../../puppet";
 
 let renderer: WorkspaceRenderer;
 let selectedNode: any = null;
@@ -49,7 +51,7 @@ class NodeTreeItemRenderer
             selectedNode = zis.n_header;
             selectedNode.addClass('workspace-node-selected');
 
-            renderer.openTab("node:" + zis.localPath);
+            renderer.openTab("node", [zis.localPath]);
         });
 
         this.n_header = $('<span class="workspace-node-text"><i class="fa fa-server"></i> ' +
@@ -233,7 +235,7 @@ class EnvironmentTreeItemRenderer
     }
 }
 
-class WorkspaceRenderer
+export class WorkspaceRenderer
 {
     settingsTimer: NodeJS.Timer;
     environments: Dictionary<string, EnvironmentTreeItemRenderer>;
@@ -254,6 +256,7 @@ class WorkspaceRenderer
         this.tabClasses = new Dictionary();
         this.tabClasses.put("node", NodeTab);
         this.tabClasses.put("default", DefaultTab);
+        this.tabClasses.put("class", NodeClassTab);
     }
 
     private async init()
@@ -319,39 +322,37 @@ class WorkspaceRenderer
         const keys = this.tabs.getKeys();
         if (keys.length == 0)
         {
-            await this.openTab("default:");
+            await this.openTab("default", []);
         }
         else if (keys.length > 0)
         {
-            const hasDefault = keys.indexOf("default:") >= 0;
+            const hasDefault = keys.indexOf("default") >= 0;
 
             if (hasDefault && keys.length > 1)
             {
-                await this.closeTab("default:");
+                await this.closeTab(["default"]);
             }
         }
     }
 
-    public async openTab(path: string): Promise<any>
+    public async openTab(kind: string, path: Array<string>): Promise<any>
     {
-        if (this.tabs.has(path))
+        const key = path.length > 0 ? kind + "_" + path.join("_") : kind;
+
+        if (this.tabs.has(key))
         {
-            const tab = this.tabs.get(path);
+            const tab = this.tabs.get(key);
 
             $(tab.buttonNode).find('a').tab('show');
             return;
         }
 
-        const split = path.split(":");
-        if (split.length != 2)
+        if (path.length < 1)
             return;
 
-        const fixedPath = split.join("_");
+        const fixedPath = key.replace(/:/g, '_');
 
-        const _className = split[0];
-        const _path = split[1];
-
-        const _class: WorkspaceTabConstructor = this.tabClasses.get(_className);
+        const _class: WorkspaceTabConstructor = this.tabClasses.get(kind);
         if (!_class)
             return;
 
@@ -364,7 +365,7 @@ class WorkspaceRenderer
             '" role="tabpanel" aria-labelledby="' + fixedPath + '-tab">' +
             '</div>').appendTo(this.n_editorContent);
 
-        const _tab = new _class(_path, tabButton, tabContents);
+        const _tab = new _class(path, tabButton, tabContents, this);
 
         await _tab.init();
         _tab.render();
@@ -400,17 +401,19 @@ class WorkspaceRenderer
 
         _a.tab('show');
 
-        this.tabs.put(path, _tab);
+        this.tabs.put(key, _tab);
 
         await this.checkEmpty();
     }
 
-    public async closeTab(path: string): Promise<any>
+    public async closeTab(path: Array<string>): Promise<any>
     {
-        if (!this.tabs.has(path))
+        const key = path.join("_");
+
+        if (!this.tabs.has(key))
             return;
 
-        const tab = this.tabs.get(path);
+        const tab = this.tabs.get(key);
         await tab.release();
 
         const btn = tab.buttonNode;
@@ -431,7 +434,7 @@ class WorkspaceRenderer
         let cnt = 0;
         let otherFoundTab = null;
 
-        this.tabs.remove(path);
+        this.tabs.remove(key);
 
         for (const otherTab of this.tabs.getValues())
         {
