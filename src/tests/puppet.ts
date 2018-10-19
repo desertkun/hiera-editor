@@ -97,6 +97,7 @@ async function testSimpleWorkspace(files: any, nodeYAML: any,
 
 describe('Workspaces', () =>
 {
+    /*
     it('missing directory', () =>
     {
         return expect(testRealWorkspace("missing...", "dev", "test")).to.be.rejectedWith(puppet.WorkspaceError);
@@ -214,12 +215,11 @@ describe('Workspaces', () =>
                   $v = "Hello, $\{::hostname\}!"
                 }
             `
-        }, {"classes": ["test"]}, async (
+        }, {"classes": ["test"], "facts": {"hostname": "myhost"}}, async (
             workspace: puppet.Workspace,
             environment: puppet.Environment,
             node: puppet.Node) =>
         {
-            node.global.put("hostname", "myhost");
             const class_ = await node.acquireClass("test");
             expect(class_.getResolvedProperty("v").value).to.equal("Hello, myhost!");
         });
@@ -407,5 +407,30 @@ describe('Workspaces', () =>
 
         });
     });
+
+    */
+
+    it('functors', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test (
+                ) {
+                    fail("Welp");
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            const class_ = await node.acquireClass("test");
+
+            expect(class_.getResolvedProperty("v").value).to.be.equal("it_was_b");
+            expect(class_.getResolvedProperty("b").value).to.be.equal("ddddd");
+
+        });
+    });
+
 });
 

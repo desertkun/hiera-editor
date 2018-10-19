@@ -1,8 +1,11 @@
 
 import {Dictionary} from "../dictionary";
 
+type ResolverHint = (obj: any) => void;
+
 export abstract class Resolver
 {
+    public hint: ResolverHint;
     public async abstract resolveClass(className: string): Promise<PuppetASTClass>;
     public async abstract resolveGlobalVariable(name: string): Promise<string>;
 }
@@ -59,6 +62,73 @@ class ResolveError extends Error
     }
 }
 
+type PuppetASTInvokeFunctor = (invoke: PuppetASTInvoke, args: Array<any>,
+                               context: PuppetASTClass, resolver: Resolver) => Promise<any>;
+
+export class PuppetASTInvoke extends PuppetASTObject
+{
+    private readonly _functor: PuppetASTQualifiedName;
+    private readonly _args: PuppetASTList;
+
+    private static readonly InvokeFunctions: any =
+    {
+        "fail": async function(invoke: PuppetASTInvoke, args: Array<any>,
+                               context: PuppetASTClass, resolver: Resolver)
+        {
+            throw new ResolveError(invoke, args[0]);
+        },
+        "require": async function(invoke: PuppetASTInvoke, args: Array<any>,
+                                  context: PuppetASTClass, resolver: Resolver)
+        {
+            await resolver.resolveClass(args[0]);
+        }
+    };
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        const obj: any = args[0];
+        this._functor = obj["functor"];
+        this._args = obj["args"];
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        const functorName: string = await this._functor.resolve(context, resolver);
+
+        if (!PuppetASTInvoke.InvokeFunctions.hasOwnProperty(functorName))
+        {
+            throw new ResolveError(this, "Unknown function: " + functorName);
+        }
+
+        const f: PuppetASTInvokeFunctor = PuppetASTInvoke.InvokeFunctions[functorName];
+
+        const resolvedArgs = [];
+        for (const arg of this._args.entries)
+        {
+            resolvedArgs.push(await arg.resolve(context, resolver))
+        }
+
+        return await f(this, resolvedArgs, context, resolver);
+    }
+
+    public get functor(): PuppetASTQualifiedName
+    {
+        return this._functor;
+    }
+
+    public get args(): PuppetASTList
+    {
+        return this._args;
+    }
+
+    public static Create(args: Array<PuppetASTObject>)
+    {
+        return new PuppetASTInvoke(args);
+    }
+}
+
 export class PuppetASTUnknown extends PuppetASTObject
 {
     private readonly _kind: string;
@@ -90,6 +160,36 @@ export class PuppetASTUnknown extends PuppetASTObject
     public get args(): Array<PuppetASTObject>
     {
         return this._args;
+    }
+}
+
+export class PuppetASTIgnored extends PuppetASTObject
+{
+    private readonly _what: string;
+
+    constructor(what: string, args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._what = what;
+    }
+
+    public get what(): string
+    {
+        return this._what;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        throw new ResolveError(this, "Entry ignored: " + this._what);
+    }
+
+    public static Create(what: string)
+    {
+        return function (args: Array<PuppetASTObject>): PuppetASTObject
+        {
+            return new PuppetASTIgnored(what, args);
+        }
     }
 }
 
@@ -399,6 +499,35 @@ export class PuppetASTOrCondition extends PuppetASTObject
     }
 }
 
+export class PuppetASTNot extends PuppetASTObject
+{
+    private readonly _value: PuppetASTObject;
+    private readonly _b: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._value = args[0];
+    }
+
+    public get value(): any
+    {
+        return this._value;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        const v = await this._value.resolve(context, resolver);
+        return !v;
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTNot(args);
+    }
+}
+
 export class PuppetASTIf extends PuppetASTObject
 {
     private readonly _test: PuppetASTObject;
@@ -672,6 +801,52 @@ export class PuppetASTList extends PuppetASTObject
     }
 }
 
+export class PuppetASTArray extends PuppetASTObject
+{
+    private readonly _entries: Array<PuppetASTObject>;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._entries = args;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        for (const entry of this._entries)
+        {
+            try
+            {
+                await entry.resolve(context, resolver);
+            }
+            catch (e)
+            {
+                if (e instanceof ResolveError)
+                {
+                    console.log("Failed to resolve array entry " + e.obj.toString() + ": " + e.message);
+                }
+                else
+                {
+                    console.log(e);
+                }
+
+                throw e
+            }
+        }
+    }
+
+    public get entries(): Array<PuppetASTObject>
+    {
+        return this._entries;
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTArray(args);
+    }
+}
+
 export class PuppetASTType extends PuppetASTObject
 {
     private readonly _type: PuppetASTObject;
@@ -777,11 +952,15 @@ export class PuppetASTResolvedProperty
 {
     private readonly _type: any;
     private readonly _value: any;
+    private readonly _error: any;
+    private readonly _hints: Array<any>;
 
-    constructor (type: any, value: any)
+    constructor (type: any, value: any, error?: any, hints?: Array<any>)
     {
         this._type = type;
         this._value = value;
+        this._error = error;
+        this._hints = hints;
     }
 
     public get type(): any
@@ -792,6 +971,16 @@ export class PuppetASTResolvedProperty
     public get value(): any
     {
         return this._value;
+    }
+
+    public get error(): any
+    {
+        return this._error;
+    }
+
+    public get hints(): Array<any>
+    {
+        return this._hints;
     }
 }
 
@@ -871,8 +1060,17 @@ export class PuppetASTClass extends PuppetASTObject
 
         console.log("Resolving class " + this._name);
 
+        const hints: Array<any> = [];
+
+        resolver.hint = function (obj: any)
+        {
+            hints.push(obj);
+        };
+
         for (const paramName in this._params)
         {
+            hints.length = 0;
+
             const param = this._params[paramName];
             let type = param.type;
             const value = param.value;
@@ -904,6 +1102,7 @@ export class PuppetASTClass extends PuppetASTObject
             catch (e)
             {
                 console.log("Failed to resolve param " + paramName + " (" + value.constructor.name + "): " + e);
+                this._resolvedProperties.put(paramName, new PuppetASTResolvedProperty(type, null, e, hints.slice(0)));
                 continue;
             }
 
@@ -1011,7 +1210,6 @@ export class PuppetASTVariable extends PuppetASTObject
 
     protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
     {
-        let resolvedVariable = null;
         const isRoot = this.isRoot();
 
         if (isRoot || context.name == this._className)
@@ -1021,13 +1219,17 @@ export class PuppetASTVariable extends PuppetASTObject
 
             if (property)
             {
-                resolvedVariable = property.value;
+                return property.value;
             }
             else if (isRoot)
             {
                 // if we've been asking for a variable without classpath mentioned,
                 // try to find a global variable
-                resolvedVariable = await resolver.resolveGlobalVariable(this._name);
+                const global = await resolver.resolveGlobalVariable(this._name);
+                if (global)
+                {
+                    return global;
+                }
             }
         }
         else
@@ -1037,16 +1239,13 @@ export class PuppetASTVariable extends PuppetASTObject
 
             if (property)
             {
-                resolvedVariable = property.value;
+                return property.value;
             }
         }
 
-        if (!resolvedVariable)
-        {
-            throw new ResolveError(this, "Variable not found: " + this.fullName);
-        }
-
-        return resolvedVariable;
+        if (resolver.hint) resolver.hint("Variable not found: " + this.fullName);
+        console.log("Variable not found: " + this.fullName);
+        return "";
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
@@ -1078,6 +1277,7 @@ export class PuppetASTParser
             "=>": PuppetASTKeyedEntry.Create,
             "default": PuppetASTDefault.Create,
             "?": PuppetASTSwitch.Create,
+            "!": PuppetASTNot.Create,
             "<": PuppetASTCondition.Less,
             ">": PuppetASTCondition.More,
             "<=": PuppetASTCondition.LessOrEqual,
@@ -1088,6 +1288,9 @@ export class PuppetASTParser
             "or": PuppetASTOrCondition.Create,
             "paren": PuppetASTParenthesis.Create,
             "if": PuppetASTIf.Create,
+            "call": PuppetASTIgnored.Create("call"),
+            "invoke": PuppetASTInvoke.Create,
+            "array": PuppetASTArray.Create
         };
     }
 

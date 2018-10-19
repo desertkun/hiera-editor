@@ -1052,7 +1052,6 @@ export module puppet
         private readonly _filePath: string;
         private readonly _nodePath: string;
         private readonly _env: Environment;
-        private readonly _global: Dictionary<string, string>;
         private _config: any;
 
         constructor(env: Environment, name: string, filePath: string, nodePath: string)
@@ -1061,12 +1060,7 @@ export module puppet
             this._name = name;
             this._filePath = filePath;
             this._nodePath = nodePath;
-            this._global = new Dictionary();
-        }
-        
-        public get global()
-        {
-            return this._global;
+            this._config = {};
         }
 
         static NodePath(name: string): string
@@ -1086,8 +1080,18 @@ export module puppet
         {
             return {
                 "env": this._env.name,
-                "classes": this._config["classes"] || []
+                "classes": this.configClasses
             }
+        }
+
+        public get configFacts()
+        {
+            return this._config["facts"] || {};
+        }
+
+        public get configClasses()
+        {
+            return this._config["classes"] || [];
         }
 
         public async init()
@@ -1118,12 +1122,12 @@ export module puppet
 
         public hasClass(className: string): boolean
         {
-            return this._config["classes"].indexOf(className) >= 0
+            return this.configClasses.indexOf(className) >= 0
         }
         
         public getGlobal(key: string): string
         {
-            return this._global.get(key) || this._env.global.get(key) || this._env.workspace.global.get(key);
+            return this.configFacts[key] || this._env.global.get(key) || this._env.workspace.global.get(key);
         }
 
         public async compileClass(className: string): Promise<PuppetASTClass>
