@@ -8,7 +8,7 @@ import {Dictionary} from "./dictionary";
 const slash = require('slash');
 const PromisePool = require('es6-promise-pool');
 
-import {PuppetASTParser, PuppetASTClass} from "./puppet/ast";
+import {PuppetASTParser, PuppetASTClass, Resolver} from "./puppet/ast";
 
 export module puppet
 {
@@ -348,15 +348,23 @@ export module puppet
     {
         private readonly _path: string;
         private _name: string;
-        private _cachePath: string;
         private _environments: Dictionary<string, Environment>;
         private _modulesInfo: PuppetModulesInfo;
+
+        private readonly _cachePath: string;
+        private readonly _global: Dictionary<string, string>;
 
         constructor(workspacePath: string, cachePath: string = null)
         {
             this._environments = new Dictionary();
             this._path = workspacePath;
             this._cachePath = cachePath || path.join(this._path, ".pe-cache");
+            this._global = new Dictionary();
+        }
+
+        public get global()
+        {
+            return this._global;
         }
 
         public get cachePath(): string
@@ -620,6 +628,8 @@ export module puppet
             }
         }
     }
+    
+    export type GlobalVariableResolver = (key: string) => string;
 
     export class Environment
     {
@@ -629,6 +639,7 @@ export module puppet
         private readonly _root: Folder;
         private readonly _workspace: Workspace;
         private readonly _compiledClasses: Dictionary<string, PuppetASTClass>;
+        private readonly _global: Dictionary<string, string>;
         private _modulesInfo: PuppetModulesInfo;
 
         constructor(workspace: Workspace, name: string, path: string, cachePath: string)
@@ -639,6 +650,12 @@ export module puppet
             this._cachePath = cachePath;
             this._root = new Folder(this, "data", this.dataPath, name);
             this._compiledClasses = new Dictionary();
+            this._global = new Dictionary();
+        }
+
+        public get global()
+        {
+            return this._global;
         }
 
         public get root(): Folder
@@ -651,7 +668,7 @@ export module puppet
             return this._workspace;
         }
 
-        public async resolveClass(className: string): Promise<PuppetASTClass>
+        public async resolveClass(className: string, global: GlobalVariableResolver): Promise<PuppetASTClass>
         {
             if (this._compiledClasses.has(className))
             {
@@ -685,8 +702,17 @@ export module puppet
                 throw "Not a class";
 
             const clazz: PuppetASTClass = obj;
-            await clazz.resolve((className: string) => {
-                return zis.resolveClass(className);
+            await clazz.resolve(clazz, new class extends Resolver
+            {
+                public resolveClass(className: string): Promise<PuppetASTClass>
+                {
+                    return zis.resolveClass(className, global);
+                }
+
+                public async resolveGlobalVariable(name: string): Promise<string>
+                {
+                    return global(name);
+                }
             });
 
             this._compiledClasses.put(className, clazz);
@@ -1024,6 +1050,7 @@ export module puppet
         private readonly _filePath: string;
         private readonly _nodePath: string;
         private readonly _env: Environment;
+        private readonly _global: Dictionary<string, string>;
         private _config: any;
 
         constructor(env: Environment, name: string, filePath: string, nodePath: string)
@@ -1032,6 +1059,12 @@ export module puppet
             this._name = name;
             this._filePath = filePath;
             this._nodePath = nodePath;
+            this._global = new Dictionary();
+        }
+        
+        public get global()
+        {
+            return this._global;
         }
 
         static NodePath(name: string): string
@@ -1085,14 +1118,22 @@ export module puppet
         {
             return this._config["classes"].indexOf(className) >= 0
         }
+        
+        public getGlobal(key: string): string
+        {
+            return this._global.get(key) || this._env.global.get(key) || this._env.workspace.global.get(key);
+        }
 
         public async compileClass(className: string): Promise<PuppetASTClass>
         {
+            const zis = this;
             if (!this.hasClass(className))
                 throw Error("No such class: " + className);
 
-            const compiled = await this._env.resolveClass(className);
-            return compiled;
+            return await this._env.resolveClass(className, (key: string) =>
+            {
+                return zis.getGlobal(key);
+            });
         }
 
         public async acquireClass(className: string): Promise<PuppetASTClass>

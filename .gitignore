@@ -3,3 +3,4 @@ wrappers
 dist
 /ts
 /.idea/workspace.xml
+.yardoc

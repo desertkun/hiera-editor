@@ -169,5 +169,44 @@ describe('Workspaces', () =>
             expect(c.value).to.equal(true);
         });
     });
+
+    it('concatenation', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test {
+                  $test_a = "Hello"
+                  $test_b = "World"
+                  $v = "$\{test_a\}, $\{test_b\}!"
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            const class_ = await node.acquireClass("test");
+            expect(class_.getResolvedProperty("v").value).to.equal("Hello, World!");
+        });
+    });
+
+    it('global', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test {
+                  $v = "Hello, $\{::hostname\}!"
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            node.global.put("hostname", "myhost");
+            const class_ = await node.acquireClass("test");
+            expect(class_.getResolvedProperty("v").value).to.equal("Hello, myhost!");
+        });
+    });
 });
 
