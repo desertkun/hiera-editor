@@ -7,7 +7,7 @@ export abstract class Resolver
     public async abstract resolveGlobalVariable(name: string): Promise<string>;
 }
 
-class PuppetASTObject
+export class PuppetASTObject
 {
     protected _resolved: any;
     private _beingResolved: boolean;
@@ -59,7 +59,7 @@ class ResolveError extends Error
     }
 }
 
-class PuppetASTUnknown extends PuppetASTObject
+export class PuppetASTUnknown extends PuppetASTObject
 {
     private readonly _kind: string;
     private readonly _args: Array<PuppetASTObject>;
@@ -93,7 +93,166 @@ class PuppetASTUnknown extends PuppetASTObject
     }
 }
 
-class PuppetASTPrimitive extends PuppetASTObject
+export class PuppetASTAccess extends PuppetASTObject
+{
+    private readonly _what: PuppetASTObject;
+    private readonly _values: Array<PuppetASTObject>;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._what = args[0];
+        args.splice(0, 1);
+        this._values = args;
+    }
+
+    public get what(): PuppetASTObject
+    {
+        return this._what;
+    }
+
+    public get values(): Array<PuppetASTObject>
+    {
+        return this._values;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        return this;
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTAccess(args);
+    }
+}
+
+export class PuppetASTQualifiedName extends PuppetASTObject
+{
+    private readonly _value: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._value = args[0];
+    }
+
+    public get value(): any
+    {
+        return this._value;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        return await this._value.resolve(context, resolver);
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTQualifiedName(args);
+    }
+}
+
+export class PuppetASTApplyOrder extends PuppetASTObject
+{
+    private readonly _first: PuppetASTObject;
+    private readonly _second: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._first = args[0];
+        this._second = args[1];
+    }
+
+    public get first(): PuppetASTObject
+    {
+        return this._first;
+    }
+
+    public get second(): PuppetASTObject
+    {
+        return this._second;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        await this._first.resolve(context, resolver);
+        await this._second.resolve(context, resolver);
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTApplyOrder(args);
+    }
+}
+
+export class PuppetASTNotifyOrder extends PuppetASTObject
+{
+    private readonly _first: PuppetASTObject;
+    private readonly _second: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._first = args[0];
+        this._second = args[1];
+    }
+
+    public get first(): PuppetASTObject
+    {
+        return this._first;
+    }
+
+    public get second(): PuppetASTObject
+    {
+        return this._second;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        await this._first.resolve(context, resolver);
+        await this._second.resolve(context, resolver);
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTNotifyOrder(args);
+    }
+}
+
+export class PuppetASTResource extends PuppetASTObject
+{
+    private readonly _properties: any;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._properties = args[0];
+    }
+
+    public get properties(): any
+    {
+        return this._properties;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        //
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTResource(args);
+    }
+}
+
+export class PuppetASTPrimitive extends PuppetASTObject
 {
     private readonly _value: any;
 
@@ -120,7 +279,7 @@ class PuppetASTPrimitive extends PuppetASTObject
     }
 }
 
-class PuppetASTList extends PuppetASTObject
+export class PuppetASTList extends PuppetASTObject
 {
     private readonly _entries: Array<PuppetASTObject>;
 
@@ -142,7 +301,7 @@ class PuppetASTList extends PuppetASTObject
     }
 }
 
-class PuppetASTType extends PuppetASTObject
+export class PuppetASTType extends PuppetASTObject
 {
     private readonly _type: PuppetASTObject;
 
@@ -169,7 +328,7 @@ class PuppetASTType extends PuppetASTObject
     }
 }
 
-class PuppetASTToString extends PuppetASTObject
+export class PuppetASTToString extends PuppetASTObject
 {
     private readonly _obj: PuppetASTObject;
 
@@ -196,7 +355,7 @@ class PuppetASTToString extends PuppetASTObject
     }
 }
 
-class PuppetASTConcat extends PuppetASTObject
+export class PuppetASTConcat extends PuppetASTObject
 {
     private readonly _entries: Array<PuppetASTObject>;
 
@@ -230,7 +389,7 @@ class PuppetASTConcat extends PuppetASTObject
     }
 }
 
-class PuppetASTBlock extends PuppetASTObject
+export class PuppetASTBlock extends PuppetASTObject
 {
     constructor(args: Array<PuppetASTObject>)
     {
@@ -243,18 +402,18 @@ class PuppetASTBlock extends PuppetASTObject
     }
 }
 
-class PuppetASTResolvedProperty
+export class PuppetASTResolvedProperty
 {
-    private readonly _type: string;
+    private readonly _type: any;
     private readonly _value: any;
 
-    constructor (type: string, value: any)
+    constructor (type: any, value: any)
     {
         this._type = type;
         this._value = value;
     }
 
-    public get type(): string
+    public get type(): any
     {
         return this._type;
     }
@@ -351,8 +510,7 @@ export class PuppetASTClass extends PuppetASTObject
             {
                 try
                 {
-                    await type.resolve(this, resolver);
-                    type = type.toString();
+                    type = await type.resolve(this, resolver);
                 }
                 catch (e)
                 {
@@ -410,7 +568,7 @@ export class PuppetASTClass extends PuppetASTObject
     }
 }
 
-class PuppetASTSetInstruction extends PuppetASTObject
+export class PuppetASTSetInstruction extends PuppetASTObject
 {
     private readonly _receiver: PuppetASTObject;
     private readonly _provider: PuppetASTObject;
@@ -458,7 +616,7 @@ class PuppetASTSetInstruction extends PuppetASTObject
     }
 }
 
-class PuppetASTVariable extends PuppetASTObject
+export class PuppetASTVariable extends PuppetASTObject
 {
     private readonly _fullName: string;
     private readonly _name: string;
@@ -555,8 +713,13 @@ export class PuppetASTParser
             "=": PuppetASTSetInstruction.Create,
             "var": PuppetASTVariable.Create,
             "qr": PuppetASTType.Create,
+            "qn": PuppetASTQualifiedName.Create,
             "str": PuppetASTToString.Create,
             "concat": PuppetASTConcat.Create,
+            "resource": PuppetASTResource.Create,
+            "->": PuppetASTApplyOrder.Create,
+            "~>": PuppetASTNotifyOrder.Create,
+            "access": PuppetASTAccess.Create,
         };
     }
 

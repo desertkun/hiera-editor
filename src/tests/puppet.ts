@@ -5,6 +5,7 @@ const rmdir = require('rimraf');
 import * as path from "path";
 import * as tmp from "tmp";
 import { puppet } from "../puppet";
+import {PuppetASTAccess, PuppetASTPrimitive, PuppetASTQualifiedName, PuppetASTType} from "../puppet/ast";
 
 const async = require("../async");
 const chai = require('chai');
@@ -208,5 +209,81 @@ describe('Workspaces', () =>
             expect(class_.getResolvedProperty("v").value).to.equal("Hello, myhost!");
         });
     });
+
+    it('resources', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test {
+                  notice { "hello": }
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            await node.acquireClass("test");
+        });
+    });
+
+    it('order chains', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test {
+                  notice { "hello": 
+                  } -> notice { "hello2": 
+                  } -> notice { "hello3": 
+                  } ~> notice { "hello4": 
+                  }
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            await node.acquireClass("test");
+        });
+    });
+
+    it('enums', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test (
+                    Enum['info', 'error', 'warning'] $log_level = 'error',
+                    Enum[absent, present] $ensure = present
+                ) {}
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            const class_ = await node.acquireClass("test");
+
+            {
+                const _t: any = class_.getResolvedProperty("log_level").type;
+                if (!(_t instanceof PuppetASTAccess))
+                    assert.fail("log_level expected to be access");
+                expect(_t.what).to.be.instanceOf(PuppetASTType);
+                expect(_t.values[0]).to.be.instanceOf(PuppetASTPrimitive).and.have.property("value", "info");
+                expect(_t.values[1]).to.be.instanceOf(PuppetASTPrimitive).and.have.property("value", "error");
+                expect(_t.values[2]).to.be.instanceOf(PuppetASTPrimitive).and.have.property("value", "warning");
+            }
+
+            {
+                const _t: any = class_.getResolvedProperty("ensure").type;
+                if (!(_t instanceof PuppetASTAccess))
+                    assert.fail("log_level expected to be access");
+                expect(_t.what).to.be.instanceOf(PuppetASTType);
+                expect(_t.values[0]).to.be.instanceOf(PuppetASTQualifiedName).and.have.deep.property("value", {"_value": "absent"});
+                expect(_t.values[1]).to.be.instanceOf(PuppetASTQualifiedName).and.have.deep.property("value", {"_value": "present"});
+            }
+        });
+    });
+
 });
 
