@@ -363,5 +363,49 @@ describe('Workspaces', () =>
 
         });
     });
+
+    it('if', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test ($a = 1, $b = 5, $c = 10, $d = 10) {
+                    if ($a < $b) {
+                        $test_1 = '1works'
+                    } else {
+                        $test_1 = '1doesnt'
+                    }
+                    if ($a > $b) {
+                        $test_2 = '2works'
+                    } else {
+                        $test_2 = '2doesnt'
+                    }
+                    if ($d == $c) {
+                        $test_3 = '3works'
+                    }
+                    if ($a == $c) {
+                        $test_4 = '4doesnt'
+                    } else {
+                        $test_4 = '4works'
+                    }
+                    if ($b != $c) {
+                        $test_5 = '5works'
+                    }
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            const class_ = await node.acquireClass("test");
+
+            expect(class_.getResolvedProperty("test_1").value).to.be.equal("1works");
+            expect(class_.getResolvedProperty("test_2").value).to.be.equal("2doesnt");
+            expect(class_.getResolvedProperty("test_3").value).to.be.equal("3works");
+            expect(class_.getResolvedProperty("test_4").value).to.be.equal("4works");
+            expect(class_.getResolvedProperty("test_5").value).to.be.equal("5works");
+
+        });
+    });
 });
 

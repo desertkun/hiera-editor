@@ -192,6 +192,33 @@ export class PuppetASTSwitch extends PuppetASTObject
     }
 }
 
+export class PuppetASTParenthesis extends PuppetASTObject
+{
+    private readonly _condition: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._condition = args[0];
+    }
+
+    public get value(): any
+    {
+        return this._condition;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        return await this._condition.resolve(context, resolver);
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTParenthesis(args);
+    }
+}
+
 export class PuppetASTQualifiedName extends PuppetASTObject
 {
     private readonly _value: PuppetASTObject;
@@ -216,6 +243,210 @@ export class PuppetASTQualifiedName extends PuppetASTObject
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
     {
         return new PuppetASTQualifiedName(args);
+    }
+}
+
+type PuppetASTConditionTest = (a: any, b: any) => boolean;
+
+export class PuppetASTCondition extends PuppetASTObject
+{
+    private readonly _test: PuppetASTConditionTest;
+    private readonly _a: PuppetASTObject;
+    private readonly _b: PuppetASTObject;
+
+    constructor(test: PuppetASTConditionTest, args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._test = test;
+        this._a = args[0];
+        this._b = args[1];
+    }
+
+    public get a(): any
+    {
+        return this._a;
+    }
+
+    public get b(): any
+    {
+        return this._b;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        const resolvedA = await this._a.resolve(context, resolver);
+        const resolvedB = await this._b.resolve(context, resolver);
+        return this._test(resolvedA, resolvedB);
+    }
+
+    public static Less(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTCondition((a: any, b: any) => {
+            return a < b;
+        }, args);
+    }
+
+    public static More(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTCondition((a: any, b: any) => {
+            return a > b;
+        }, args);
+    }
+
+    public static MoreOrEqual(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTCondition((a: any, b: any) => {
+            return a >= b;
+        }, args);
+    }
+
+    public static LessOrEqual(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTCondition((a: any, b: any) => {
+            return a <= b;
+        }, args);
+    }
+
+    public static Equal(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTCondition((a: any, b: any) => {
+            return a == b;
+        }, args);
+    }
+
+    public static NotEqual(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTCondition((a: any, b: any) => {
+            return a != b;
+        }, args);
+    }
+}
+
+export class PuppetASTAndCondition extends PuppetASTObject
+{
+    private readonly _a: PuppetASTObject;
+    private readonly _b: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._a = args[0];
+        this._b = args[1];
+    }
+
+    public get a(): any
+    {
+        return this._a;
+    }
+
+    public get b(): any
+    {
+        return this._b;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        if (!await this._a.resolve(context, resolver))
+            return false;
+        if (!await this._b.resolve(context, resolver))
+            return false;
+        return true;
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTAndCondition(args);
+    }
+}
+
+export class PuppetASTOrCondition extends PuppetASTObject
+{
+    private readonly _a: PuppetASTObject;
+    private readonly _b: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._a = args[0];
+        this._b = args[1];
+    }
+
+    public get a(): any
+    {
+        return this._a;
+    }
+
+    public get b(): any
+    {
+        return this._b;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        if (await this._a.resolve(context, resolver))
+            return true;
+        if (await this._b.resolve(context, resolver))
+            return true;
+        return false;
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTOrCondition(args);
+    }
+}
+
+export class PuppetASTIf extends PuppetASTObject
+{
+    private readonly _test: PuppetASTObject;
+    private readonly _then: PuppetASTObject;
+    private readonly _else: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        const obj: any = args[0];
+
+        this._test = obj["test"];
+        this._then = obj["then"];
+        this._else = obj["else"];
+    }
+
+    public get test(): any
+    {
+        return this._test;
+    }
+
+    public get then(): any
+    {
+        return this._then;
+    }
+
+    public get else(): any
+    {
+        return this._else;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        const v = await this._test.resolve(context, resolver);
+
+        if (v)
+        {
+            return await this._then.resolve(context, resolver);
+        }
+
+        if (this._else)
+            return await this._else.resolve(context, resolver);
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTIf(args);
     }
 }
 
@@ -404,6 +635,30 @@ export class PuppetASTList extends PuppetASTObject
         super();
 
         this._entries = args;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        for (const entry of this._entries)
+        {
+            try
+            {
+                await entry.resolve(context, resolver);
+            }
+            catch (e)
+            {
+                if (e instanceof ResolveError)
+                {
+                    console.log("Failed to resolve body entry " + e.obj.toString() + ": " + e.message);
+                }
+                else
+                {
+                    console.log(e);
+                }
+
+                throw e
+            }
+        }
     }
 
     public get entries(): Array<PuppetASTObject>
@@ -655,27 +910,8 @@ export class PuppetASTClass extends PuppetASTObject
             this._resolvedProperties.put(paramName, new PuppetASTResolvedProperty(type, result));
         }
 
-        if (this._body instanceof PuppetASTList)
-        {
-            for (const bodyEntry of this._body.entries)
-            {
-                try
-                {
-                    await bodyEntry.resolve(this, resolver);
-                }
-                catch (e)
-                {
-                    if (e instanceof ResolveError)
-                    {
-                        console.log("Failed to resolve body entry " + e.obj.toString() + ": " + e.message);
-                    }
-                    else
-                    {
-                        console.log(e);
-                    }
-                }
-            }
-        }
+        if (this._body)
+            await this._body.resolve(this, resolver);
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
@@ -737,6 +973,7 @@ export class PuppetASTVariable extends PuppetASTObject
     private readonly _fullName: string;
     private readonly _name: string;
     private readonly _className: string;
+    private readonly _root: boolean;
 
     constructor(args: Array<PuppetASTObject>)
     {
@@ -745,6 +982,8 @@ export class PuppetASTVariable extends PuppetASTObject
         this._fullName = (<PuppetASTPrimitive>args[0]).value;
 
         const split = this._fullName.split("::");
+        // cases like "$::operatingsystem"
+        this._root = split.length > 1 && split[0] == "";
         this._name = split[split.length - 1];
         split.splice(split.length - 1, 1);
         this._className = split.join("::");
@@ -762,7 +1001,7 @@ export class PuppetASTVariable extends PuppetASTObject
 
     public isRoot()
     {
-        return this._className == "";
+        return this._root || this._className == "";
     }
 
     public get className(): string
@@ -838,7 +1077,17 @@ export class PuppetASTParser
             "access": PuppetASTAccess.Create,
             "=>": PuppetASTKeyedEntry.Create,
             "default": PuppetASTDefault.Create,
-            "?": PuppetASTSwitch.Create
+            "?": PuppetASTSwitch.Create,
+            "<": PuppetASTCondition.Less,
+            ">": PuppetASTCondition.More,
+            "<=": PuppetASTCondition.LessOrEqual,
+            ">=": PuppetASTCondition.MoreOrEqual,
+            "==": PuppetASTCondition.Equal,
+            "!=": PuppetASTCondition.NotEqual,
+            "and": PuppetASTAndCondition.Create,
+            "or": PuppetASTOrCondition.Create,
+            "paren": PuppetASTParenthesis.Create,
+            "if": PuppetASTIf.Create,
         };
     }
 

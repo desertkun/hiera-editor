@@ -651,7 +651,9 @@ export module puppet
             this._cachePath = cachePath;
             this._root = new Folder(this, "data", this.dataPath, name);
             this._compiledClasses = new Dictionary();
+
             this._global = new Dictionary();
+            this._global.put("environment", name);
         }
 
         public get global()
