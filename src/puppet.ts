@@ -3,6 +3,7 @@ import * as path from "path";
 import * as os from "os";
 
 import * as async from "./async";
+
 import {Dictionary} from "./dictionary";
 const slash = require('slash');
 const PromisePool = require('es6-promise-pool');
@@ -197,6 +198,10 @@ export module puppet
         }
     }
 
+    export class PuppetError extends Error {}
+    export class WorkspaceError extends PuppetError {}
+    export class NoSuchEnvironmentError extends PuppetError {}
+
     export class PuppetModulesInfo
     {
         private readonly _cachePath: string;
@@ -286,7 +291,8 @@ export module puppet
                         }
 
                         cb.done += 1;
-                        cb.callback(cb.done);
+
+                        if (cb.callback) cb.callback(cb.done);
                     }
 
                     result.push([compile, file, this._modulesPath, clazz.source]);
@@ -342,13 +348,20 @@ export module puppet
     {
         private readonly _path: string;
         private _name: string;
+        private _cachePath: string;
         private _environments: Dictionary<string, Environment>;
         private _modulesInfo: PuppetModulesInfo;
 
-        constructor(path: string)
+        constructor(workspacePath: string, cachePath: string = null)
         {
             this._environments = new Dictionary();
-            this._path = path;
+            this._path = workspacePath;
+            this._cachePath = cachePath || path.join(this._path, ".pe-cache");
+        }
+
+        public get cachePath(): string
+        {
+            return this._cachePath;
         }
 
         public get path():string 
@@ -376,11 +389,6 @@ export module puppet
             return await env.root.findNode(entries);
         }
 
-        public get cachePath(): string
-        {
-            return path.join(this._path, ".pe-cache");
-        }
-
         public get modulesPath(): string
         {
             return path.join(this._path, "modules");
@@ -396,19 +404,24 @@ export module puppet
             return this._name;
         }
 
-        public async refresh(progressCallback: any, updateProgressCategory: any): Promise<any>
+        public async refresh(progressCallback: any = null, updateProgressCategory: any = null): Promise<any>
         {
+            if (!await async.isDirectory(this.path))
+            {
+                throw new WorkspaceError("Workspace path does not exist");
+            }
+
             if (!await async.isDirectory(this.cachePath))
             {
                 if (!await async.makeDirectory(this.cachePath))
                 {
-                    throw "Failed to create cache directory";
+                    throw new WorkspaceError("Failed to create cache directory");
                 }
             }
 
             let upToDate: boolean = false;
 
-            updateProgressCategory("Processing classes...");
+            if (updateProgressCategory) updateProgressCategory("Processing classes...");
 
             const bStat = await async.fileStat(this.cacheModulesFilePath);
             if (bStat)
@@ -426,7 +439,7 @@ export module puppet
 
             if (!upToDate)
             {
-                updateProgressCategory("Extracting class info...");
+                if (updateProgressCategory) updateProgressCategory("Extracting class info...");
 
                 const a = JSON.stringify([
                     "*/manifests/**/*.pp", "*/functions/**/*.pp", "*/types/**/*.pp", "*/lib/**/*.rb"
@@ -453,23 +466,27 @@ export module puppet
 
                 const logicalCpuCount = Math.max(os.cpus().length - 1, 1);
                 const pool = new PromisePool(promiseProducer, logicalCpuCount);
-                promiseCallback.callback = (done: number) =>
-                {
-                    if (originalPoolSize != 0)
-                    {
-                        const progress: number = done / originalPoolSize;
-                        progressCallback(progress);
-                    }
-                };
 
-                updateProgressCategory("Compiling classes...");
+                if (progressCallback)
+                {
+                    promiseCallback.callback = (done: number) =>
+                    {
+                        if (originalPoolSize != 0)
+                        {
+                            const progress: number = done / originalPoolSize;
+                            progressCallback(progress);
+                        }
+                    };
+                }
+
+                if (updateProgressCategory) updateProgressCategory("Compiling classes...");
 
                 await pool.start();
             }
 
             for (const env of await this.listEnvironments())
             {
-                updateProgressCategory("Processing environment: " + env.name);
+                if (updateProgressCategory) updateProgressCategory("Processing environment: " + env.name);
                 await env.refresh(progressCallback)
             }
         }
@@ -492,14 +509,14 @@ export module puppet
 
             if (!await async.isDirectory(environmentsPath))
             {
-                return null;
+                throw new WorkspaceError("Workspace does not have environments folder")
             }
 
             const environmentPath = path.join(environmentsPath, name);
 
             if (!await async.isDirectory(environmentsPath))
             {
-                return null;
+                throw new NoSuchEnvironmentError("Environment " + name + " does not exists");
             }
 
             return this.acquireEnvironment(name, environmentPath, this.cachePath);
@@ -678,10 +695,13 @@ export module puppet
 
         public findClassInfo(className: string): PuppetClassInfo
         {
-            const localClassInfo = this._modulesInfo.findClass(className);
+            if (this._modulesInfo)
+            {
+                const localClassInfo = this._modulesInfo.findClass(className);
 
-            if (localClassInfo)
-                return localClassInfo;
+                if (localClassInfo)
+                    return localClassInfo;
+            }
 
             return this._workspace.modulesInfo.findClass(className);
         }
@@ -722,7 +742,7 @@ export module puppet
             const types: any = {};
 
             const globalClassInfo = this._workspace.modulesInfo.dump(classes, types);
-            const classInfo = this._modulesInfo.dump(classes, types);
+            if (this._modulesInfo) this._modulesInfo.dump(classes, types);
 
             return {
                 "classes": classes,
@@ -730,7 +750,7 @@ export module puppet
             }
         }
 
-        public async refresh(progressCallback: any): Promise<any>
+        public async refresh(progressCallback: any = null): Promise<any>
         {
             if (!await async.isDirectory(this.cachePath))
             {
@@ -783,14 +803,18 @@ export module puppet
 
                 const logicalCpuCount = Math.max(os.cpus().length - 1, 1);
                 const pool = new PromisePool(promiseProducer, logicalCpuCount);
-                promiseCallback.callback = (done: number) =>
+
+                if (progressCallback)
                 {
-                    if (originalPoolSize != 0)
+                    promiseCallback.callback = (done: number) =>
                     {
-                        const progress: number = done / originalPoolSize;
-                        progressCallback(progress);
-                    }
-                };
+                        if (originalPoolSize != 0)
+                        {
+                            const progress: number = done / originalPoolSize;
+                            progressCallback(progress);
+                        }
+                    };
+                }
             }
         }
 
@@ -880,7 +904,7 @@ export module puppet
             return newFolder;
         }
 
-        private acquireNode(env: Environment, name: string, filePath: string, nodePath: string): Node
+        private async acquireNode(env: Environment, name: string, filePath: string, nodePath: string): Promise<Node>
         {
             if (this._nodes.has(name))
             {
@@ -889,6 +913,7 @@ export module puppet
 
             const newNode = new Node(env, name, filePath, nodePath);
             this._nodes.put(name, newNode);
+            await newNode.init();
             return newNode;
         }
 
@@ -901,7 +926,7 @@ export module puppet
                 return null;
             }
 
-            return this.acquireNode(this._env, name, entryPath, slash(path.join(this._localPath, name)));
+            return await this.acquireNode(this._env, name, entryPath, slash(path.join(this._localPath, name)));
         }
 
         public async getFolder(name: string): Promise<Folder>
@@ -969,7 +994,7 @@ export module puppet
 
                 if (await async.isFile(entryPath))
                 {
-                    result.push(this.acquireNode(
+                    result.push(await this.acquireNode(
                         this._env, nodeName, entryPath, slash(path.join(this._localPath, nodeName))));
                 }
             }
@@ -1030,6 +1055,11 @@ export module puppet
             }
         }
 
+        public async init()
+        {
+            await this.refresh();
+        }
+
         public async refresh()
         {
             this._config = await async.readYAML(this.path);
@@ -1056,7 +1086,7 @@ export module puppet
             return this._config["classes"].indexOf(className) >= 0
         }
 
-        public async compileClass(className: string)
+        public async compileClass(className: string): Promise<PuppetASTClass>
         {
             if (!this.hasClass(className))
                 throw Error("No such class: " + className);
@@ -1065,7 +1095,7 @@ export module puppet
             return compiled;
         }
 
-        public async acquireClass(className: string)
+        public async acquireClass(className: string): Promise<PuppetASTClass>
         {
             const compiled = await this.compileClass(className);
             return compiled;

@@ -4,7 +4,7 @@ import { app } from "electron";
 import * as fs from "fs";
 import * as path from "path";
 import * as child_process from "child_process";
-const storage = require('electron-json-storage');
+
 const YAML = require('yamljs');
 
 export function fileExists(path: string): Promise<boolean>
@@ -357,6 +357,24 @@ export function writeJSON(filePath: string, data: any): Promise<any>
                 reject(error)
             } 
             else 
+            {
+                resolve();
+            }
+        })
+    });
+}
+
+export function write(filePath: string, data: any): Promise<any>
+{
+    return new Promise<any>((resolve, reject) =>
+    {
+        fs.writeFile(filePath, data, "UTF-8", (error) =>
+        {
+            if (error)
+            {
+                reject(error)
+            }
+            else
             {
                 resolve();
             }

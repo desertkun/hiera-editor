@@ -95,8 +95,6 @@ register("find-node", async function(reply: any, localPath: string): Promise<any
         return null;
     }
 
-    await node.refresh();
-
     return node.dump();
 });
 

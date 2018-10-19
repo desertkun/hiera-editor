@@ -160,9 +160,9 @@ class PuppetASTBlock extends PuppetASTObject
 class PuppetASTResolvedProperty
 {
     private readonly _type: string;
-    private readonly _value: string;
+    private readonly _value: any;
 
-    constructor (type: string, value: string)
+    constructor (type: string, value: any)
     {
         this._type = type;
         this._value = value;
@@ -173,7 +173,7 @@ class PuppetASTResolvedProperty
         return this._type;
     }
 
-    public get value(): string
+    public get value(): any
     {
         return this._value;
     }
@@ -252,12 +252,11 @@ export class PuppetASTClass extends PuppetASTObject
                 continue;
             }
 
-            let asString: string;
+            let result: any;
 
             try
             {
-                await value.resolve(classResolver);
-                asString = value.toString();
+                result = await value.resolve(classResolver);
             }
             catch (e)
             {
@@ -265,7 +264,7 @@ export class PuppetASTClass extends PuppetASTObject
                 continue;
             }
 
-            this._resolvedProperties.put(paramName, new PuppetASTResolvedProperty(type, asString));
+            this._resolvedProperties.put(paramName, new PuppetASTResolvedProperty(type, result));
         }
 
         if (this._body instanceof PuppetASTList)
@@ -290,19 +289,18 @@ export class PuppetASTClass extends PuppetASTObject
 
                     const provider = bodyEntry.provider;
 
-                    let asString: string;
+                    let result: any;
 
                     try
                     {
-                        await provider.resolve(classResolver);
-                        asString = provider.toString();
+                        result = await provider.resolve(classResolver);
                     }
                     catch (e)
                     {
                         continue;
                     }
 
-                    this._resolvedProperties.put(paramName, new PuppetASTResolvedProperty(null, asString));
+                    this._resolvedProperties.put(paramName, new PuppetASTResolvedProperty(null, result));
                 }
             }
         }

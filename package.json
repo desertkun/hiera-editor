@@ -9,7 +9,8 @@
     "debug:osx": "electron $NODE_DEBUG_OPTION .",
     "postinstall": "npx npmpd && npx run-script-os",
     "install:darwin": "BUNDLE_GEMFILE=./ruby/Gemfile ./node_modules/traveling-ruby-osx/bin/bundle install",
-    "install:win32": "cmd /C \"set BUNDLE_GEMFILE=ruby\\Gemfile && node_modules\\traveling-ruby-win32\\bin\\gem install --bindir node_modules\\traveling-ruby-win32\\bin.real --no-ri --no-rdoc bundler && node_modules\\traveling-ruby-win32\\bin\\bundle install\""
+    "install:win32": "cmd /C \"set BUNDLE_GEMFILE=ruby\\Gemfile && node_modules\\traveling-ruby-win32\\bin\\gem install --bindir node_modules\\traveling-ruby-win32\\bin.real --no-ri --no-rdoc bundler && node_modules\\traveling-ruby-win32\\bin\\bundle install\"",
+    "test": "mocha %NODE_DEBUG_OPTION% --timeout 15000 dist/tests/**/*.js"
   },
   "repository": "https://github.com/desertkun/hiera-editor",
   "keywords": [
@@ -20,12 +21,23 @@
   "author": "desertkun",
   "license": "MIT",
   "devDependencies": {
+    "@types/chai-as-promised": "^7.1.0",
+    "@types/mocha": "^5.2.5",
+    "@types/tmp": "0.0.33",
+    "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
     "electron": "^3.0.0",
+    "mocha": "^5.2.0",
     "npm-platform-dependencies": "git+https://github.com/desertkun/npm-platform-dependencies.git",
-    "run-script-os": "^1.0.3"
+    "rimraf": "^2.6.2",
+    "run-script-os": "^1.0.3",
+    "tmp": "0.0.33",
+    "ts-node": "^7.0.1",
+    "typescript": "^3.1.3"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^5.3.1",
+    "@types/chai": "^4.1.6",
     "app-root-path": "^2.0.1",
     "electron-ipc-tunnel": "^3.1.0",
     "electron-json-storage": "^4.1.3",
