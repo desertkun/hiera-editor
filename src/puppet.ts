@@ -201,6 +201,7 @@ export module puppet
     export class PuppetError extends Error {}
     export class WorkspaceError extends PuppetError {}
     export class NoSuchEnvironmentError extends PuppetError {}
+    export class CompilationError extends PuppetError {}
 
     export class PuppetModulesInfo
     {
@@ -681,7 +682,7 @@ export module puppet
             const classInfo = this.findClassInfo(className);
 
             if (classInfo == null)
-                throw Error("No such class info: " + className);
+                throw new CompilationError("No such class info: " + className);
 
             const compiledPath = classInfo.modulesInfo.getCompiledClassPath(classInfo.file);
             let parsedJSON = null;
@@ -692,8 +693,7 @@ export module puppet
             }
             catch (e)
             {
-                console.log("Failed to parse class " + className);
-                throw e;
+                throw new CompilationError("Failed to parse class " + className);
             }
 
             const obj = PuppetASTParser.Parse(parsedJSON);

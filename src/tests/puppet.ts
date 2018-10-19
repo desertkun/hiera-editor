@@ -114,6 +114,21 @@ describe('Workspaces', () =>
         });
     });
 
+    it('compilation error', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                $%@%+@*$ _&(FHW_ +{@#}UH
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            await expect(node.acquireClass("test")).to.be.rejectedWith(puppet.CompilationError);
+        });
+    });
+
     it('workspace with body params', () =>
     {
         return testSimpleWorkspace({
@@ -227,6 +242,45 @@ describe('Workspaces', () =>
         });
     });
 
+    it('keyed entries', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test {
+                  notice { "hello": 
+                    name => "hello",
+                    ensure => present
+                  }
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            await node.acquireClass("test");
+        });
+    });
+
+    it('default entries', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test {
+                  notice { "hello": 
+                    ensure => def
+                  }
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            await node.acquireClass("test");
+        });
+    });
+
     it('order chains', () =>
     {
         return testSimpleWorkspace({
@@ -285,5 +339,29 @@ describe('Workspaces', () =>
         });
     });
 
+    it('switch', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test (
+                    $test = 'b',
+                    $test_def = 'd',
+                ) {
+                    $v = $test ? {'a' => 'it_was_a', 'b' => 'it_was_b', 'c' => 'it_was_c', default => 'default'}
+                    $b = $test_def ? {'a' => 'it_was_a', 'b' => 'it_was_b', 'c' => 'it_was_c', default => 'ddddd'}
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            const class_ = await node.acquireClass("test");
+
+            expect(class_.getResolvedProperty("v").value).to.be.equal("it_was_b");
+            expect(class_.getResolvedProperty("b").value).to.be.equal("ddddd");
+
+        });
+    });
 });
 

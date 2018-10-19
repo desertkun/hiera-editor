@@ -128,6 +128,70 @@ export class PuppetASTAccess extends PuppetASTObject
     }
 }
 
+export class PuppetASTSwitch extends PuppetASTObject
+{
+    private readonly _variable: PuppetASTObject;
+    private readonly _over: PuppetASTList;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._variable = args[0];
+        this._over = (<PuppetASTList>args[1]);
+    }
+
+    public get variable(): PuppetASTObject
+    {
+        return this._variable;
+    }
+
+    public get over(): PuppetASTList
+    {
+        return this._over;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        const resolvedValue = await this._variable.resolve(context, resolver);
+
+        let default_ = null;
+
+        for (const entry of this._over.entries)
+        {
+            if (!(entry instanceof PuppetASTKeyedEntry))
+                continue;
+
+            const keyed = <PuppetASTKeyedEntry>entry;
+            if (keyed.key instanceof PuppetASTDefault)
+            {
+                default_ = await keyed.value.resolve(context, resolver);
+            }
+            else
+            {
+                const key = await keyed.key.resolve(context, resolver);
+
+                if (key == resolvedValue)
+                {
+                    return await keyed.value.resolve(context, resolver);
+                }
+            }
+        }
+
+        if (default_ == null)
+        {
+            throw new ResolveError(this, "Failed to resolve switch: default value was hit and not provided")
+        }
+
+        return default_;
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTSwitch(args);
+    }
+}
+
 export class PuppetASTQualifiedName extends PuppetASTObject
 {
     private readonly _value: PuppetASTObject;
@@ -152,6 +216,58 @@ export class PuppetASTQualifiedName extends PuppetASTObject
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
     {
         return new PuppetASTQualifiedName(args);
+    }
+}
+
+export class PuppetASTDefault extends PuppetASTObject
+{
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        return "default";
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTDefault(args);
+    }
+}
+
+export class PuppetASTKeyedEntry extends PuppetASTObject
+{
+    private readonly _key: PuppetASTObject;
+    private readonly _value: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this._key = args[0];
+        this._value = args[1];
+    }
+
+    public get key(): PuppetASTObject
+    {
+        return this._key;
+    }
+
+    public get value(): PuppetASTObject
+    {
+        return this._value;
+    }
+
+    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    {
+        return this;
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTKeyedEntry(args);
     }
 }
 
@@ -720,6 +836,9 @@ export class PuppetASTParser
             "->": PuppetASTApplyOrder.Create,
             "~>": PuppetASTNotifyOrder.Create,
             "access": PuppetASTAccess.Create,
+            "=>": PuppetASTKeyedEntry.Create,
+            "default": PuppetASTDefault.Create,
+            "?": PuppetASTSwitch.Create
         };
     }
 
