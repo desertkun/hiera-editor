@@ -12,11 +12,6 @@ function initialize()
 {
     init();
 
-    process.on('uncaughtException', function (error)
-    {
-        console.log("Error: " + error);
-    });
-
     projects_window.show();
 }
 

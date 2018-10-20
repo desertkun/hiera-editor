@@ -332,8 +332,8 @@ describe('Workspaces', () =>
                 if (!(_t instanceof PuppetASTAccess))
                     assert.fail("log_level expected to be access");
                 expect(_t.what).to.be.instanceOf(PuppetASTType);
-                expect(_t.values[0]).to.be.instanceOf(PuppetASTQualifiedName).and.have.deep.property("value", {"_value": "absent"});
-                expect(_t.values[1]).to.be.instanceOf(PuppetASTQualifiedName).and.have.deep.property("value", {"_value": "present"});
+                expect(_t.values[0]).to.be.instanceOf(PuppetASTQualifiedName).and.have.deep.property("value", {"value": "absent"});
+                expect(_t.values[1]).to.be.instanceOf(PuppetASTQualifiedName).and.have.deep.property("value", {"value": "present"});
             }
         });
     });
@@ -423,6 +423,5 @@ describe('Workspaces', () =>
             await expect(node.acquireClass("test")).to.be.rejectedWith("Welp");
         });
     });
-
 });
 

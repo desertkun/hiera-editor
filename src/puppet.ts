@@ -1162,14 +1162,14 @@ export module puppet
 
             const defaultValues: any = {};
 
-            for (const name in compiled.resolvedProperties.getKeys())
+            for (const name of compiled.resolvedProperties.getKeys())
             {
                 const property = compiled.getResolvedProperty(name);
                 const p: any = {};
 
                 if (property.type != null)
                 {
-                    p["type"] = property.type.toString();
+                    p["type"] = property.type;
                 }
 
                 if (property.value != null)

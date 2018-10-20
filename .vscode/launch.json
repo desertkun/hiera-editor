@@ -13,6 +13,7 @@
             "windows": {
                 "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/electron.cmd"
             },
+            "preLaunchTask": "buildTypescript",
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen",
             "args" : [
@@ -39,6 +40,7 @@
                 "-r", "ts-node/register",
                 "--no-timeouts", 
                 "--colors", 
+                "--full-trace",
                 "${workspaceFolder}/src/tests/**/*.ts"
             ],
             "internalConsoleOptions": "openOnSessionStart"
