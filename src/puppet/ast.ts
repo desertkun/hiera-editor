@@ -1111,6 +1111,8 @@ export class PuppetASTClass extends PuppetASTObject
 
         if (this._body)
             await this._body.resolve(this, resolver);
+
+        console.log("Class " + this._name + " has been resolved");
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject

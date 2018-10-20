@@ -704,18 +704,27 @@ export module puppet
                 throw "Not a class";
 
             const clazz: PuppetASTClass = obj;
-            await clazz.resolve(clazz, new class extends Resolver
-            {
-                public resolveClass(className: string): Promise<PuppetASTClass>
-                {
-                    return zis.resolveClass(className, global);
-                }
 
-                public async resolveGlobalVariable(name: string): Promise<string>
+            try
+            {
+                await clazz.resolve(clazz, new class extends Resolver
                 {
-                    return global(name);
-                }
-            });
+                    public resolveClass(className: string): Promise<PuppetASTClass>
+                    {
+                        return zis.resolveClass(className, global);
+                    }
+
+                    public async resolveGlobalVariable(name: string): Promise<string>
+                    {
+                        return global(name);
+                    }
+                });
+            }
+            catch (e)
+            {
+                console.log(e);
+                throw new CompilationError("Failed to compile class: " + e);
+            }
 
             this._compiledClasses.put(className, clazz);
             return clazz;
@@ -1130,7 +1139,7 @@ export module puppet
             return this.configFacts[key] || this._env.global.get(key) || this._env.workspace.global.get(key);
         }
 
-        public async compileClass(className: string): Promise<PuppetASTClass>
+        public async acquireClass(className: string): Promise<PuppetASTClass>
         {
             const zis = this;
             if (!this.hasClass(className))
@@ -1142,10 +1151,39 @@ export module puppet
             });
         }
 
-        public async acquireClass(className: string): Promise<PuppetASTClass>
+        public async dumpClass(className: string): Promise<any>
         {
-            const compiled = await this.compileClass(className);
-            return compiled;
+            const classInfo = this._env.findClassInfo(className);
+
+            if (classInfo == null)
+                return {};
+
+            const compiled = await this.acquireClass(className);
+
+            const defaultValues: any = {};
+
+            for (const name in compiled.resolvedProperties.getKeys())
+            {
+                const property = compiled.getResolvedProperty(name);
+                const p: any = {};
+
+                if (property.type != null)
+                {
+                    p["type"] = property.type.toString();
+                }
+
+                if (property.value != null)
+                {
+                    p["value"] = property.value;
+                }
+
+                defaultValues[name] = p;
+            }
+
+            return {
+                "classInfo": classInfo.dump(),
+                "defaults": defaultValues
+            }
         }
     }
 

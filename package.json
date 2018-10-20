@@ -5,12 +5,10 @@
   "main": "dist/main.js",
   "scripts": {
     "start": "electron .",
-    "debug:win32": "electron %NODE_DEBUG_OPTION% .",
-    "debug:osx": "electron $NODE_DEBUG_OPTION .",
     "postinstall": "npx npmpd && npx run-script-os",
     "install:darwin": "BUNDLE_GEMFILE=./ruby/Gemfile ./node_modules/traveling-ruby-osx/bin/bundle install",
     "install:win32": "cmd /C \"set BUNDLE_GEMFILE=ruby\\Gemfile && node_modules\\traveling-ruby-win32\\bin\\gem install --bindir node_modules\\traveling-ruby-win32\\bin.real --no-ri --no-rdoc bundler && node_modules\\traveling-ruby-win32\\bin\\bundle install\"",
-    "test": "mocha %NODE_DEBUG_OPTION% --timeout 15000 dist/tests/**/*.js"
+    "test": "mocha --timeout 15000 dist/tests/**/*.js"
   },
   "repository": "https://github.com/desertkun/hiera-editor",
   "keywords": [

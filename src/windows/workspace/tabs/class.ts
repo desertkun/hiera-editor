@@ -11,6 +11,7 @@ export class NodeClassTab extends WorkspaceTab
         const classPath = this.path[1];
 
         this.classInfo = await ipc.acquireNodeClass(nodePath, classPath);
+        const a = 1;
     }
 
     async release(): Promise<any>

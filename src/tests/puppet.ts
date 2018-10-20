@@ -97,7 +97,6 @@ async function testSimpleWorkspace(files: any, nodeYAML: any,
 
 describe('Workspaces', () =>
 {
-    /*
     it('missing directory', () =>
     {
         return expect(testRealWorkspace("missing...", "dev", "test")).to.be.rejectedWith(puppet.WorkspaceError);
@@ -408,15 +407,12 @@ describe('Workspaces', () =>
         });
     });
 
-    */
-
     it('functors', () =>
     {
         return testSimpleWorkspace({
             "init.pp": `
-                class test (
-                ) {
-                    fail("Welp");
+                class test {
+                    fail("Welp")
                 }
             `
         }, {"classes": ["test"]}, async (
@@ -424,11 +420,7 @@ describe('Workspaces', () =>
             environment: puppet.Environment,
             node: puppet.Node) =>
         {
-            const class_ = await node.acquireClass("test");
-
-            expect(class_.getResolvedProperty("v").value).to.be.equal("it_was_b");
-            expect(class_.getResolvedProperty("b").value).to.be.equal("ddddd");
-
+            await expect(node.acquireClass("test")).to.be.rejectedWith("Welp");
         });
     });
 

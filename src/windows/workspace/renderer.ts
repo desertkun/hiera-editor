@@ -330,7 +330,7 @@ export class WorkspaceRenderer
 
             if (hasDefault && keys.length > 1)
             {
-                await this.closeTab(["default"]);
+                await this.closeTab("default");
             }
         }
     }
@@ -346,9 +346,6 @@ export class WorkspaceRenderer
             $(tab.buttonNode).find('a').tab('show');
             return;
         }
-
-        if (path.length < 1)
-            return;
 
         const fixedPath = key.replace(/:/g, '_');
 
@@ -395,7 +392,7 @@ export class WorkspaceRenderer
         if (_tab.canBeClosed)
         {
             const _i = $('<i class="fas fa-times close-btn"></i>').appendTo(_a).click(() => {
-                this.closeTab(path);
+                this.closeTab(key);
             });
         }
 
@@ -406,10 +403,8 @@ export class WorkspaceRenderer
         await this.checkEmpty();
     }
 
-    public async closeTab(path: Array<string>): Promise<any>
+    public async closeTab(key: string): Promise<any>
     {
-        const key = path.join("_");
-
         if (!this.tabs.has(key))
             return;
 

@@ -114,7 +114,7 @@ register("acquire-node-class", async function(reply: any, nodePath: string, clas
         return null;
     }
 
-    return await node.acquireClass(className);
+    return await node.dumpClass(className);
 });
 
 register("get-class-info", async function(reply: any, env: string): Promise<any>

@@ -1,5 +1,5 @@
 
-import { app, BrowserWindow } from "electron";
+import { app } from "electron";
 import * as path from "path";
 import * as url from "url";
 import { puppet } from "./puppet";
@@ -11,6 +11,12 @@ import { init, projects_window } from "./global"
 function initialize() 
 {
     init();
+
+    process.on('uncaughtException', function (error)
+    {
+        console.log("Error: " + error);
+    });
+
     projects_window.show();
 }
 
