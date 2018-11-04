@@ -648,8 +648,6 @@ export class PuppetASTList extends PuppetASTObject
                 {
                     console.log(e);
                 }
-
-                throw e
             }
         }
     }
@@ -951,8 +949,17 @@ export class PuppetASTSetInstruction extends PuppetASTObject
         }
 
         const paramName = this.receiver.name;
-        const result = await this.provider.resolve(context, resolver);
-        const pp = new PuppetASTResolvedProperty(null, result);
+        let pp;
+        try
+        {
+            const result = await this.provider.resolve(context, resolver);
+            pp = new PuppetASTResolvedProperty(null, result);
+        }
+        catch (e)
+        {
+            pp = new PuppetASTResolvedProperty(null, null, e);
+        }
+        
         context.setResolvedProperty(paramName, pp);
         return pp;
     }
@@ -1070,6 +1077,8 @@ export class PuppetASTParser
             "paren": PuppetASTParenthesis.Create,
             "if": PuppetASTIf.Create,
             "call": PuppetASTIgnored.Create("call"),
+            "exported-query": PuppetASTIgnored.Create("exported-query"),
+            "collect": PuppetASTIgnored.Create("collect"),
             "invoke": PuppetASTInvoke.Create,
             "array": PuppetASTArray.Create
         };
