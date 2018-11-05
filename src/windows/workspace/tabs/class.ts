@@ -1,17 +1,315 @@
 import {ipc} from "../../../ipc/client";
 import {WorkspaceTab} from "./tab";
+import {WorkspaceRenderer} from "../renderer";
+
+const $ = require("jquery");
+
+interface RenderedProperty
+{
+    value(): any;
+}
+
+type PropertyChangedCallback = (value: any) => void;
+
+interface PropertyRenderer
+{
+    render(group: any, propertyId: string, property: any, value: any, changed: PropertyChangedCallback): RenderedProperty;
+}
+
+class StringPropertyRenderer implements PropertyRenderer
+{
+    public render(group: any, propertyId: string, property: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    {
+        const textField = $('<input type="text" class="form-control" id="' + propertyId + '">')
+            .appendTo(group)
+            .val(value)
+            .change(function()
+            {
+                changed($(this).val());
+            });
+
+        if (property.value)
+        {
+            $(textField).attr('placeholder', property.value);
+        }
+
+        return {
+            value(): any
+            {
+                return textField.val();
+            }
+        };
+    }
+}
+
+class NumberPropertyRenderer implements PropertyRenderer
+{
+    private isNumberKey(event: any)
+    {
+        var charCode = (event.which) ? event.which : event.keyCode;
+
+        if (charCode != 46 && charCode > 31  && (charCode < 48 || charCode > 57))
+            return false;
+
+        return true;
+    }  
+
+    public render(group: any, propertyId: string, property: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    {
+        const textField = $('<input type="text" class="form-control" id="' + propertyId + '">')
+            .appendTo(group)
+            .val(value)
+            .keypress(this.isNumberKey);
+
+        if (property.value)
+        {
+            $(textField).attr('placeholder', property.value);
+        }
+
+        return {
+            value(): any
+            {
+                return textField.val();
+            }
+        };
+    }
+}
+
+class BooleanPropertyRenderer implements PropertyRenderer
+{
+    public render(group: any, propertyId: string, property: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    {
+        const textField = $('<input type="checkbox" id="' + propertyId + '">')
+            .appendTo(group)
+            .bootstrapSwitch({
+                state: value,
+                onSwitchChange: (event: any, state: boolean) =>
+                {
+                    changed(state);
+                }
+            });
+
+        return {
+            value(): any
+            {
+                return textField.bootstrapSwitch('state');
+            }
+        };
+    }
+}
 
 export class NodeClassTab extends WorkspaceTab
 {
-    private classInfo: any;
+    private info: any;
+    private className: string;
+    private nodePath: string;
+    private editor: any;
+    private renderedProperties: any;
+
+    public constructor(path: Array<string>, buttonNode: any, contentNode: any, renderer: WorkspaceRenderer)
+    {
+        super(path, buttonNode, contentNode, renderer);
+
+        this.renderedProperties = {};
+    }
 
     async init(): Promise<any>
     {
-        const nodePath = this.path[0];
-        const classPath = this.path[1];
+        this.nodePath = this.path[0];
+        this.className = this.path[1];
+        this.info = await ipc.acquireNodeClass(this.nodePath, this.className);
+    }
 
-        this.classInfo = await ipc.acquireNodeClass(nodePath, classPath);
-        const a = 1;
+    private buildValue(classInfo: any): any
+    {
+        const properties: any = {};
+
+        for (const property_name in classInfo.defaults)
+        {
+            const property = classInfo.defaults[property_name];
+
+            if (property.hasOwnProperty("value"))
+            {
+                properties[property_name] = property.value;
+            }
+        }
+
+        return properties
+    }
+
+    private getPropertyRenderer(type: any): PropertyRenderer
+    {
+        switch (type.type)
+        {
+            case "String":
+            {
+                switch(type.data)
+                {
+                    case "String":
+                    {
+                        return new StringPropertyRenderer();
+                    }
+                    case "Integer":
+                    {
+                        return new NumberPropertyRenderer();
+                    }
+                    case "Boolean":
+                    {
+                        return new BooleanPropertyRenderer();
+                    }
+                }
+            }
+            case "PuppetASTAccess":
+            {
+                switch (type.data.what.type.value)
+                {
+                    case "Optional":
+                    {
+                        return this.getPropertyRenderer(type.data.values[0]);
+                    }
+                    /*
+                    case "Enum":
+                    {
+                        const enum_: Array<string> = [];
+
+                        for (const obj of type.data.values)
+                        {
+                            enum_.push(obj.value);
+                        }
+
+                        out["enum"] = enum_;
+                    }
+                    */
+                }
+            }
+        }
+
+        return new StringPropertyRenderer();
+    }
+
+    public classFields(): Array<string>
+    {
+        return this.info.classInfo.fields;
+    }
+
+    public get defaults(): any
+    {
+        return this.info.defaults;
+    }
+
+    public get values(): any
+    {
+        return this.info.values;
+    }
+
+    public classInfo(): any
+    {
+        return this.info.classInfo;
+    }
+
+    public render(): any
+    {
+        const editorHolder = $('<div class="w-100 node-class-properties"></div>').appendTo(this.contentNode);
+
+        this.renderProperties(editorHolder);
+    }
+
+    private fixedPropertyName(name: string): string
+    {
+        return name.replace(/:/g, "_");
+    }
+
+    private renderProperty(propertyName: string, node: any)
+    {
+        const zis = this;
+
+        const propertyId = 'property-' + this.fixedPropertyName(propertyName);
+        
+        const humanName = propertyName.replace(/_/g, " ").replace(/\w\S*/g, function(txt){
+            return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+        });
+
+        const property: any = this.defaults[propertyName];
+        const defaultValue = property.value;
+        const value: any = this.values[propertyName] || defaultValue;
+
+        const label = $('<div></div>').appendTo(node);
+        
+        const modified = $('<i class="fas fa-pen node-class-property-modified-icon" style="display: none;"></i>').appendTo(label);
+        const labelText = $('<label for="' + propertyId + '">' + humanName + '</label>').appendTo(label);
+
+        if (value != defaultValue)
+        {
+            modified.show();
+            $(label).addClass("text-primary");
+        }
+
+        const group = $('<div class="input-group"></div>').appendTo(node);
+
+        let renderer, type;
+
+        if (property.hasOwnProperty("type"))
+        {
+            type = property.type;
+            renderer = this.getPropertyRenderer(property.type);
+        }
+        else
+        {
+            type = null;
+            renderer = new StringPropertyRenderer();
+        }
+
+        this.renderedProperties[propertyName] = renderer.render(group, propertyId, property, value, function(value: any)
+        {
+            if (value != defaultValue)
+            {
+                modified.show();
+                label.addClass("text-primary");
+            }
+            else
+            {
+                modified.hide();
+                label.removeClass("text-primary");
+            }
+
+            ipc.setNodeClassProperty(zis.nodePath, zis.className, propertyName, value);
+        });
+        
+        if (property.hasOwnProperty("error"))
+        {
+            const p_ = $('<div class="input-group-append"></div>').appendTo(group);
+            const tooltipTitle = "Cannot resolve defaults:<br/>" + property.error.message;
+            const b_ = $('<button class="btn btn-outline-warning" type="button" data-toggle="tooltip" data-placement="left">' + 
+                '<i class="fas fa-exclamation-triangle"></i></button>').appendTo(p_).tooltip({
+                    title: tooltipTitle,
+                    html: true
+                });
+        }
+
+        
+    }
+
+    public getIcon(): any
+    {
+        const iconData = this.info.icon;
+
+        if (iconData != null)
+        {
+            return $('<img class="node-entry-icon" src="' + iconData + '" style="width: 16px; height: 16px;">');
+        }
+        else
+        {
+            return $('<i class="fas fa-puzzle-piece"></i>');
+        }
+    }
+
+    private renderProperties(node: any)
+    {
+        for (const fieldName of this.classFields())
+        {
+            const inputGroup = $('<div class="node-class-property"></div>').appendTo(node);
+            this.renderProperty(fieldName, inputGroup);
+        }
     }
 
     async release(): Promise<any>
@@ -19,13 +317,9 @@ export class NodeClassTab extends WorkspaceTab
 
     }
 
-    render(): any
-    {
-    }
-
     get shortTitle(): string
     {
-        return this.path[1];
+        return this.className;
     }
 
     get fullTitle(): string

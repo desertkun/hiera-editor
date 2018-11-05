@@ -874,6 +874,7 @@ export class PuppetASTClass extends PuppetASTObject
             hints.length = 0;
 
             const param = this.params[paramName];
+
             let type = param.type;
             const value = param.value;
 
@@ -1027,6 +1028,11 @@ export class PuppetASTVariable extends PuppetASTObject
 
             if (property)
             {
+                if (property.error)
+                {
+                    throw property.error;
+                }
+                
                 return property.value;
             }
         }

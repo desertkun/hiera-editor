@@ -62,3 +62,15 @@
 }
 
 .class-group-subgroups {}
+
+.node-class-properties {
+    padding: 8px;
+}
+
+.node-class-property {
+    padding-bottom: 8px;
+}
+
+.node-class-property-modified-icon {
+    padding-right: 8px;
+}

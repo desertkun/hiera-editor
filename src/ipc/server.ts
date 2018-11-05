@@ -5,12 +5,12 @@ import { projects_list, projects_window, workspace_window, setCurrentWorkspace, 
 import { ProjectsModel, ProjectModel } from "../projects"
 import { puppet } from "../puppet"
 
-register("add-project", async function(reply: any, path: string)
+register("addProject", async function(reply: any, path: string)
 {
     return await projects_list.addProject(path);
 });
 
-register("open-project", async function(reply: any, path: string)
+register("openProject", async function(reply: any, path: string)
 {
     const project: ProjectModel = projects_list.getProject(path);
 
@@ -22,7 +22,7 @@ register("open-project", async function(reply: any, path: string)
     projects_window.close();
 });
 
-register("get-projects-list", async function(reply: any)
+register("getProjectList", async function(reply: any)
 {
     const projects: Array<ProjectModel> = projects_list.list;
     const result: any = [];
@@ -41,7 +41,7 @@ register("get-projects-list", async function(reply: any)
     return result
 });
 
-register("get-environments-list", async function(reply: any)
+register("getEnvironmentList", async function(reply: any)
 {
     const workspace: puppet.Workspace = getCurrentWorkspace();
 
@@ -60,7 +60,7 @@ register("get-environments-list", async function(reply: any)
     return names;
 });
 
-register("get-environment-tree", async function(reply: any, name: string): Promise<any>
+register("getEnvironmentTree", async function(reply: any, name: string): Promise<any>
 {
     const workspace: puppet.Workspace = getCurrentWorkspace();
 
@@ -79,7 +79,7 @@ register("get-environment-tree", async function(reply: any, name: string): Promi
     return await environment.root.tree();
 });
 
-register("find-node", async function(reply: any, localPath: string): Promise<any>
+register("findNode", async function(reply: any, localPath: string): Promise<any>
 {
     const workspace: puppet.Workspace = getCurrentWorkspace();
 
@@ -98,7 +98,7 @@ register("find-node", async function(reply: any, localPath: string): Promise<any
     return node.dump();
 });
 
-register("acquire-node-class", async function(reply: any, nodePath: string, className: string): Promise<any>
+register("acquireNodeClass", async function(reply: any, nodePath: string, className: string): Promise<any>
 {
     const workspace: puppet.Workspace = getCurrentWorkspace();
 
@@ -117,7 +117,28 @@ register("acquire-node-class", async function(reply: any, nodePath: string, clas
     return await node.dumpClass(className);
 });
 
-register("get-class-info", async function(reply: any, env: string): Promise<any>
+
+register("setNodeClassProperty", async function(reply: any, 
+    nodePath: string, className: string, propertyName: string, value: any): Promise<any>
+{
+    const workspace: puppet.Workspace = getCurrentWorkspace();
+
+    if (workspace == null)
+    {
+        return null;
+    }
+
+    const node = await workspace.findNode(nodePath);
+
+    if (node == null)
+    {
+        return null;
+    }
+
+    return await node.setClassProperty(className, propertyName, value);
+});
+
+register("getClassInfo", async function(reply: any, env: string): Promise<any>
 {
     const workspace: puppet.Workspace = getCurrentWorkspace();
 
@@ -136,7 +157,7 @@ register("get-class-info", async function(reply: any, env: string): Promise<any>
     return environment.getClassInfo();
 });
 
-register("refresh-workspace", async function(reply: any): Promise<any>
+register("refreshWorkspace", async function(reply: any): Promise<any>
 {
     const workspace: puppet.Workspace = getCurrentWorkspace();
 
@@ -146,13 +167,13 @@ register("refresh-workspace", async function(reply: any): Promise<any>
     }
 
     await workspace.refresh((progress: number) => {
-        workspace_window.browserWindow.webContents.send("refresh-workspace-progress", progress);
+        workspace_window.browserWindow.webContents.send("refreshWorkspaceProgress", progress);
     }, (text: string) => {
-        workspace_window.browserWindow.webContents.send("refresh-workspace-category", text);
+        workspace_window.browserWindow.webContents.send("refreshWorkspaceCategory", text);
     });
 });
 
-register("show-open-directory-dialog", function(reply: any, defaultPath?: string)
+register("showOpenDirectoryDialog", function(reply: any, defaultPath?: string)
 {
     return new Promise<string>((resolve, reject) => 
     {
@@ -175,7 +196,7 @@ register("show-open-directory-dialog", function(reply: any, defaultPath?: string
     });
 });
 
-register("get-current-workspace-path", async function()
+register("getCurrentWorkspacePath", async function()
 {
     const workspace: puppet.Workspace = getCurrentWorkspace();
 

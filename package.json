@@ -46,7 +46,7 @@
     "npm": "^5.6.0",
     "slash": "^2.0.0",
     "text-ellipsis": "^1.0.3",
-    "yamljs": "^0.3.0"
+    "yaml": "^1.0.0"
   },
   "darwinDependencies": {
     "traveling-ruby-osx": "latest"

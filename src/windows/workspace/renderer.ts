@@ -219,12 +219,12 @@ class EnvironmentTreeItemRenderer
 
     private async init()
     {
-        electron.ipcRenderer.on('refresh-workspace-category', function(event: any, text: number)
+        electron.ipcRenderer.on('refreshWorkspaceCategory', function(event: any, text: number)
         {
             $('#loading-category').text(text);
         });
 
-        electron.ipcRenderer.on('refresh-workspace-progress', function(event: any, progress: number)
+        electron.ipcRenderer.on('refreshWorkspaceProgress', function(event: any, progress: number)
         {
             const p = Math.floor(progress * 100);
             $('#loading-progress').css('width', "" + p + "%");

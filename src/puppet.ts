@@ -118,6 +118,11 @@ export module puppet
             return this.info["file"];
         }
 
+        public get fields(): Array<string>
+        {
+            return Object.keys(this.info["defaults"] || {});
+        }
+
         public get description(): string
         {
             return this._description;
@@ -143,6 +148,7 @@ export module puppet
             return {
                 "name": this.name,
                 "file": this.info["file"],
+                "fields": this.fields,
                 "inherits": this.info["inherits"],
                 "description": this.description,
                 "options": this.options
@@ -1093,6 +1099,11 @@ export module puppet
             }
         }
 
+        public get config()
+        {
+            return this._config;
+        }
+
         public get configFacts()
         {
             return this._config["facts"] || {};
@@ -1108,10 +1119,21 @@ export module puppet
             await this.refresh();
         }
 
+        public async save()
+        {
+            const ordered: any = {};
+
+            for (const key of Object.keys(this._config).sort())
+            {
+              ordered[key] = this._config[key];
+            }
+
+            await async.writeYAML(this.path, ordered);
+        }
+
         public async refresh()
         {
             this._config = await async.readYAML(this.path);
-            const a = 0;
         }
 
         public get name():string
@@ -1151,6 +1173,29 @@ export module puppet
             });
         }
 
+        public compilePropertyPath(className: string, propertyName: string): string
+        {
+            return className + "::" + propertyName;
+        }
+
+        public async setClassProperty(className: string, propertyName: string, value: any): Promise<any>
+        {
+            const classInfo = this._env.findClassInfo(className);
+
+            if (classInfo == null)
+                return;
+
+            const compiled = await this.acquireClass(className);
+
+            if (!compiled)
+                return;
+
+            const propertyPath = this.compilePropertyPath(className, propertyName);
+            this.config[propertyPath] = value;
+
+            await this.save();
+        }
+
         public async dumpClass(className: string): Promise<any>
         {
             const classInfo = this._env.findClassInfo(className);
@@ -1161,6 +1206,7 @@ export module puppet
             const compiled = await this.acquireClass(className);
 
             const defaultValues: any = {};
+            const values: any = {};
 
             for (const name of compiled.resolvedProperties.getKeys())
             {
@@ -1169,7 +1215,10 @@ export module puppet
 
                 if (property.type != null)
                 {
-                    p["type"] = property.type;
+                    p["type"] = {
+                        "type": property.type.constructor.name,
+                        "data": property.type
+                    };
                 }
 
                 if (property.value != null)
@@ -1177,10 +1226,27 @@ export module puppet
                     p["value"] = property.value;
                 }
 
+                if (property.error != null)
+                {
+                    p["error"] = {
+                        message: property.error.message,
+                        stack: property.error.stack
+                    };
+                }
+
                 defaultValues[name] = p;
+
+                const propertyPath = this.compilePropertyPath(className, name);
+                const configValue = this.config[propertyPath];
+                if (configValue != null)
+                {
+                    values[name] = configValue;
+                }
             }
 
             return {
+                "icon": classInfo.options.icon,
+                "values": values,
                 "classInfo": classInfo.dump(),
                 "defaults": defaultValues
             }
