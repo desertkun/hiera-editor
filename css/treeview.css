@@ -1,0 +1,56 @@
+
+.treeview-node {
+    width: 100%;
+    font-size: 14px;
+    cursor: default;
+    user-select: none;
+}
+
+.treeview-node-child {
+    padding-left: 20px;
+}
+
+div.treeview-node-childs-empty {
+    display: none;
+    padding-left: 24px;
+}
+
+div.treeview-node-childs-empty:only-child {
+    display: block;
+}
+
+.treeview-node-header {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.treeview-node-text {
+    padding: 6px;
+}
+
+.treeview-node-text :first-child {
+    margin-right: 6px;
+}
+
+.treeview-node-header:hover .treeview-node-text {
+    background-color: #DBF1FF;
+}
+
+.treeview-node-text-bold {
+    font-weight: bold;
+}
+
+.treeview-node-selected .treeview-node-text {
+  background-color: #2082ff !important;
+  color: #fff;
+}
+
+.treeview-collapse-icon {
+    display: inline-block;
+    text-align: center;
+    width: 20px;
+    height: 20px;    
+    margin-left: 4px;
+    margin-right: -4px;
+}

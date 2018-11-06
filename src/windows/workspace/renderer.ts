@@ -14,6 +14,7 @@ import {DefaultTab} from "./tabs/default";
 import {NodeClassTab} from "./tabs/class";
 
 import {puppet} from "../../puppet";
+import {TreeView, TreeViewNode} from "./treeview";
 
 let renderer: WorkspaceRenderer;
 let selectedNode: any = null;
@@ -24,11 +25,10 @@ class NodeTreeItemRenderer
     private path: string;
     private localPath: string;
 
-    private readonly n_parent: any;
-    private n_node: any;
-    private n_header: any;
+    private readonly n_parent: TreeViewNode;
+    private n_node: TreeViewNode;
 
-    constructor(name: string, path: string, localPath: string, parentNode: any)
+    constructor(name: string, path: string, localPath: string, parentNode: TreeViewNode)
     {
         this.name = name;
         this.path = path;
@@ -41,21 +41,42 @@ class NodeTreeItemRenderer
     {
         const zis = this;
 
-        this.n_node = $('<div class="workspace-node"></div>').appendTo(this.n_parent).click(() =>
+        this.n_node = this.n_parent.addChild( 
+            (node) => 
         {
-            if (selectedNode)
-            {
-                selectedNode.removeClass('workspace-node-selected');
-            }
-
-            selectedNode = zis.n_header;
-            selectedNode.addClass('workspace-node-selected');
-
-            renderer.openTab("node", [zis.localPath]);
+            node.icon = $('<i class="fa fa-server"></i>');
+            node.title = zis.name;
+            node.leaf = true;
+            node.selectable = (node) => {
+                renderer.openTab("node", [zis.localPath]);
+            };
         });
 
-        this.n_header = $('<span class="workspace-node-text"><i class="fa fa-server"></i> ' +
-            this.name + '</span>').appendTo(this.n_node);
+        /*
+        const n_classes = this.n_node.addChild( 
+            (node) => 
+        {
+            node.icon = $('<i class="fas fa-puzzle-piece"></i>');
+            node.title = "Classes";
+            node.emptyText = "Node has no classes";
+            node.leaf = false;
+            node.selectable = (node) => {
+                //renderer.openTab("class", [this.tab.nodePath, clazz.fullName]);
+            };
+        });
+
+        const n_resources = this.n_node.addChild( 
+            (node) => 
+        {
+            node.icon = $('<i class="far fa-clone"></i>');
+            node.title = "Resources";
+            node.emptyText = "Node has no resources";
+            node.leaf = false;
+            node.selectable = (node) => {
+                //renderer.openTab("class", [this.tab.nodePath, clazz.fullName]);
+            };
+        });
+        */
     }
 }
 
@@ -66,11 +87,10 @@ class FolderTreeItemRenderer
     private name: string;
     private root: boolean;
 
-    private n_folder: any;
-    private readonly n_parent: any;
-    private n_nodes: any;
+    private readonly n_parent: TreeViewNode;
+    private n_nodes: TreeViewNode;
 
-    constructor(name: string, parentNode: any, root: boolean)
+    constructor(name: string, parentNode: TreeViewNode, root: boolean)
     {
         this.name = name;
         this.nodes = new Dictionary();
@@ -82,25 +102,6 @@ class FolderTreeItemRenderer
         this.render();
     }
 
-    private headerClick()
-    {
-        const entry = $(this).parent();
-        const i = $(this).children('span.collapse-icon').children('i');
-
-        if (entry.hasClass('workspace-folder-opened'))
-        {
-            i.removeClass().addClass('fa fa-angle-right');
-            entry.removeClass('workspace-folder-opened');
-            entry.children('.workspace-nodes').hide();
-        }
-        else
-        {
-            i.removeClass().addClass('fa fa-angle-down');
-            entry.addClass('workspace-folder-opened');
-            entry.children('.workspace-nodes').show();
-        }
-    }
-
     private render()
     {
         if (this.root)
@@ -109,23 +110,14 @@ class FolderTreeItemRenderer
         }
         else
         {
-            this.n_folder = $('<div class="workspace-folder"></div>').appendTo(this.n_parent);
+            const zis = this;
 
-            const header = $('<div class="workspace-folder-header"></div>').
-                appendTo(this.n_folder).click(this.headerClick);
-
-            const title = $('<span class="collapse-icon"><i class="fa fa-angle-right"></i></span>' +
-                '<span class="workspace-folder-text"><i class="fa fa-folder"></i> ' +
-                this.name + '</span>').appendTo(header);
-
-            //$('<span class="workspace-environment-button"><i class="fas fa-plus"></i></span>').appendTo(header);
-
-            this.n_nodes = $('<div class="workspace-nodes" style="display: none;"></div>').appendTo(this.n_folder);
-
-            $('<div class="workspace-nodes-empty">' +
-                '<span class="text text-muted">No nodes</span></div>').appendTo(this.n_nodes);
+            this.n_nodes = this.n_parent.addChild( 
+                (node) => {
+                    node.title = zis.name;
+                    node.icon = $('<i class="fa fa-folder"></i>');
+                });
         }
-
     }
 
     public addNode(name: string, path: string, localPath: string): NodeTreeItemRenderer
@@ -163,58 +155,34 @@ class EnvironmentTreeItemRenderer
     private root: FolderTreeItemRenderer;
     private name: string;
 
-    private n_environment: any;
-    private readonly n_parent: any;
-    private n_nodes: any;
+    private n_environment: TreeViewNode;
+    private readonly n_treeView: TreeViewNode;
 
-    constructor(name: string, parentNode: any)
+    constructor(name: string, treeView: TreeViewNode)
     {
         this.name = name;
 
-        this.n_parent = parentNode;
+        this.n_treeView = treeView;
 
         this.render();
-
-        this.root = new FolderTreeItemRenderer("root", this.n_nodes, true);
+        this.root = new FolderTreeItemRenderer("root", this.n_environment, true);
 
         this.init();
     }
 
-    private headerClick()
-    {
-        const entry = $(this).parent();
-        const i = $(this).children('span.collapse-icon').children('i');
-
-        if (entry.hasClass('workspace-environment-opened'))
-        {
-            i.removeClass().addClass('fa fa-angle-right');
-            entry.removeClass('workspace-environment-opened');
-            entry.children('.workspace-nodes').hide();
-        }
-        else
-        {
-            i.removeClass().addClass('fa fa-angle-down');
-            entry.addClass('workspace-environment-opened');
-            entry.children('.workspace-nodes').show();
-        }
-    }
-
     private render()
     {
-        this.n_environment = $('<div class="workspace-environment" id="environment-' + this.name +
-            '"></div>').appendTo(this.n_parent);
+        const zis = this;
 
-        const header = $('<div class="workspace-environment-header"></div>').
-            appendTo(this.n_environment).click(this.headerClick);
-        const title = $('<span class="collapse-icon"><i class="fa fa-angle-right"></i></span>' +
-            '<span class="workspace-environment-text"><i class="ic ic-environment"></i> ' +
-            this.name + '</span>').appendTo(header);
-        $('<span class="workspace-environment-button"><i class="fas fa-plus"></i></span>').appendTo(header);
-
-        this.n_nodes = $('<div class="workspace-nodes" style="display: none;"></div>').appendTo(this.n_environment);
-
-        $('<div class="workspace-nodes-empty">' +
-            '<span class="text text-muted">No nodes</span></div>').appendTo(this.n_nodes);
+        this.n_environment = this.n_treeView.addChild( 
+            (node) => 
+        {
+            node.title = zis.name;
+            node.bold = true;
+            node.emptyText = "No nodes";
+            node.icon = $('<i class="ic ic-environment"/>');
+        }, "environment-" + this.name);
+        
     }
 
     private async init()
@@ -240,11 +208,11 @@ export class WorkspaceRenderer
     settingsTimer: NodeJS.Timer;
     environments: Dictionary<string, EnvironmentTreeItemRenderer>;
     tabs: Dictionary<string, WorkspaceTab>;
+    private workspaceTree: TreeView;
 
     private readonly tabClasses: Dictionary<string, WorkspaceTabConstructor>;
     n_editorTabs: any;
     n_editorContent: any;
-    n_workspace: any;
 
     constructor()
     {
@@ -272,7 +240,7 @@ export class WorkspaceRenderer
             document.title = ellipsis(path, 80, {side: 'start'});
         }
 
-        this.n_workspace = $('#workspace');
+        this.workspaceTree = new TreeView($('#workspace'));
 
         const environments: string[] = await ipc.getEnvironmentList();
 
@@ -288,7 +256,7 @@ export class WorkspaceRenderer
 
     public addEnvironment(name: string): EnvironmentTreeItemRenderer
     {
-        const environment = new EnvironmentTreeItemRenderer(name, this.n_workspace);
+        const environment = new EnvironmentTreeItemRenderer(name, this.workspaceTree.root);
         this.environments.put(name, environment);
         return environment;
     }
