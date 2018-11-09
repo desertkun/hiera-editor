@@ -5,7 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as child_process from "child_process";
 
-const YAML = require('yaml');
+import * as YAML from "yaml";
 
 export function fileExists(path: string): Promise<boolean>
 {
@@ -390,7 +390,7 @@ export function writeYAML(filePath: string, data: any): Promise<any>
 
         try
         {
-            dumped = YAML.stringify(data, 2, 2);
+            dumped = YAML.stringify(data, {});
         }
         catch (e)
         {
