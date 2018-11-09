@@ -21,20 +21,78 @@ let selectedNode: any = null;
 
 class NodeTreeItemRenderer
 {
+    private renderer: WorkspaceRenderer;
     private name: string;
     private path: string;
     private localPath: string;
+    private info: any;
+    private classInfo: any;
 
     private readonly n_parent: TreeViewNode;
     private n_node: TreeViewNode;
 
-    constructor(name: string, path: string, localPath: string, parentNode: TreeViewNode)
+    constructor(renderer: WorkspaceRenderer, 
+        name: string, path: string, localPath: string, parentNode: TreeViewNode)
     {
+        this.renderer = renderer;
         this.name = name;
         this.path = path;
         this.localPath = localPath;
         this.n_parent = parentNode;
+    }
+
+    public async init()
+    {
+        this.info = await ipc.findNode(this.localPath);
+        this.classInfo = await renderer.getClassInfo(this.info.env);
         this.render();
+    }
+
+    private renderClasses(node: TreeViewNode, parentClassPath: string): boolean
+    {
+        const zis = this;
+        let hadAny: boolean = false;
+
+        for (const className of this.info.classes)
+        {
+            const classInfo = this.classInfo.classes[className];
+
+            const classPath: Array<string> = className.split("::");
+            const name = classPath[classPath.length - 1];
+            classPath.splice(classPath.length - 1, 1);
+            const parentName = classPath.join("::");
+
+            //if (parentClassPath != null && parentName != parentClassPath)
+            //    continue;
+
+            console.log(className);
+
+            const iconData = classInfo.options.icon;
+
+            const classNode = node.addChild( 
+                (node) => 
+            {
+                if (iconData != null)
+                {
+                    node.icon = $('<img class="node-entry-icon" src="' + iconData + 
+                        '" style="width: 16px; height: 16px;">');
+                }
+                else
+                {
+                    node.icon = $('<i class="node-entry-icon fas fa-puzzle-piece"></i>');
+                }
+
+                node.title = className;
+                node.leaf = true;
+                node.selectable = (node) => {
+                    renderer.openTab("class", [zis.localPath, className]);
+                };
+            });
+
+            hadAny = true;
+        }
+
+        return hadAny;
     }
 
     private render()
@@ -46,13 +104,11 @@ class NodeTreeItemRenderer
         {
             node.icon = $('<i class="fa fa-server"></i>');
             node.title = zis.name;
-            node.leaf = true;
             node.selectable = (node) => {
                 renderer.openTab("node", [zis.localPath]);
             };
         });
 
-        /*
         const n_classes = this.n_node.addChild( 
             (node) => 
         {
@@ -65,6 +121,8 @@ class NodeTreeItemRenderer
             };
         });
 
+        this.renderClasses(n_classes, null);
+
         const n_resources = this.n_node.addChild( 
             (node) => 
         {
@@ -76,12 +134,12 @@ class NodeTreeItemRenderer
                 //renderer.openTab("class", [this.tab.nodePath, clazz.fullName]);
             };
         });
-        */
     }
 }
 
 class FolderTreeItemRenderer
 {
+    private renderer: WorkspaceRenderer;
     private nodes: Dictionary<string, NodeTreeItemRenderer>;
     private folders: Dictionary<string, FolderTreeItemRenderer>;
     private name: string;
@@ -90,8 +148,9 @@ class FolderTreeItemRenderer
     private readonly n_parent: TreeViewNode;
     private n_nodes: TreeViewNode;
 
-    constructor(name: string, parentNode: TreeViewNode, root: boolean)
+    constructor(renderer: WorkspaceRenderer, name: string, parentNode: TreeViewNode, root: boolean)
     {
+        this.renderer = renderer;
         this.name = name;
         this.nodes = new Dictionary();
         this.folders = new Dictionary();
@@ -122,14 +181,14 @@ class FolderTreeItemRenderer
 
     public addNode(name: string, path: string, localPath: string): NodeTreeItemRenderer
     {
-        const node = new NodeTreeItemRenderer(name, path, localPath, this.n_nodes);
+        const node = new NodeTreeItemRenderer(this.renderer, name, path, localPath, this.n_nodes);
         this.nodes.put(name, node);
         return node;
     }
 
     public addFolder(name: string): FolderTreeItemRenderer
     {
-        const folder = new FolderTreeItemRenderer(name, this.n_nodes, false);
+        const folder = new FolderTreeItemRenderer(this.renderer, name, this.n_nodes, false);
         this.folders.put(name, folder);
         return folder;
     }
@@ -145,29 +204,30 @@ class FolderTreeItemRenderer
 
         for (const nodeEntry of tree.nodes)
         {
-            this.addNode(nodeEntry.name, nodeEntry.path, nodeEntry.localPath);
+            const node = this.addNode(nodeEntry.name, nodeEntry.path, nodeEntry.localPath);
+            await node.init();
         }
     }
 }
 
 class EnvironmentTreeItemRenderer
 {
+    private renderer: WorkspaceRenderer;
     private root: FolderTreeItemRenderer;
     private name: string;
 
     private n_environment: TreeViewNode;
     private readonly n_treeView: TreeViewNode;
 
-    constructor(name: string, treeView: TreeViewNode)
+    constructor(renderer: WorkspaceRenderer, name: string, treeView: TreeViewNode)
     {
+        this.renderer = renderer;
         this.name = name;
 
         this.n_treeView = treeView;
 
         this.render();
-        this.root = new FolderTreeItemRenderer("root", this.n_environment, true);
-
-        this.init();
+        this.root = new FolderTreeItemRenderer(renderer, "root", this.n_environment, true);
     }
 
     private render()
@@ -185,7 +245,7 @@ class EnvironmentTreeItemRenderer
         
     }
 
-    private async init()
+    public async init()
     {
         electron.ipcRenderer.on('refreshWorkspaceCategory', function(event: any, text: number)
         {
@@ -209,6 +269,7 @@ export class WorkspaceRenderer
     environments: Dictionary<string, EnvironmentTreeItemRenderer>;
     tabs: Dictionary<string, WorkspaceTab>;
     private workspaceTree: TreeView;
+    private cachedClassInfo: any;
 
     private readonly tabClasses: Dictionary<string, WorkspaceTabConstructor>;
     n_editorTabs: any;
@@ -216,7 +277,7 @@ export class WorkspaceRenderer
 
     constructor()
     {
-        this.init();
+        this.cachedClassInfo = {};
 
         this.environments = new Dictionary();
         this.tabs = new Dictionary();
@@ -225,6 +286,20 @@ export class WorkspaceRenderer
         this.tabClasses.put("node", NodeTab);
         this.tabClasses.put("default", DefaultTab);
         this.tabClasses.put("class", NodeClassTab);
+
+        this.init();
+    }
+
+    public async getClassInfo(env: string): Promise<any>
+    {
+        if (this.cachedClassInfo.hasOwnProperty(env))
+        {
+            return this.cachedClassInfo[env];
+        }
+
+        const classInfo = await ipc.getClassInfo(env);
+        this.cachedClassInfo[env] = classInfo;
+        return classInfo;
     }
 
     private async init()
@@ -244,19 +319,20 @@ export class WorkspaceRenderer
 
         const environments: string[] = await ipc.getEnvironmentList();
 
+        await ipc.refreshWorkspace();
+
         for (const environment of environments)
         {
-            this.addEnvironment(environment);
+            const env = this.addEnvironment(environment);
+            await env.init();
         }
-
-        await ipc.refreshWorkspace();
 
         await this.enable();
     }
 
     public addEnvironment(name: string): EnvironmentTreeItemRenderer
     {
-        const environment = new EnvironmentTreeItemRenderer(name, this.workspaceTree.root);
+        const environment = new EnvironmentTreeItemRenderer(this, name, this.workspaceTree.root);
         this.environments.put(name, environment);
         return environment;
     }

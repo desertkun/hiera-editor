@@ -508,6 +508,9 @@ export module puppet
 
         private async loadModulesInfo(): Promise<PuppetModulesInfo>
         {
+            if (this._modulesInfo)
+                return this._modulesInfo;
+
             if (!await async.isFile(this.cacheModulesFilePath))
             {
                 return null;
