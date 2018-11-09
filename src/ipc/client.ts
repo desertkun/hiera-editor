@@ -1,9 +1,18 @@
 import IpcClient from "electron-ipc-tunnel/client";
+import {IpcAPI} from "./api";
 
-class IpcProxy implements ProxyHandler<IpcClient>
+class IpcProxy implements ProxyHandler<any>
 {
-    get (target: IpcClient, p: PropertyKey, receiver: any): any
+    private readonly client: IpcClient;
+
+    constructor()
     {
+        this.client = new IpcClient();
+    }
+
+    get (target: any, p: PropertyKey, receiver: any): any
+    {
+        const zis = this;
         const methodName = p.toString();
 
         return function()
@@ -14,9 +23,9 @@ class IpcProxy implements ProxyHandler<IpcClient>
                 args.push(arg);
             }
             
-            return target.send.apply(target, args);
+            return zis.client.send.apply(zis.client, args);
         };
     }
 }
 
-export const ipc: any = new Proxy<IpcClient>(new IpcClient(), new IpcProxy());
+export const ipc: IpcAPI = new Proxy<any>({}, new IpcProxy()) as IpcAPI;

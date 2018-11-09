@@ -1,207 +1,225 @@
 
 import { dialog, OpenDialogOptions } from "electron";
-import register from "electron-ipc-tunnel/server";
 import { projects_list, projects_window, workspace_window, setCurrentWorkspace, getCurrentWorkspace } from "../global"
 import { ProjectsModel, ProjectModel } from "../projects"
 import { puppet } from "../puppet"
 
-register("addProject", async function(reply: any, path: string)
+import register from "electron-ipc-tunnel/server";
+import { IpcAPI } from "./api"
+
+export class IpcServer implements IpcAPI
 {
-    return await projects_list.addProject(path);
-});
-
-register("openProject", async function(reply: any, path: string)
-{
-    const project: ProjectModel = projects_list.getProject(path);
-
-    if (project == null)
-        throw new Error("No such project: " + path);
-
-    setCurrentWorkspace(project.workspace);
-    workspace_window.show(path);
-    projects_window.close();
-});
-
-register("getProjectList", async function(reply: any)
-{
-    const projects: Array<ProjectModel> = projects_list.list;
-    const result: any = [];
-
-    for (let project of projects)
+    public async addProject(path: string): Promise<boolean>
     {
-        if (!project.workspace)
-            continue;
-        
-        result.push({
-            "name": project.workspace.name,
-            "path": project.path
-        })
+        return await projects_list.addProject(path);
     }
 
-    return result
-});
-
-register("getEnvironmentList", async function(reply: any)
-{
-    const workspace: puppet.Workspace = getCurrentWorkspace();
-
-    if (workspace == null)
+    public async openProject(path: string): Promise<void> 
     {
-        return [];
+        const project: ProjectModel = projects_list.getProject(path);
+
+        if (project == null)
+            throw new Error("No such project: " + path);
+
+        setCurrentWorkspace(project.workspace);
+        workspace_window.show(path);
+        projects_window.close();
     }
 
-    const names: string[] = [];
-
-    for (const env of await workspace.listEnvironments())
+    public async getProjectList(): Promise<any> 
     {
-        names.push(env.name);
-    }
-
-    return names;
-});
-
-register("getEnvironmentTree", async function(reply: any, name: string): Promise<any>
-{
-    const workspace: puppet.Workspace = getCurrentWorkspace();
-
-    if (workspace == null)
-    {
-        return null;
-    }
-
-    const environment: puppet.Environment = await workspace.getEnvironment(name);
-
-    if (environment == null)
-    {
-        return null;
-    }
-
-    return await environment.root.tree();
-});
-
-register("findNode", async function(reply: any, localPath: string): Promise<any>
-{
-    const workspace: puppet.Workspace = getCurrentWorkspace();
-
-    if (workspace == null)
-    {
-        return null;
-    }
-
-    const node = await workspace.findNode(localPath);
-
-    if (node == null)
-    {
-        return null;
-    }
-
-    return node.dump();
-});
-
-register("acquireNodeClass", async function(reply: any, nodePath: string, className: string): Promise<any>
-{
-    const workspace: puppet.Workspace = getCurrentWorkspace();
-
-    if (workspace == null)
-    {
-        return null;
-    }
-
-    const node = await workspace.findNode(nodePath);
-
-    if (node == null)
-    {
-        return null;
-    }
-
-    return await node.dumpClass(className);
-});
-
-
-register("setNodeClassProperty", async function(reply: any, 
-    nodePath: string, className: string, propertyName: string, value: any): Promise<any>
-{
-    const workspace: puppet.Workspace = getCurrentWorkspace();
-
-    if (workspace == null)
-    {
-        return null;
-    }
-
-    const node = await workspace.findNode(nodePath);
-
-    if (node == null)
-    {
-        return null;
-    }
-
-    return await node.setClassProperty(className, propertyName, value);
-});
-
-register("getClassInfo", async function(reply: any, env: string): Promise<any>
-{
-    const workspace: puppet.Workspace = getCurrentWorkspace();
-
-    if (workspace == null)
-    {
-        return null;
-    }
-
-    const environment = await workspace.getEnvironment(env);
-
-    if (environment == null)
-    {
-        return null;
-    }
-
-    return environment.getClassInfo();
-});
-
-register("refreshWorkspace", async function(reply: any): Promise<any>
-{
-    const workspace: puppet.Workspace = getCurrentWorkspace();
-
-    if (workspace == null)
-    {
-        return null;
-    }
-
-    await workspace.refresh((progress: number) => {
-        workspace_window.browserWindow.webContents.send("refreshWorkspaceProgress", progress);
-    }, (text: string) => {
-        workspace_window.browserWindow.webContents.send("refreshWorkspaceCategory", text);
-    });
-});
-
-register("showOpenDirectoryDialog", function(reply: any, defaultPath?: string)
-{
-    return new Promise<string>((resolve, reject) => 
-    {
-        const options: OpenDialogOptions = {
-            'defaultPath': defaultPath,
-            'properties': ['openDirectory']
-        };
+        const projects: Array<ProjectModel> = projects_list.list;
+        const result: any = [];
     
-        dialog.showOpenDialog(options, (filePaths: string[]) =>
+        for (let project of projects)
         {
-            if (filePaths)
-            {
-                resolve(filePaths[0]);
-            }
-            else
-            {
-                resolve(null);
-            }
+            if (!project.workspace)
+                continue;
+            
+            result.push({
+                "name": project.workspace.name,
+                "path": project.path
+            })
+        }
+    
+        return result
+    }
+
+    public async getEnvironmentList(): Promise<string[]> 
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return [];
+        }
+
+        const names: string[] = [];
+
+        for (const env of await workspace.listEnvironments())
+        {
+            names.push(env.name);
+        }
+
+        return names;    
+    }
+
+    public async getEnvironmentTree(name: string): Promise<any> 
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return null;
+        }
+
+        const environment: puppet.Environment = await workspace.getEnvironment(name);
+
+        if (environment == null)
+        {
+            return null;
+        }
+
+        return await environment.root.tree();
+    }
+
+    public async findNode(localPath: string): Promise<any> 
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return null;
+        }
+
+        const node = await workspace.findNode(localPath);
+
+        if (node == null)
+        {
+            return null;
+        }
+
+        return node.dump();
+    }
+
+    public async acquireNodeClass(nodePath: string, className: string): Promise<any> 
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return null;
+        }
+
+        const node = await workspace.findNode(nodePath);
+
+        if (node == null)
+        {
+            return null;
+        }
+
+        return await node.dumpClass(className);
+    }
+
+    public async setNodeClassProperty(
+        nodePath: string, className: string, propertyName: string, value: any
+    ): Promise<any> 
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return null;
+        }
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+        {
+            return null;
+        }
+    
+        return await node.setClassProperty(className, propertyName, value);
+    }
+
+    public async getClassInfo(env: string): Promise<any> 
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return null;
+        }
+
+        const environment = await workspace.getEnvironment(env);
+
+        if (environment == null)
+        {
+            return null;
+        }
+
+        return environment.getClassInfo();
+    }
+
+    public async refreshWorkspace(): Promise<any> 
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return null;
+        }
+
+        await workspace.refresh((progress: number) => {
+            workspace_window.browserWindow.webContents.send("refreshWorkspaceProgress", progress);
+        }, (text: string) => {
+            workspace_window.browserWindow.webContents.send("refreshWorkspaceCategory", text);
         });
-    });
-});
+    }
 
-register("getCurrentWorkspacePath", async function()
+    public showOpenDirectoryDialog(defaultPath?: string): Promise<any> 
+    {
+        return new Promise<string>((resolve, reject) => 
+        {
+            const options: OpenDialogOptions = {
+                'defaultPath': defaultPath,
+                'properties': ['openDirectory']
+            };
+        
+            dialog.showOpenDialog(options, (filePaths: string[]) =>
+            {
+                if (filePaths)
+                {
+                    resolve(filePaths[0]);
+                }
+                else
+                {
+                    resolve(null);
+                }
+            });
+        });
+    }
+
+    public async getCurrentWorkspacePath(): Promise<string> 
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return null;
+
+        return workspace.path;
+    }
+}
+
+const server: IpcServer = new IpcServer();
+
+for (const methodName of Object.getOwnPropertyNames(Object.getPrototypeOf(server)))
 {
-    const workspace: puppet.Workspace = getCurrentWorkspace();
+    if (methodName == "constructor")
+        continue;
 
-    if (workspace == null)
-        return null;
-
-    return workspace.path;
-});
+    register(methodName, (receive: any, ...args: any[]) =>
+    {
+        return (server as any)[methodName].apply(server, args);
+    });
+}
