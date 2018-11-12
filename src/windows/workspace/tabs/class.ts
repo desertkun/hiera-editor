@@ -42,6 +42,38 @@ class StringPropertyRenderer implements PropertyRenderer
     }
 }
 
+class EnumPropertyRenderer implements PropertyRenderer
+{
+    private readonly values: Array<string>;
+    constructor(values: Array<string>)
+    {
+        this.values = values;
+    }
+
+    public render(group: any, propertyId: string, property: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    {
+        const select = $('<select class="selectpicker" id="' + propertyId + '"></select>').appendTo(group);
+
+        for (const value_ of this.values)
+        {
+            const p_ = (value_ == value) ? " selected" : "";
+            $('<option' + p_ + '>' + value_ + '</option>').appendTo(select);
+        }
+
+        select.selectpicker().change(function()
+        {
+            changed($(this).val());
+        });
+
+        return {
+            value(): any
+            {
+                return select.val();
+            }
+        };
+    }
+}
+
 class NumberPropertyRenderer implements PropertyRenderer
 {
     private isNumberKey(event: any)
@@ -167,19 +199,24 @@ export class NodeClassTab extends WorkspaceTab
                     {
                         return this.getPropertyRenderer(type.data.values[0]);
                     }
-                    /*
                     case "Enum":
                     {
-                        const enum_: Array<string> = [];
+                        const values: Array<string> = [];
 
                         for (const obj of type.data.values)
                         {
-                            enum_.push(obj.value);
+                            if (obj.value instanceof Object)
+                            {
+                                values.push(obj.value.value);
+                            }
+                            else
+                            {
+                                values.push(obj.value);
+                            }
                         }
 
-                        out["enum"] = enum_;
+                        return new EnumPropertyRenderer(values);
                     }
-                    */
                 }
             }
         }

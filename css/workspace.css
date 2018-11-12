@@ -19,4 +19,5 @@ body {
     width: 350px;
     float: left;
     height:100%;
+    overflow-y: auto;
 }
