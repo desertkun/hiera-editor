@@ -337,7 +337,7 @@ export class NodeClassTab extends WorkspaceTab
         {
             const p_ = $('<div class="input-group-append"></div>').appendTo(group);
             const tooltipTitle = "Cannot resolve defaults:<br/>" + property.error.message;
-            const b_ = $('<button class="btn btn-outline-warning" type="button" data-toggle="tooltip" data-placement="left">' + 
+            const b_ = $('<button class="btn btn-sm btn-outline-warning" type="button" data-toggle="tooltip" data-placement="left">' + 
                 '<i class="fas fa-exclamation-triangle"></i></button>').appendTo(p_).tooltip({
                     title: tooltipTitle,
                     html: true

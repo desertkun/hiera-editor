@@ -1,3 +1,5 @@
+const {remote} = require('electron')
+const {Menu, MenuItem} = remote;
 
 const $ = require("jquery");
 
@@ -11,6 +13,9 @@ export class TreeViewNode
     private childsElement: any;
     private readonly childs: any;
     private readonly view: TreeView;
+    private clickEvent: any;
+    private header: any;
+    private _contextMenu: any;
     
     private root: boolean;
 
@@ -19,7 +24,9 @@ export class TreeViewNode
     private _icon: any;
     private _bold: boolean;
     private _leaf: boolean;
-    private _selectable: TreeViewSelectedCallback;
+    private _selectable: boolean;
+    private _collapsed: boolean;
+    private _onSelect: TreeViewSelectedCallback;
 
     constructor(view: TreeView)
     {
@@ -30,7 +37,8 @@ export class TreeViewNode
         this._title = "???";
         this._bold = false;
         this._leaf = false;
-        this._selectable = null;
+        this._selectable = false;
+        this._collapsed = true;
         this._icon = null;
     }
 
@@ -39,9 +47,19 @@ export class TreeViewNode
         this._emptyText = value;
     }
 
-    public set selectable(callback: TreeViewSelectedCallback)
+    public set selectable(value: boolean)
     {
-        this._selectable = callback;
+        this._selectable = value;
+    }
+    
+    public set collapsed(value: boolean)
+    {
+        this._collapsed = value;
+    }
+
+    public set onSelect(callback: TreeViewSelectedCallback)
+    {
+        this._onSelect = callback;
     }
     
     public set icon(value: any)
@@ -64,25 +82,52 @@ export class TreeViewNode
         this._leaf = value;
     }
 
-    private headerClick()
+    private selectableHandler()
     {
-        const entry = $(this).parent();
-        const i = $(this).children('span.treeview-collapse-icon').children('i');
+        this.view.selectNode(this.header);
 
-        if (entry.hasClass('treeview-node-opened'))
+        if (this._onSelect)
+        {
+            this._onSelect(this);
+        }
+    }
+
+    private collapseHandler()
+    {
+        const i = this.header.children('span.treeview-collapse-icon').children('i');
+
+        if (this.element.hasClass('treeview-node-opened'))
         {
             i.removeClass().addClass('fa fa-angle-right');
-            entry.removeClass('treeview-node-opened');
-            entry.children('.treeview-node-childs').hide();
+            this.element.removeClass('treeview-node-opened');
+            this.element.children('.treeview-node-childs').hide();
         }
         else
         {
             i.removeClass().addClass('fa fa-angle-down');
-            entry.addClass('treeview-node-opened');
-            entry.children('.treeview-node-childs').show();
+            this.element.addClass('treeview-node-opened');
+            this.element.children('.treeview-node-childs').show();
         }
 
         // 
+    }
+
+    public contextMenu(entries: Array<any>): void
+    {
+        const zis = this;
+        this._contextMenu = new Menu();
+
+        for (const entry of entries)
+        {
+            const item = new MenuItem(entry);
+            this._contextMenu.append(item);
+        }
+
+        this.header.on("contextmenu", (event: any) => 
+        {
+            event.preventDefault();
+            zis._contextMenu.popup({window: remote.getCurrentWindow()})
+        });
     }
 
     public click(callback: any): any
@@ -108,25 +153,38 @@ export class TreeViewNode
             this.element.addClass("treeview-node-child");
         }
         
-        const header = $('<div class="treeview-node-header"></div>').
+        this.header = $('<div class="treeview-node-header"></div>').
             appendTo(this.element);
 
-        if (this._leaf && this._selectable)
+        if (this._selectable)
         {
-            this.element.click(() => 
+            this.header.click(() => 
             {
-                zis.view.selectNode(header);
-                zis._selectable(zis);
+                zis.selectableHandler.apply(zis, []);
             });
         }
 
         if (!this._leaf)
         {
-            const collapseIcon = $('<span class="treeview-collapse-icon"><i class="fa fa-angle-right"></i></span>').appendTo(header);
-            header.click(this.headerClick);
+            const collapseIcon = $('<span class="treeview-collapse-icon"></span>').appendTo(this.header);
+
+            if (this._collapsed)
+            {
+                $('<i class="fa fa-angle-right"></i>').appendTo(collapseIcon);
+            }
+            else
+            {
+                this.element.addClass("treeview-node-opened");
+                $('<i class="fa fa-angle-down"></i>').appendTo(collapseIcon);
+            }
+
+            this.header.click(() => 
+            {
+                zis.collapseHandler.apply(zis, []);
+            });
         }
 
-        const text = $('<span class="treeview-node-text"></span>').appendTo(header);
+        const text = $('<span class="treeview-node-text"></span>').appendTo(this.header);
 
         if (this._bold)
         {
@@ -140,7 +198,12 @@ export class TreeViewNode
 
         text.append(this._title);
 
-        this.childsElement = $('<div class="treeview-node-childs" style="display: none;"></div>').appendTo(this.element);
+        this.childsElement = $('<div class="treeview-node-childs"></div>').appendTo(this.element);
+
+        if (this._collapsed)
+        {
+            this.childsElement.css("display", "none");
+        }
 
         $('<div class="treeview-node-childs-empty">' +
             '<span class="text text-muted">' + this._emptyText + '</span></div>').appendTo(this.childsElement);

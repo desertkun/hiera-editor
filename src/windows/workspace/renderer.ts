@@ -4,8 +4,11 @@ import {Dictionary} from "../../dictionary";
 
 const $ = require("jquery");
 const ellipsis = require('text-ellipsis');
-const remote = require('electron').remote;
 const electron = require('electron');
+const remote = electron.remote;
+const app = remote.app;
+const path = require('path');
+const nativeImage = electron.nativeImage;
 const storage = require('electron-json-storage');
 
 import {NodeTab} from "./tabs/node"
@@ -87,10 +90,35 @@ class NodeTreeItemRenderer
 
                 node.title = className;
                 node.leaf = true;
-                node.selectable = (node) => {
+                node.selectable = true;
+                node.onSelect = (node) => {
                     renderer.openTab("class", [zis.localPath, className]);
                 };
             });
+            
+            classNode.contextMenu([
+                {
+                    label: "Copy",
+                    click: () => {
+                        //
+                    }
+                },
+                {
+                    label: "Reset To Defaults",
+                    click: () => {
+                        //
+                    }
+                },
+                {
+                    type: "separator"
+                },
+                {
+                    label: "Remove This Class",
+                    click: () => {
+                        //
+                    }
+                }
+            ]);
 
             hadAny = true;
         }
@@ -107,10 +135,32 @@ class NodeTreeItemRenderer
         {
             node.icon = $('<i class="fa fa-server"></i>');
             node.title = zis.name;
-            node.selectable = (node) => {
-                renderer.openTab("node", [zis.localPath]);
-            };
+            node.selectable = false;
         });
+
+        this.n_node.contextMenu([
+            {
+                label: "Assign New Class",
+                click: () => {
+                    //
+                }
+            },
+            {
+                label: "Create New Resource",
+                click: () => {
+                    //
+                }
+            },
+            {
+                type: "separator"
+            },
+            {
+                label: "Remove",
+                click: () => {
+                    //
+                }
+            }
+        ])
 
         const n_classes = this.n_node.addChild( 
             (node) => 
@@ -119,12 +169,29 @@ class NodeTreeItemRenderer
             node.title = "Classes";
             node.emptyText = "Node has no classes";
             node.leaf = false;
-            node.selectable = (node) => {
-                //renderer.openTab("class", [this.tab.nodePath, clazz.fullName]);
-            };
+            node.selectable = false;
+            node.collapsed = false;
         });
 
         this.renderClasses(n_classes, null);
+
+        n_classes.contextMenu([
+            {
+                label: "Assign New Class",
+                click: () => {
+                    //
+                }
+            },
+            {
+                type: "separator"
+            },
+            {
+                label: "Remove All Classes",
+                click: () => {
+                    //
+                }
+            }
+        ]);
 
         const n_resources = this.n_node.addChild( 
             (node) => 
@@ -133,10 +200,27 @@ class NodeTreeItemRenderer
             node.title = "Resources";
             node.emptyText = "Node has no resources";
             node.leaf = false;
-            node.selectable = (node) => {
-                //renderer.openTab("class", [this.tab.nodePath, clazz.fullName]);
-            };
+            node.selectable = false;
+            node.collapsed = false;
         });
+        
+        n_resources.contextMenu([
+            {
+                label: "Create New Resource",
+                click: () => {
+                    //
+                }
+            },
+            {
+                type: "separator"
+            },
+            {
+                label: "Remove All Resources",
+                click: () => {
+                    //
+                }
+            }
+        ]);
     }
 }
 
@@ -175,10 +259,29 @@ class FolderTreeItemRenderer
             const zis = this;
 
             this.n_nodes = this.n_parent.addChild( 
-                (node) => {
-                    node.title = zis.name;
-                    node.icon = $('<i class="fa fa-folder"></i>');
-                });
+                (node) => 
+            {
+                node.title = zis.name;
+                node.icon = $('<i class="fa fa-folder"></i>');
+            });
+
+            this.n_nodes.contextMenu([
+                {
+                    label: "Create New Node",
+                    click: () => {
+                        //
+                    }
+                },
+                {
+                    type: "separator"
+                },
+                {
+                    label: "Delete This Directory",
+                    click: () => {
+                        //
+                    }
+                }
+            ])
         }
     }
 
