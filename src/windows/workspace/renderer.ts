@@ -53,7 +53,10 @@ class NodeTreeItemRenderer
         const zis = this;
         let hadAny: boolean = false;
 
-        for (const className of this.info.classes)
+        const nodeClassNames = this.info.classes;
+        nodeClassNames.sort();
+
+        for (const className of nodeClassNames)
         {
             const classInfo = this.classInfo.classes[className];
 

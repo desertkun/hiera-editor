@@ -21,3 +21,8 @@ body {
     height:100%;
     overflow-y: auto;
 }
+
+.class-property-action {
+    margin-right: 8px;
+    cursor: pointer;
+}

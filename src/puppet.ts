@@ -1199,6 +1199,24 @@ export module puppet
             await this.save();
         }
 
+        public async removeClassProperty(className: string, propertyName: string): Promise<any>
+        {
+            const classInfo = this._env.findClassInfo(className);
+
+            if (classInfo == null)
+                return;
+
+            const compiled = await this.acquireClass(className);
+
+            if (!compiled)
+                return;
+
+            const propertyPath = this.compilePropertyPath(className, propertyName);
+            delete this.config[propertyPath];
+
+            await this.save();
+        }
+
         public async dumpClass(className: string): Promise<any>
         {
             const classInfo = this._env.findClassInfo(className);

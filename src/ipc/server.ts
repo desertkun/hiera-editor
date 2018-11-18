@@ -142,6 +142,27 @@ export class IpcServer implements IpcAPI
         return await node.setClassProperty(className, propertyName, value);
     }
 
+    public async removeNodeClassProperty(
+        nodePath: string, className: string, propertyName: string
+    ): Promise<any> 
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return null;
+        }
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+        {
+            return null;
+        }
+    
+        return await node.removeClassProperty(className, propertyName);
+    }
+
     public async getClassInfo(env: string): Promise<any> 
     {
         const workspace: puppet.Workspace = getCurrentWorkspace();

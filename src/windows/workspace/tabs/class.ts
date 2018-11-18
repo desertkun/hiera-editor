@@ -7,6 +7,7 @@ const $ = require("jquery");
 interface RenderedProperty
 {
     value(): any;
+    set(value: any): void;
 }
 
 type PropertyChangedCallback = (value: any) => void;
@@ -20,7 +21,7 @@ class StringPropertyRenderer implements PropertyRenderer
 {
     public render(group: any, propertyId: string, property: any, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
-        const textField = $('<input type="text" class="form-control" id="' + propertyId + '">')
+        const textField = $('<input type="text" class="form-control form-control-sm" id="' + propertyId + '">')
             .appendTo(group)
             .val(value)
             .change(function()
@@ -37,6 +38,10 @@ class StringPropertyRenderer implements PropertyRenderer
             value(): any
             {
                 return textField.val();
+            },
+            set(value: any): void
+            {
+                textField.val(value);
             }
         };
     }
@@ -60,7 +65,9 @@ class EnumPropertyRenderer implements PropertyRenderer
             $('<option' + p_ + '>' + value_ + '</option>').appendTo(select);
         }
 
-        select.selectpicker().change(function()
+        select.selectpicker({
+            style: "selectpicker-sm"
+        }).change(function()
         {
             changed($(this).val());
         });
@@ -69,6 +76,10 @@ class EnumPropertyRenderer implements PropertyRenderer
             value(): any
             {
                 return select.val();
+            },
+            set(value: any): void
+            {
+                select.val(value);
             }
         };
     }
@@ -88,7 +99,7 @@ class NumberPropertyRenderer implements PropertyRenderer
 
     public render(group: any, propertyId: string, property: any, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
-        const textField = $('<input type="text" class="form-control" id="' + propertyId + '">')
+        const textField = $('<input type="text" class="form-control form-control-sm" id="' + propertyId + '">')
             .appendTo(group)
             .val(value)
             .keypress(this.isNumberKey);
@@ -102,6 +113,10 @@ class NumberPropertyRenderer implements PropertyRenderer
             value(): any
             {
                 return textField.val();
+            },
+            set(value: any): void
+            {
+                textField.val(value);
             }
         };
     }
@@ -115,6 +130,7 @@ class BooleanPropertyRenderer implements PropertyRenderer
             .appendTo(group)
             .bootstrapSwitch({
                 state: value,
+                size: 'small',
                 onSwitchChange: (event: any, state: boolean) =>
                 {
                     changed(state);
@@ -125,6 +141,10 @@ class BooleanPropertyRenderer implements PropertyRenderer
             value(): any
             {
                 return textField.bootstrapSwitch('state');
+            },
+            set(value: any): void
+            {
+                textField.bootstrapSwitch('state', value);
             }
         };
     }
@@ -270,12 +290,14 @@ export class NodeClassTab extends WorkspaceTab
         const defaultValue = property.value;
         const value: any = this.values[propertyName] || defaultValue;
 
-        const label = $('<div></div>').appendTo(node);
+        const label = $('<span class="text-small"></span>').appendTo(node);
         
-        const modified = $('<i class="fas fa-pen node-class-property-modified-icon" style="display: none;"></i>').appendTo(label);
-        const labelText = $('<label for="' + propertyId + '">' + humanName + '</label>').appendTo(label);
+        const modified = $('<a class="class-property-action" style="display: none;" title="Reset to default value">' + 
+            '<i class="fas fa-trash"></i></a>').appendTo(label);
+        $('<label for="' + propertyId + '">' + humanName + '</label>').appendTo(label);
 
-        if (value != defaultValue)
+        // show the modified marker is the class if there is any value to it (including null)
+        if (this.values.hasOwnProperty(propertyName))
         {
             modified.show();
             $(label).addClass("text-primary");
@@ -296,21 +318,20 @@ export class NodeClassTab extends WorkspaceTab
             renderer = new StringPropertyRenderer();
         }
 
-        this.renderedProperties[propertyName] = renderer.render(group, propertyId, property, value, function(value: any)
+        const renderedProperty = this.renderedProperties[propertyName] = renderer.render(group, propertyId, property, value, async function(value: any)
         {
-            if (value != defaultValue)
-            {
-                modified.show();
-                label.addClass("text-primary");
-            }
-            else
-            {
-                modified.hide();
-                label.removeClass("text-primary");
-            }
+            await ipc.setNodeClassProperty(zis.nodePath, zis.className, propertyName, value);
 
-            ipc.setNodeClassProperty(zis.nodePath, zis.className, propertyName, value);
+            modified.show();
+            label.addClass("text-primary");
         });
+        
+        modified.click(async () => {
+            await ipc.removeNodeClassProperty(zis.nodePath, zis.className, propertyName);
+            modified.hide();
+            label.removeClass("text-primary");
+            renderedProperty.set(defaultValue);
+        }).tooltip();
         
         if (property.hasOwnProperty("error"))
         {
@@ -342,9 +363,14 @@ export class NodeClassTab extends WorkspaceTab
 
     private renderProperties(node: any)
     {
-        for (const fieldName of this.classFields())
+        const container = $('<div class="flex-container"></div>').appendTo(node);
+
+        const classFields = this.classFields();
+        classFields.sort();
+
+        for (const fieldName of classFields)
         {
-            const inputGroup = $('<div class="node-class-property"></div>').appendTo(node);
+            const inputGroup = $('<div class="node-class-property flex-item"></div>').appendTo(container);
             this.renderProperty(fieldName, inputGroup);
         }
     }

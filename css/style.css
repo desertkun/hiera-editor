@@ -98,3 +98,44 @@ html, body {
 .nav-tabs.compact .nav-link.active {
     border-bottom: 1px solid #ffffff;
 }
+
+.label-xsmall {
+    vertical-align: super;
+    font-size: x-small;
+}
+
+.label-small {
+    vertical-align: super;
+    font-size: small;
+}
+
+.label-medium {
+    vertical-align: super;
+    font-size: medium;
+}
+
+.label-large {
+    vertical-align: super;
+    font-size: large;
+}
+
+.label-bs {
+    vertical-align: super;
+}
+
+.selectpicker-sm {
+    font-size: small;
+}
+
+.flex-container {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+}
+
+.flex-item {
+    width: 360px;
+    flex-grow: 1;
+    padding: 8px;
+    margin: auto;
+}

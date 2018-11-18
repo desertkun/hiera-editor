@@ -9,6 +9,7 @@ export interface IpcAPI
     findNode(localPath: string): Promise<any>;
     acquireNodeClass(nodePath: string, className: string): Promise<any>;
     setNodeClassProperty(nodePath: string, className: string, propertyName: string, value: any): Promise<any>;
+    removeNodeClassProperty(nodePath: string, className: string, propertyName: string): Promise<any>;
     getClassInfo(env: string): Promise<any>;
     refreshWorkspace(): Promise<any>;
     showOpenDirectoryDialog(defaultPath?: string): Promise<string>;
