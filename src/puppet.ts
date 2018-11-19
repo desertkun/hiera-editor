@@ -81,6 +81,7 @@ export module puppet
         public readonly name: string;
         private readonly info: any;
         private readonly _options: any;
+        private readonly _tags: any;
         private readonly _description: string;
         private readonly _modules: PuppetModulesInfo;
 
@@ -90,6 +91,7 @@ export module puppet
             this.info = info;
             this._modules = modules;
             this._options = {};
+            this._tags = {};
 
             const docstring = info["docstring"];
             if (docstring)
@@ -108,8 +110,18 @@ export module puppet
                         {
                             this._options[tag["opt_name"]] = tag["opt_text"];
                         }
+
+                        const text = tag["text"];
+                        if (text)
+                        {
+                            this._tags[tag_name] = text;
+                        }
                     }
                 }
+            }
+            else
+            {
+                this._description = "";
             }
         }
 
@@ -133,6 +145,11 @@ export module puppet
             return this._options;
         }
 
+        public get tags(): any
+        {
+            return this._tags;
+        }
+
         public get source(): string
         {
             return this.info["source"];
@@ -151,7 +168,8 @@ export module puppet
                 "fields": this.fields,
                 "inherits": this.info["inherits"],
                 "description": this.description,
-                "options": this.options
+                "options": this.options,
+                "tags": this.tags
             }
         }
     }
@@ -239,6 +257,24 @@ export module puppet
         public getCompiledClassPath(fileName: string)
         {
             return path.join(this._cachePath, "obj", fileName + ".o");
+        }
+
+        public async searchClasses(search: string, results: Array<any>): Promise<void>
+        {
+            for (const puppetClass of this._classes.getValues())
+            {
+                if (puppetClass.name.indexOf(search) >= 0 ||
+                    puppetClass.description.indexOf(search) >= 0 ||
+                    puppetClass.file.indexOf(search) >= 0)
+                {
+                    results.push(puppetClass.dump());
+                }
+            }
+
+            results.sort((a: any, b: any) => 
+            {
+                return a.name.localeCompare(b.name);
+            })
         }
 
         public async generateCompilePromises(cb: CompiledPromisesCallback): Promise<Array<any>>
@@ -680,6 +716,16 @@ export module puppet
             return this._workspace;
         }
 
+        public async searchClasses(search: string): Promise<any[]>
+        {
+            const results: Array<any> = [];
+
+            this._modulesInfo.searchClasses(search, results);
+            this._workspace.modulesInfo.searchClasses(search, results)
+
+            return results;
+        }
+
         public async resolveClass(className: string, global: GlobalVariableResolver): Promise<PuppetASTClass>
         {
             if (this._compiledClasses.has(className))
@@ -1102,6 +1148,11 @@ export module puppet
             }
         }
 
+        public get env(): Environment
+        {
+            return this._env;
+        }
+
         public get config()
         {
             return this._config;
@@ -1162,6 +1213,37 @@ export module puppet
         public getGlobal(key: string): string
         {
             return this.configFacts[key] || this._env.global.get(key) || this._env.workspace.global.get(key);
+        }
+
+        public async removeClass(className: string): Promise<void>
+        {
+            const zis = this;
+            if (!this.hasClass(className))
+                return;
+
+            if (this._config["classes"] == null)
+                this._config["classes"] = [];
+
+            const index = this.configClasses.indexOf(className);
+
+            if (index >= 0)
+            {
+                this.configClasses.splice(index, 1);
+                await this.save();
+            }
+        }
+
+        public async assignClass(className: string): Promise<void>
+        {
+            const zis = this;
+            if (this.hasClass(className))
+                return;
+
+            if (this._config["classes"] == null)
+                this._config["classes"] = [];
+
+            this.configClasses.push(className);
+            await this.save();
         }
 
         public async acquireClass(className: string): Promise<PuppetASTClass>

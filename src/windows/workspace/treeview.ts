@@ -244,6 +244,11 @@ export class TreeView
         this._root.setAsRoot(element);
     }
 
+    public clear()
+    {
+        this.element.html('');
+    }
+
     public get root(): TreeViewNode
     {
         return this._root;

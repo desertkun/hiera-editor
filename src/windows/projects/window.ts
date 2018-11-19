@@ -11,7 +11,9 @@ export class ProjectsWindow extends Window
     public show()
     {
         this.openWindow(600, 400, "projects.html", null, {
-            "resizable": false
+            resizable: false,
+            modal: true,
+            autoHideMenuBar: true
         });
     }
 

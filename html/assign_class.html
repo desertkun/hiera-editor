@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Assign a New Class</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src * 'self' data: https:;">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-reboot.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/assign-class.css">
+    <link rel="stylesheet" href="../css/font-awesome.min.css">
+    <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
+    <script type="text/javascript">
+      window.$ = window.jQuery = require('jquery');
+    </script>
+    <script src="../js/tether.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+  </head>
+  <body>
+    <div class="assign-class-container w-100 h-100">
+        <div class="input-group mb-3" id="search-filter">
+            <input type="text" class="form-control form-control-sm" placeholder="Class Name" 
+            aria-label="Class Name" aria-describedby="class-name-filter-label" id="class-name-filter" autofocus>
+            <div class="input-group-append">
+                <span class="input-group-text" id="class-name-filter-label"><i class="fas fa-search"></i></span>
+            </div>
+        </div>
+        <div class="w-100" id="search-results">
+        </div>
+    </div>
+
+    <script>
+      require('../dist/windows/assign_class/renderer.js')
+    </script>
+  </body>
+</html>

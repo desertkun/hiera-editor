@@ -1,6 +1,7 @@
 
 import { dialog, OpenDialogOptions } from "electron";
 import { projects_list, projects_window, workspace_window, setCurrentWorkspace, getCurrentWorkspace } from "../global"
+import { AssignClassWindow } from "../windows/assign_class/window"
 import { ProjectsModel, ProjectModel } from "../projects"
 import { puppet } from "../puppet"
 
@@ -229,6 +230,59 @@ export class IpcServer implements IpcAPI
             return null;
 
         return workspace.path;
+    }
+    
+    public async assignNewClassToNode(nodePath: string): Promise<string>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return null;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return null;
+    
+        const window = new AssignClassWindow(nodePath);
+        const className = await window.show();
+
+        if (!className)
+            return null;
+
+        await node.assignClass(className);
+
+        return className;
+    }
+    
+    public async removeClassFromNode(nodePath: string, className: string): Promise<void>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return;
+
+        await node.removeClass(className);
+    }
+
+    public async searchClasses(nodePath: string, search: string): Promise<any[]>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return [];
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return [];
+
+        return await node.env.searchClasses(search);
     }
 }
 

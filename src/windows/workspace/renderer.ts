@@ -113,9 +113,12 @@ class NodeTreeItemRenderer
                     type: "separator"
                 },
                 {
-                    label: "Remove This Class",
-                    click: () => {
-                        //
+                    label: "Remove",
+                    click: async () => 
+                    {
+                        await ipc.removeClassFromNode(zis.localPath, className);
+                        await renderer.refresh();
+                        renderer.closeTabKind("class", [zis.localPath, className]);
                     }
                 }
             ]);
@@ -141,8 +144,15 @@ class NodeTreeItemRenderer
         this.n_node.contextMenu([
             {
                 label: "Assign New Class",
-                click: () => {
-                    //
+                click: async () => 
+                {
+                    const className = await ipc.assignNewClassToNode(zis.localPath);
+
+                    if (className)
+                    {
+                        await renderer.refresh();
+                        renderer.openTab("class", [zis.localPath, className]);
+                    }
                 }
             },
             {
@@ -178,8 +188,15 @@ class NodeTreeItemRenderer
         n_classes.contextMenu([
             {
                 label: "Assign New Class",
-                click: () => {
-                    //
+                click: async () => 
+                {
+                    const className = await ipc.assignNewClassToNode(zis.localPath);
+
+                    if (className)
+                    {
+                        await renderer.refresh();
+                        renderer.openTab("class", [zis.localPath, className]);
+                    }
                 }
             },
             {
@@ -408,6 +425,21 @@ export class WorkspaceRenderer
         return classInfo;
     }
 
+    public async refresh()
+    {
+        this.workspaceTree.clear();
+
+        const environments: string[] = await ipc.getEnvironmentList();
+
+        this.environments = new Dictionary();
+
+        for (const environment of environments)
+        {
+            const env = this.addEnvironment(environment);
+            await env.init();
+        }
+    }
+
     private async init()
     {
         this.initSidebar();
@@ -551,6 +583,12 @@ export class WorkspaceRenderer
         this.tabs.put(key, _tab);
 
         await this.checkEmpty();
+    }
+
+    public async closeTabKind(kind: string, path: Array<string>): Promise<any>
+    {
+        const key = path.length > 0 ? kind + "_" + path.join("_") : kind;
+        await this.closeTab(key);
     }
 
     public async closeTab(key: string): Promise<any>

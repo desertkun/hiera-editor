@@ -11,6 +11,7 @@ import * as url from "url";
 const windowStateKeeper = require('electron-window-state');
 
 type OnWindowClosedCallback = () => void;
+type BrowserWindowLoaded = (window: BrowserWindow) => void;
 
 export abstract class Window
 {
@@ -23,7 +24,8 @@ export abstract class Window
 
     }
 
-    protected openWindow(defaultWidth: number, defaultHeight: number, htmlName: string, stateName: string, options: any = {})
+    protected openWindow(defaultWidth: number, defaultHeight: number, htmlName: string, stateName: string, options: any = {}, 
+        onLoaded: BrowserWindowLoaded = null)
     {
         if (stateName != null)
         {
@@ -63,6 +65,14 @@ export abstract class Window
                 this._onClosed();
             }
         });
+
+        if (onLoaded)
+        {
+            const zis = this;
+            this._window.webContents.once("did-finish-load", () => {
+                onLoaded.apply(zis, [zis._window]);
+            });
+        }
     }
 
     public load(htmlName: string)
