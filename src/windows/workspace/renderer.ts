@@ -91,10 +91,11 @@ class NodeTreeItemRenderer
                 node.title = className;
                 node.leaf = true;
                 node.selectable = true;
-                node.onSelect = (node) => {
+                node.onSelect = (node) => 
+                {
                     renderer.openTab("class", [zis.localPath, className]);
                 };
-            });
+            }, "class-" + zis.localPath + "-" + className, renderer.openNodes);
             
             classNode.contextMenu([
                 {
@@ -105,8 +106,10 @@ class NodeTreeItemRenderer
                 },
                 {
                     label: "Reset To Defaults",
-                    click: () => {
-                        //
+                    click: async () => 
+                    {
+                        await ipc.removeNodeClassProperties(zis.localPath, className);
+                        await renderer.refreshTabKind("class", [zis.localPath, className]);
                     }
                 },
                 {
@@ -118,7 +121,7 @@ class NodeTreeItemRenderer
                     {
                         await ipc.removeClassFromNode(zis.localPath, className);
                         await renderer.refresh();
-                        renderer.closeTabKind("class", [zis.localPath, className]);
+                        await renderer.closeTabKind("class", [zis.localPath, className]);
                     }
                 }
             ]);
@@ -139,7 +142,7 @@ class NodeTreeItemRenderer
             node.icon = $('<i class="fa fa-server"></i>');
             node.title = zis.name;
             node.selectable = false;
-        });
+        }, "node-" + zis.localPath, renderer.openNodes);
 
         this.n_node.contextMenu([
             {
@@ -180,8 +183,7 @@ class NodeTreeItemRenderer
             node.emptyText = "Node has no classes";
             node.leaf = false;
             node.selectable = false;
-            node.collapsed = false;
-        });
+        }, "node-" + zis.localPath + "-classes", renderer.openNodes);
 
         this.renderClasses(n_classes, null);
 
@@ -204,8 +206,14 @@ class NodeTreeItemRenderer
             },
             {
                 label: "Remove All Classes",
-                click: () => {
-                    //
+                click: async () => 
+                {
+                    const classNames = await ipc.removeClassesFromNode(zis.localPath);
+                    await renderer.refresh();
+                    for (const className of classNames)
+                    {
+                        await renderer.closeTabKind("class", [zis.localPath, className]);
+                    }
                 }
             }
         ]);
@@ -218,8 +226,7 @@ class NodeTreeItemRenderer
             node.emptyText = "Node has no resources";
             node.leaf = false;
             node.selectable = false;
-            node.collapsed = false;
-        });
+        }, "node-" + zis.localPath + "-resources", renderer.openNodes);
         
         n_resources.contextMenu([
             {
@@ -248,17 +255,19 @@ class FolderTreeItemRenderer
     private folders: Dictionary<string, FolderTreeItemRenderer>;
     private name: string;
     private root: boolean;
+    private localPath: string;
 
     private readonly n_parent: TreeViewNode;
     private n_nodes: TreeViewNode;
 
-    constructor(renderer: WorkspaceRenderer, name: string, parentNode: TreeViewNode, root: boolean)
+    constructor(renderer: WorkspaceRenderer, name: string, parentNode: TreeViewNode, localPath: string, root: boolean)
     {
         this.renderer = renderer;
         this.name = name;
         this.nodes = new Dictionary();
         this.folders = new Dictionary();
         this.root = root;
+        this.localPath = localPath;
 
         this.n_parent = parentNode;
 
@@ -280,7 +289,7 @@ class FolderTreeItemRenderer
             {
                 node.title = zis.name;
                 node.icon = $('<i class="fa fa-folder"></i>');
-            });
+            }, "folder-" + zis.localPath, renderer.openNodes);
 
             this.n_nodes.contextMenu([
                 {
@@ -311,7 +320,7 @@ class FolderTreeItemRenderer
 
     public addFolder(name: string): FolderTreeItemRenderer
     {
-        const folder = new FolderTreeItemRenderer(this.renderer, name, this.n_nodes, false);
+        const folder = new FolderTreeItemRenderer(this.renderer, name, this.n_nodes, this.localPath + "/" + name, false);
         this.folders.put(name, folder);
         return folder;
     }
@@ -350,7 +359,7 @@ class EnvironmentTreeItemRenderer
         this.n_treeView = treeView;
 
         this.render();
-        this.root = new FolderTreeItemRenderer(renderer, "root", this.n_environment, true);
+        this.root = new FolderTreeItemRenderer(renderer, "root", this.n_environment, "root", true);
     }
 
     private render()
@@ -364,7 +373,7 @@ class EnvironmentTreeItemRenderer
             node.bold = true;
             node.emptyText = "No nodes";
             node.icon = $('<i class="ic ic-environment"/>');
-        }, "environment-" + this.name);
+        }, "environment-" + this.name, renderer.openNodes);
         
     }
 
@@ -398,8 +407,11 @@ export class WorkspaceRenderer
     n_editorTabs: any;
     n_editorContent: any;
 
+    private _openNodes: Set<string>;
+
     constructor()
     {
+        this._openNodes = new Set<string>();
         this.cachedClassInfo = {};
 
         this.environments = new Dictionary();
@@ -411,6 +423,11 @@ export class WorkspaceRenderer
         this.tabClasses.put("class", NodeClassTab);
 
         this.init();
+    }
+
+    public get openNodes(): Set<string>
+    {
+        return this._openNodes;
     }
 
     public async getClassInfo(env: string): Promise<any>
@@ -481,7 +498,7 @@ export class WorkspaceRenderer
             '<span class="text text-muted"><i class="fas fa-cog fa-4x fa-spin"></i></span></p>' +
             '<p class="text-center"><span class="text text-muted" id="loading-category">' +
             'Please wait while the workspace is updating cache</span></p>' +
-            '<p class="text-center"><div class="progress" style="width: 300px;">' +
+            '<p class="text-center"><div class="progress" style="width: 400px;">' +
             '<div class="progress-bar progress-bar-striped progress-bar-animated" ' +
             'id="loading-progress" role="progressbar" aria-valuenow="0" ' +
             'aria-valuemin="0" aria-valuemax="100" style="width:0">' +
@@ -573,8 +590,8 @@ export class WorkspaceRenderer
 
         if (_tab.canBeClosed)
         {
-            const _i = $('<i class="fas fa-times close-btn"></i>').appendTo(_a).click(() => {
-                this.closeTab(key);
+            const _i = $('<i class="fas fa-times close-btn"></i>').appendTo(_a).click(async () => {
+                await this.closeTab(key);
             });
         }
 
@@ -589,6 +606,21 @@ export class WorkspaceRenderer
     {
         const key = path.length > 0 ? kind + "_" + path.join("_") : kind;
         await this.closeTab(key);
+    }
+
+    public async refreshTabKind(kind: string, path: Array<string>): Promise<any>
+    {
+        const key = path.length > 0 ? kind + "_" + path.join("_") : kind;
+        await this.refreshTab(key);
+    }
+
+    public async refreshTab(key: string): Promise<void>
+    {
+        if (!this.tabs.has(key))
+            return;
+
+        const tab = this.tabs.get(key);
+        await tab.refresh();
     }
 
     public async closeTab(key: string): Promise<any>

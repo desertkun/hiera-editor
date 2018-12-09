@@ -1221,6 +1221,8 @@ export module puppet
             if (!this.hasClass(className))
                 return;
 
+            await this.removeClassProperties(className);
+
             if (this._config["classes"] == null)
                 this._config["classes"] = [];
 
@@ -1231,6 +1233,26 @@ export module puppet
                 this.configClasses.splice(index, 1);
                 await this.save();
             }
+        }
+
+        public async removeAllClasses(): Promise<Array<string>>
+        {
+            const toRemove = [];
+
+            for (const className of this.configClasses)
+            {
+                toRemove.push(className);
+            }
+            
+            for (const className of toRemove)
+            {
+                await this.removeClassProperties(className);
+            }
+
+            this._config["classes"] = [];
+            await this.save();
+
+            return toRemove;
         }
 
         public async assignClass(className: string): Promise<void>
@@ -1295,6 +1317,27 @@ export module puppet
 
             const propertyPath = this.compilePropertyPath(className, propertyName);
             delete this.config[propertyPath];
+
+            await this.save();
+        }
+
+        public async removeClassProperties(className: string): Promise<any>
+        {
+            const classInfo = this._env.findClassInfo(className);
+
+            if (classInfo == null)
+                return;
+
+            const compiled = await this.acquireClass(className);
+
+            if (!compiled)
+                return;
+
+            for (const propertyName of classInfo.fields)
+            {
+                const propertyPath = this.compilePropertyPath(className, propertyName);
+                delete this.config[propertyPath];
+            }
 
             await this.save();
         }

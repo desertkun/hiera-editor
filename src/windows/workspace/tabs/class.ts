@@ -144,7 +144,7 @@ class BooleanPropertyRenderer implements PropertyRenderer
             },
             set(value: any): void
             {
-                textField.bootstrapSwitch('state', value);
+                textField.bootstrapSwitch('state', value, true);
             }
         };
     }

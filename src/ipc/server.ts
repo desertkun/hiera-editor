@@ -164,6 +164,25 @@ export class IpcServer implements IpcAPI
         return await node.removeClassProperty(className, propertyName);
     }
 
+    public async removeNodeClassProperties(nodePath: string, className: string): Promise<any>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return null;
+        }
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+        {
+            return null;
+        }
+    
+        return await node.removeClassProperties(className);
+    }
+
     public async getClassInfo(env: string): Promise<any> 
     {
         const workspace: puppet.Workspace = getCurrentWorkspace();
@@ -268,6 +287,21 @@ export class IpcServer implements IpcAPI
             return;
 
         await node.removeClass(className);
+    }
+
+    public async removeClassesFromNode(nodePath: string): Promise<Array<string>>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return;
+
+        return await node.removeAllClasses();
     }
 
     public async searchClasses(nodePath: string, search: string): Promise<any[]>

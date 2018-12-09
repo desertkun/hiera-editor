@@ -16,21 +16,23 @@ export class TreeViewNode
     private clickEvent: any;
     private header: any;
     private _contextMenu: any;
+    private openNodes: Set<string>;
     
     private root: boolean;
 
+    private _id: string;
     private _emptyText: string;
     private _title: string;
     private _icon: any;
     private _bold: boolean;
     private _leaf: boolean;
     private _selectable: boolean;
-    private _collapsed: boolean;
     private _onSelect: TreeViewSelectedCallback;
 
-    constructor(view: TreeView)
+    constructor(view: TreeView, openNodes?: Set<string>)
     {
         this.view = view;
+        this.openNodes = openNodes;
 
         this.childs = {};
         this._emptyText = "No entries";
@@ -38,7 +40,6 @@ export class TreeViewNode
         this._bold = false;
         this._leaf = false;
         this._selectable = false;
-        this._collapsed = true;
         this._icon = null;
     }
 
@@ -51,17 +52,17 @@ export class TreeViewNode
     {
         this._selectable = value;
     }
-    
-    public set collapsed(value: boolean)
-    {
-        this._collapsed = value;
-    }
 
     public set onSelect(callback: TreeViewSelectedCallback)
     {
         this._onSelect = callback;
     }
     
+    public get id(): string
+    {
+        return this._id;
+    }
+
     public set icon(value: any)
     {
         this._icon = value;
@@ -101,12 +102,22 @@ export class TreeViewNode
             i.removeClass().addClass('fa fa-angle-right');
             this.element.removeClass('treeview-node-opened');
             this.element.children('.treeview-node-childs').hide();
+
+            if (this.openNodes != null && this._id != null)
+            {
+                this.openNodes.delete(this._id);
+            }
         }
         else
         {
             i.removeClass().addClass('fa fa-angle-down');
             this.element.addClass('treeview-node-opened');
             this.element.children('.treeview-node-childs').show();
+
+            if (this.openNodes != null && this._id != null)
+            {
+                this.openNodes.add(this._id);
+            }
         }
 
         // 
@@ -146,6 +157,7 @@ export class TreeViewNode
         if (id)
         {
             this.element.attr('id', id);
+            this._id = id;
         }
         
         if (!parent.root)
@@ -164,11 +176,13 @@ export class TreeViewNode
             });
         }
 
+        let collapsed = this.openNodes != null && this._id != null && !this.openNodes.has(this._id);
+
         if (!this._leaf)
         {
             const collapseIcon = $('<span class="treeview-collapse-icon"></span>').appendTo(this.header);
 
-            if (this._collapsed)
+            if (collapsed)
             {
                 $('<i class="fa fa-angle-right"></i>').appendTo(collapseIcon);
             }
@@ -200,7 +214,7 @@ export class TreeViewNode
 
         this.childsElement = $('<div class="treeview-node-childs"></div>').appendTo(this.element);
 
-        if (this._collapsed)
+        if (collapsed)
         {
             this.childsElement.css("display", "none");
         }
@@ -216,9 +230,9 @@ export class TreeViewNode
         this.element = null;
     }
 
-    public addChild(setup: TreeViewSetupNodeCallback, id?: string): TreeViewNode
+    public addChild(setup: TreeViewSetupNodeCallback, id?: string, openNodes?: Set<string>): TreeViewNode
     {
-        const child = new TreeViewNode(this.view);
+        const child = new TreeViewNode(this.view, openNodes);
         setup(child);
         child.setParent(this, id);
 

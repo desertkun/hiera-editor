@@ -23,9 +23,10 @@ export class WorkspaceWindow extends Window
         this._workspacePath = workspacePath;
 
         this.openWindow(1000, 600, "workspace.html", "workspace-window.json", {
-            "resizable": true,
-            "minWidth": 600,
-            "minHeight": 400
+            resizable: true,
+            autoHideMenuBar: true,
+            minWidth: 600,
+            minHeight: 400
         });
     }
 

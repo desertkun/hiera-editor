@@ -54,6 +54,12 @@ export abstract class WorkspaceTab
     {
         $(this.buttonNode).find('a span').html(title);
     }
+    
+    public refresh(): any
+    {
+        $(this.contentNode).html('');
+        this.render();
+    }
 
     public abstract async init(): Promise<any>;
     public abstract async release(): Promise<any>;
