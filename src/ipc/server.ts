@@ -121,6 +121,25 @@ export class IpcServer implements IpcAPI
 
         return await node.dumpClass(className);
     }
+    
+    public async acquireNodeResource(nodePath: string, definedTypeName: string, title: string): Promise<any>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return null;
+        }
+
+        const node = await workspace.findNode(nodePath);
+
+        if (node == null)
+        {
+            return null;
+        }
+
+        return await node.dumpResource(definedTypeName, title);
+    }
 
     public async setNodeClassProperty(
         nodePath: string, className: string, propertyName: string, value: any
@@ -162,6 +181,44 @@ export class IpcServer implements IpcAPI
         }
     
         return await node.removeClassProperty(className, propertyName);
+    }
+
+    public async setNodeResourceProperty(nodePath: string, definedTypeName: string, title: string, propertyName: string, value: any): Promise<any>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return null;
+        }
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+        {
+            return null;
+        }
+    
+        return await node.setResourceProperty(definedTypeName, title, propertyName, value);
+    }
+
+    public async removeNodeResourceProperty(nodePath: string, definedTypeName: string, title: string, propertyName: string): Promise<any>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return null;
+        }
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+        {
+            return null;
+        }
+    
+        return await node.removeResourceProperty(definedTypeName, title, propertyName);
     }
 
     public async removeNodeClassProperties(nodePath: string, className: string): Promise<any>
@@ -287,6 +344,36 @@ export class IpcServer implements IpcAPI
             return;
 
         await node.removeClass(className);
+    }
+    
+    public async removeResourceFromNode(nodePath: string, definedTypeName: string, title: string): Promise<void>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return;
+
+        await node.removeResource(definedTypeName, title);
+    }
+    
+    public async renameNodeResource(nodePath: string, definedTypeName: string, title: string, newTitle: string): Promise<boolean>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return;
+
+        return await node.renameResource(definedTypeName, title, newTitle);
     }
 
     public async removeClassesFromNode(nodePath: string): Promise<Array<string>>

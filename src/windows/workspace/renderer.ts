@@ -2,6 +2,7 @@ import {ipc} from "../../ipc/client";
 
 import {Dictionary} from "../../dictionary";
 
+const Dialogs = require('dialogs');
 const $ = require("jquery");
 const ellipsis = require('text-ellipsis');
 const electron = require('electron');
@@ -15,10 +16,12 @@ import {NodeTab} from "./tabs/node"
 import {WorkspaceTab, WorkspaceTabConstructor} from "./tabs/tab";
 import {DefaultTab} from "./tabs/default";
 import {NodeClassTab} from "./tabs/class";
+import {NodeResourceTab} from "./tabs/resource";
 
 import {puppet} from "../../puppet";
 import {TreeView, TreeViewNode} from "./treeview";
 
+const dialogs = Dialogs();
 let renderer: WorkspaceRenderer;
 let selectedNode: any = null;
 
@@ -62,17 +65,6 @@ class NodeTreeItemRenderer
         for (const className of nodeClassNames)
         {
             const classInfo = this.classInfo.classes[className];
-
-            const classPath: Array<string> = className.split("::");
-            const name = classPath[classPath.length - 1];
-            classPath.splice(classPath.length - 1, 1);
-            const parentName = classPath.join("::");
-
-            //if (parentClassPath != null && parentName != parentClassPath)
-            //    continue;
-
-            console.log(className);
-
             const iconData = classInfo.options.icon;
 
             const classNode = node.addChild( 
@@ -125,6 +117,115 @@ class NodeTreeItemRenderer
                     }
                 }
             ]);
+
+            hadAny = true;
+        }
+
+        return hadAny;
+    }
+    
+    private renderResources(node: TreeViewNode, parentClassPath: string): boolean
+    {
+        const zis = this;
+        let hadAny: boolean = false;
+
+        const nodeResources = this.info.resources;
+        const nodeResourcesNames = Object.keys(nodeResources);
+        nodeResourcesNames.sort();
+
+        for (const definedTypeName of nodeResourcesNames)
+        {
+            const resourceTypeInfo = this.classInfo.types[definedTypeName];
+            const iconData = resourceTypeInfo.options.icon;
+
+            const resourceNode = node.addChild( 
+                (node) => 
+            {
+                if (iconData != null)
+                {
+                    node.icon = $('<img class="node-entry-icon" src="' + iconData + 
+                        '" style="width: 16px; height: 16px;">');
+                }
+                else
+                {
+                    node.icon = $('<i class="node-entry-icon fas fa-puzzle-piece"></i>');
+                }
+
+                node.title = definedTypeName;
+                node.leaf = false;
+            }, "resources-" + zis.localPath + "-" + definedTypeName, renderer.openNodes);
+            
+            resourceNode.contextMenu([
+                {
+                    label: "Remove",
+                    click: async () => 
+                    {
+                        /*
+                        await ipc.removeResourceFromNode(zis.localPath, definedTypeName);
+                        await renderer.refresh();
+                        await renderer.closeTabKind("class", [zis.localPath, className]);
+                        */
+                    }
+                }
+            ]);
+            
+            const titles = nodeResources[definedTypeName];
+
+            for (const title of titles)
+            {
+                const resourceNameNode = resourceNode.addChild( 
+                    (node) => 
+                {
+                    node.icon = $('<i class="node-entry-icon fas fa-file"></i>');
+                    node.title = title;
+                    node.selectable = true;
+                    node.leaf = true;
+                    node.onSelect = (node) => 
+                    {
+                        renderer.openTab("resource", [zis.localPath, definedTypeName, title]);
+                    };
+                }, "resource-" + zis.localPath + "-" + definedTypeName + "-" + title, renderer.openNodes);
+                
+                resourceNameNode.contextMenu([
+                    {
+                        label: "Rename",
+                        click: async () => 
+                        {
+                            const newTitle = await new Promise<string>((resolve: any) => {
+                                dialogs.prompt("Enter new name for resource " + definedTypeName, title, (result: string) =>
+                                {
+                                    resolve(result);
+                                })
+                            });
+
+                            if (newTitle == null || newTitle == title)
+                                return;
+
+                            if (!(await ipc.renameNodeResource(zis.localPath, definedTypeName, title, newTitle)))
+                                return;
+
+                            await renderer.refresh();
+                            
+                            if (await renderer.closeTabKind("resource", [zis.localPath, definedTypeName, title]))
+                            {
+                                await renderer.openTab("resource", [zis.localPath, definedTypeName, newTitle])
+                            }
+                        }
+                    },
+                    {
+                        type: "separator"
+                    },
+                    {
+                        label: "Remove",
+                        click: async () => 
+                        {
+                            await ipc.removeResourceFromNode(zis.localPath, definedTypeName, title);
+                            await renderer.refresh();
+                            await renderer.closeTabKind("resource", [zis.localPath, definedTypeName, title]);
+                        }
+                    }
+                ]);
+            }
 
             hadAny = true;
         }
@@ -245,6 +346,8 @@ class NodeTreeItemRenderer
                 }
             }
         ]);
+
+        this.renderResources(n_resources, null);
     }
 }
 
@@ -421,6 +524,7 @@ export class WorkspaceRenderer
         this.tabClasses.put("node", NodeTab);
         this.tabClasses.put("default", DefaultTab);
         this.tabClasses.put("class", NodeClassTab);
+        this.tabClasses.put("resource", NodeResourceTab);
 
         this.init();
     }
@@ -602,10 +706,10 @@ export class WorkspaceRenderer
         await this.checkEmpty();
     }
 
-    public async closeTabKind(kind: string, path: Array<string>): Promise<any>
+    public async closeTabKind(kind: string, path: Array<string>): Promise<boolean>
     {
         const key = path.length > 0 ? kind + "_" + path.join("_") : kind;
-        await this.closeTab(key);
+        return await this.closeTab(key);
     }
 
     public async refreshTabKind(kind: string, path: Array<string>): Promise<any>
@@ -623,10 +727,10 @@ export class WorkspaceRenderer
         await tab.refresh();
     }
 
-    public async closeTab(key: string): Promise<any>
+    public async closeTab(key: string): Promise<boolean>
     {
         if (!this.tabs.has(key))
-            return;
+            return false;
 
         const tab = this.tabs.get(key);
         await tab.release();
@@ -666,6 +770,7 @@ export class WorkspaceRenderer
         }
 
         await this.checkEmpty();
+        return true;
     }
 
     private async enable()

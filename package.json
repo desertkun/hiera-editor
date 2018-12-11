@@ -10,7 +10,7 @@
     "install:win32": "cmd /C \"set BUNDLE_GEMFILE=ruby\\Gemfile && node_modules\\traveling-ruby-win32\\bin\\gem install --bindir node_modules\\traveling-ruby-win32\\bin.real --no-ri --no-rdoc bundler && node_modules\\traveling-ruby-win32\\bin\\bundle install\"",
     "test": "mocha --timeout 15000 dist/tests/**/*.js",
     "package-mac": "npx electron-packager . --overwrite --platform=darwin --arch=x64 --icon=assets/icons/icon.icns --prune=true --out=release-builds",
-    "package-win": "npx electron-packager . hiera-editor --overwrite --asar=true --platform=win32 --arch=ia32 --icon=assets/icons/icon.ico --prune=true --out=release-builds --version-string.ProductName=\"Hiera Editor\"",    
+    "package-win": "npx electron-packager . hiera-editor --overwrite --asar=true --platform=win32 --arch=ia32 --icon=assets/icons/icon.ico --prune=true --out=release-builds --version-string.ProductName=\"Hiera Editor\"",
     "package-linux": "npx electron-packager . hiera-editor --overwrite --asar=true --platform=linux --arch=x64 --icon=assets/icons/icon.png --prune=true --out=release-builds"
   },
   "repository": "https://github.com/desertkun/hiera-editor",
@@ -42,6 +42,7 @@
     "@types/chai": "^4.1.6",
     "@types/yaml": "^1.0.0",
     "app-root-path": "^2.0.1",
+    "dialogs": "^1.1.20",
     "electron-ipc-tunnel": "^3.1.0",
     "electron-json-storage": "^4.1.3",
     "electron-window-state": "^4.1.1",

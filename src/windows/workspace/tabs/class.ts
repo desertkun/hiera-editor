@@ -14,12 +14,12 @@ type PropertyChangedCallback = (value: any) => void;
 
 interface PropertyRenderer
 {
-    render(group: any, propertyId: string, property: any, value: any, changed: PropertyChangedCallback): RenderedProperty;
+    render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty;
 }
 
 class StringPropertyRenderer implements PropertyRenderer
 {
-    public render(group: any, propertyId: string, property: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
         const textField = $('<input type="text" class="form-control form-control-sm" id="' + propertyId + '">')
             .appendTo(group)
@@ -29,9 +29,9 @@ class StringPropertyRenderer implements PropertyRenderer
                 changed($(this).val());
             });
 
-        if (property.value)
+        if (defaultValue)
         {
-            $(textField).attr('placeholder', property.value);
+            $(textField).attr('placeholder', defaultValue);
         }
 
         return {
@@ -55,7 +55,7 @@ class EnumPropertyRenderer implements PropertyRenderer
         this.values = values;
     }
 
-    public render(group: any, propertyId: string, property: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
         const select = $('<select class="selectpicker" id="' + propertyId + '"></select>').appendTo(group);
 
@@ -80,6 +80,7 @@ class EnumPropertyRenderer implements PropertyRenderer
             set(value: any): void
             {
                 select.val(value);
+                select.selectpicker('refresh');
             }
         };
     }
@@ -97,16 +98,20 @@ class NumberPropertyRenderer implements PropertyRenderer
         return true;
     }  
 
-    public render(group: any, propertyId: string, property: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
         const textField = $('<input type="text" class="form-control form-control-sm" id="' + propertyId + '">')
             .appendTo(group)
             .val(value)
-            .keypress(this.isNumberKey);
+            .keypress(this.isNumberKey)
+            .change(function()
+            {
+                changed(parseInt($(this).val()));
+            });
 
-        if (property.value)
+        if (defaultValue)
         {
-            $(textField).attr('placeholder', property.value);
+            $(textField).attr('placeholder', defaultValue);
         }
 
         return {
@@ -124,7 +129,7 @@ class NumberPropertyRenderer implements PropertyRenderer
 
 class BooleanPropertyRenderer implements PropertyRenderer
 {
-    public render(group: any, propertyId: string, property: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
         const textField = $('<input type="checkbox" id="' + propertyId + '">')
             .appendTo(group)
@@ -152,11 +157,11 @@ class BooleanPropertyRenderer implements PropertyRenderer
 
 export class NodeClassTab extends WorkspaceTab
 {
-    private info: any;
-    private className: string;
-    private nodePath: string;
-    private editor: any;
-    private renderedProperties: any;
+    protected info: any;
+    protected className: string;
+    protected nodePath: string;
+    protected editor: any;
+    protected renderedProperties: any;
 
     public constructor(path: Array<string>, buttonNode: any, contentNode: any, renderer: WorkspaceRenderer)
     {
@@ -165,11 +170,16 @@ export class NodeClassTab extends WorkspaceTab
         this.renderedProperties = {};
     }
 
-    async init(): Promise<any>
+    public async init(): Promise<any>
     {
         this.nodePath = this.path[0];
         this.className = this.path[1];
-        this.info = await ipc.acquireNodeClass(this.nodePath, this.className);
+        this.info = await this.acquireInfo();
+    }
+
+    protected async acquireInfo(): Promise<any>
+    {
+        return await ipc.acquireNodeClass(this.nodePath, this.className);
     }
 
     private buildValue(classInfo: any): any
@@ -244,7 +254,104 @@ export class NodeClassTab extends WorkspaceTab
         return new StringPropertyRenderer();
     }
 
-    public classFields(): Array<string>
+    public render(): any
+    {
+        const editorHolder = $('<div class="w-100 node-class-properties"></div>').appendTo(this.contentNode);
+
+        this.renderProperties(editorHolder);
+    }
+
+    private fixedPropertyName(name: string): string
+    {
+        return name.replace(/:/g, "_");
+    }
+
+    private renderProperty(propertyName: string, node: any, required: boolean)
+    {
+        const zis = this;
+
+        const propertyId = 'property-' + this.fixedPropertyName(propertyName);
+        
+        const humanName = propertyName.replace(/_/g, " ").replace(/\w\S*/g, function(txt){
+            return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+        });
+
+        const defaultValue = this.getDefaultValue(propertyName);
+        const value: any = this.getPropertyValue(propertyName) || defaultValue;
+
+        const label = $('<span class="text-small"></span>').appendTo(node);
+        
+        const modified = $('<a class="class-property-action" style="display: none;" title="Reset to default value">' + 
+            '<i class="fas fa-trash"></i></a>').appendTo(label);
+        const l = $('<label for="' + propertyId + '">' + humanName + '</label>').appendTo(label);
+
+        if (required)
+        {
+            $(l).css('font-weight', "bold");
+        }
+
+        // show the modified marker is the class if there is any value to it (including null)
+        if (this.hasDefaultValue(propertyName) && value != defaultValue)
+        {
+            modified.show();
+            $(label).addClass("text-primary");
+        }
+
+        const group = $('<div class="input-group"></div>').appendTo(node);
+
+        let renderer;
+
+        const typeInfo = this.getPropertyTypeInfo(propertyName);
+
+        if (typeInfo != null)
+        {
+            renderer = this.getPropertyRenderer(typeInfo);
+        }
+        else
+        {
+            renderer = new StringPropertyRenderer();
+        }
+
+        const renderedProperty = this.renderedProperties[propertyName] = 
+            renderer.render(group, propertyId, defaultValue, value, async function(value: any)
+        {
+            await zis.setProperty(propertyName, value);
+
+            if (zis.hasDefaultValue(propertyName))
+            {
+                modified.show();
+                label.addClass("text-primary");
+            }
+        });
+        
+        modified.click(async () => {
+            await zis.removeProperty(propertyName);
+            modified.hide();
+            label.removeClass("text-primary");
+            renderedProperty.set(defaultValue);
+        }).tooltip();
+        
+        const error = this.getPropertyErrorInfo(propertyName);
+        if (error != null)
+        {
+            const p_ = $('<div class="input-group-append"></div>').appendTo(group);
+            const tooltipTitle = "Cannot resolve defaults:<br/>" + error.message;
+            const b_ = $('<button class="btn btn-sm btn-outline-warning" type="button" data-toggle="tooltip" data-placement="left">' + 
+                '<i class="fas fa-exclamation-triangle"></i></button>').appendTo(p_).tooltip({
+                    title: tooltipTitle,
+                    html: true
+                });
+        }
+
+        
+    }
+
+    protected getPropertyErrorInfo(propertyName: string): any
+    {
+        return this.info.errors[propertyName];
+    }
+
+    public getProperties(): Array<string>
     {
         return this.info.classInfo.fields;
     }
@@ -264,87 +371,34 @@ export class NodeClassTab extends WorkspaceTab
         return this.info.classInfo;
     }
 
-    public render(): any
+    protected getPropertyTypeInfo(propertyName: string): any
     {
-        const editorHolder = $('<div class="w-100 node-class-properties"></div>').appendTo(this.contentNode);
-
-        this.renderProperties(editorHolder);
+        return this.info.types[propertyName];
     }
 
-    private fixedPropertyName(name: string): string
+    protected getPropertyValue(propertyName: string): any
     {
-        return name.replace(/:/g, "_");
+        return this.values[propertyName];
     }
 
-    private renderProperty(propertyName: string, node: any)
+    protected getDefaultValue(propertyName: string): any
     {
-        const zis = this;
+        return this.defaults[propertyName];
+    }
 
-        const propertyId = 'property-' + this.fixedPropertyName(propertyName);
-        
-        const humanName = propertyName.replace(/_/g, " ").replace(/\w\S*/g, function(txt){
-            return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
-        });
+    protected hasDefaultValue(propertyName: string): boolean
+    {
+        return this.defaults[propertyName] != null;
+    }
 
-        const property: any = this.defaults[propertyName];
-        const defaultValue = property.value;
-        const value: any = this.values[propertyName] || defaultValue;
+    protected async setProperty(propertyName: string, value: any)
+    {
+        await ipc.setNodeClassProperty(this.nodePath, this.className, propertyName, value);
+    }
 
-        const label = $('<span class="text-small"></span>').appendTo(node);
-        
-        const modified = $('<a class="class-property-action" style="display: none;" title="Reset to default value">' + 
-            '<i class="fas fa-trash"></i></a>').appendTo(label);
-        $('<label for="' + propertyId + '">' + humanName + '</label>').appendTo(label);
-
-        // show the modified marker is the class if there is any value to it (including null)
-        if (this.values.hasOwnProperty(propertyName))
-        {
-            modified.show();
-            $(label).addClass("text-primary");
-        }
-
-        const group = $('<div class="input-group"></div>').appendTo(node);
-
-        let renderer, type;
-
-        if (property.hasOwnProperty("type"))
-        {
-            type = property.type;
-            renderer = this.getPropertyRenderer(property.type);
-        }
-        else
-        {
-            type = null;
-            renderer = new StringPropertyRenderer();
-        }
-
-        const renderedProperty = this.renderedProperties[propertyName] = renderer.render(group, propertyId, property, value, async function(value: any)
-        {
-            await ipc.setNodeClassProperty(zis.nodePath, zis.className, propertyName, value);
-
-            modified.show();
-            label.addClass("text-primary");
-        });
-        
-        modified.click(async () => {
-            await ipc.removeNodeClassProperty(zis.nodePath, zis.className, propertyName);
-            modified.hide();
-            label.removeClass("text-primary");
-            renderedProperty.set(defaultValue);
-        }).tooltip();
-        
-        if (property.hasOwnProperty("error"))
-        {
-            const p_ = $('<div class="input-group-append"></div>').appendTo(group);
-            const tooltipTitle = "Cannot resolve defaults:<br/>" + property.error.message;
-            const b_ = $('<button class="btn btn-sm btn-outline-warning" type="button" data-toggle="tooltip" data-placement="left">' + 
-                '<i class="fas fa-exclamation-triangle"></i></button>').appendTo(p_).tooltip({
-                    title: tooltipTitle,
-                    html: true
-                });
-        }
-
-        
+    protected async removeProperty(propertyName: string)
+    {
+        await ipc.removeNodeClassProperty(this.nodePath, this.className, propertyName);
     }
 
     public getIcon(): any
@@ -365,13 +419,38 @@ export class NodeClassTab extends WorkspaceTab
     {
         const container = $('<div class="flex-container"></div>').appendTo(node);
 
-        const classFields = this.classFields();
+        const classFields = this.getProperties();
         classFields.sort();
+
+        // required fields first
+        
+        let hadRequiredField = false;
 
         for (const fieldName of classFields)
         {
+            if (this.hasDefaultValue(fieldName))
+                continue;
+
             const inputGroup = $('<div class="node-class-property flex-item"></div>').appendTo(container);
-            this.renderProperty(fieldName, inputGroup);
+            this.renderProperty(fieldName, inputGroup, true);
+
+            hadRequiredField = true;
+        }
+
+        if (hadRequiredField)
+        {
+            $('<hr>').appendTo(container);
+        }
+
+        // non-required fields last
+
+        for (const fieldName of classFields)
+        {
+            if (!this.hasDefaultValue(fieldName))
+                continue;
+                
+            const inputGroup = $('<div class="node-class-property flex-item"></div>').appendTo(container);
+            this.renderProperty(fieldName, inputGroup, false);
         }
     }
 

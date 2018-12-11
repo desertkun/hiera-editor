@@ -8,7 +8,7 @@ import {Dictionary} from "./dictionary";
 const slash = require('slash');
 const PromisePool = require('es6-promise-pool');
 
-import {PuppetASTParser, PuppetASTClass, Resolver} from "./puppet/ast";
+import {PuppetASTParser, PuppetASTClass, PuppetASTDefinedType, PuppetASTResource, Resolver} from "./puppet/ast";
 
 export module puppet
 {
@@ -178,6 +178,9 @@ export module puppet
     {
         public readonly name: string;
         private readonly info: any;
+        private readonly _tags: any;
+        private readonly _options: any;
+        private readonly _description: string;
         private readonly _modules: PuppetModulesInfo;
 
         constructor(name: string, info: any, modules: PuppetModulesInfo)
@@ -185,6 +188,39 @@ export module puppet
             this.name = name;
             this.info = info;
             this._modules = modules;
+            this._options = {};
+            this._tags = {};
+
+            const docstring = info["docstring"];
+            if (docstring)
+            {
+                this._description = docstring["text"];
+
+                const tags = docstring["tags"];
+                if (tags)
+                {
+                    for (const tag of tags)
+                    {
+                        const tag_name = tag["tag_name"];
+                        const name = tag["name"];
+
+                        if (tag_name == "option" && name == "editor")
+                        {
+                            this._options[tag["opt_name"]] = tag["opt_text"];
+                        }
+
+                        const text = tag["text"];
+                        if (text)
+                        {
+                            this._tags[tag_name] = text;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                this._description = "";
+            }
         }
 
         public get modulesInfo(): PuppetModulesInfo
@@ -197,6 +233,26 @@ export module puppet
             return this.info["source"];
         }
 
+        public get fields(): Array<string>
+        {
+            return Object.keys(this.info["defaults"] || {});
+        }
+
+        public get description(): string
+        {
+            return this._description;
+        }
+
+        public get options(): any
+        {
+            return this._options;
+        }
+
+        public get tags(): any
+        {
+            return this._tags;
+        }
+
         public get file(): string
         {
             return this.info["file"];
@@ -206,7 +262,12 @@ export module puppet
         {
             return {
                 "name": this.name,
-                "file": this.info["file"]
+                "file": this.info["file"],
+                "fields": this.fields,
+                "inherits": this.info["inherits"],
+                "description": this.description,
+                "options": this.options,
+                "tags": this.tags
             }
         }
     }
@@ -281,6 +342,7 @@ export module puppet
         {
             const result: Array<any> = [];
             const classes = this.classes.getValues();
+            const definedTypes = this.definedTypes.getValues();
 
             const _cachedStats: any = {};
             const _realStats: any = {};
@@ -292,6 +354,15 @@ export module puppet
 
                 _cachedStats[clazz.file] = async.fileStat(file);
                 _realStats[clazz.file] = async.fileStat(realFile);
+            }
+
+            for (let definedType of definedTypes)
+            {
+                const file = this.getCompiledClassPath(definedType.file);
+                const realFile = path.join(this._modulesPath, definedType.file);
+
+                _cachedStats[definedType.file] = async.fileStat(file);
+                _realStats[definedType.file] = async.fileStat(realFile);
             }
 
             const cachedStats = await async.PromiseAllObject(_cachedStats);
@@ -345,6 +416,54 @@ export module puppet
                 }
             }
 
+            for (let definedType of definedTypes)
+            {
+                const file = path.join(this._cachePath, "obj", definedType.file + ".o");
+                const realFile = path.join(this._modulesPath, definedType.file);
+
+                if (cachedStats[definedType.file])
+                {
+                    const cachedStat = cachedStats[definedType.file];
+                    const cachedTime: Number = cachedStat.mtimeMs;
+
+                    const realStat = realStats[definedType.file];
+                    const realTime: Number = realStat.mtimeMs;
+
+                    if (cachedTime >= realTime)
+                    {
+                        // compiled file is up-to-date
+                        continue;
+                    }
+                }
+
+                try
+                {
+                    async function compile(file: string, modulesPath: string, source: string)
+                    {
+                        console.log("Compiling " + file + "...");
+
+                        try
+                        {
+                            await puppet.Ruby.CallInOut("puppet-parser.rb", [file], modulesPath, source);
+                            console.log("Compiling " + file + " done!");
+                        }
+                        catch (e)
+                        {
+                            console.log("Failed to compile " + file + ": " + e);
+                        }
+
+                        cb.done += 1;
+
+                        if (cb.callback) cb.callback(cb.done);
+                    }
+
+                    result.push([compile, file, this._modulesPath, definedType.source]);
+                }
+                catch (e) {
+                    console.log(e);
+                }
+            }
+
             return result;
         }
 
@@ -371,6 +490,11 @@ export module puppet
         public findClass(className: string): PuppetClassInfo
         {
             return this._classes.get(className);
+        }
+
+        public findDefinedType(definedTypeName: string): PuppetDefinedTypeInfo
+        {
+            return this._definedTypes.get(definedTypeName);
         }
 
         public dump(classes: any, types: any)
@@ -677,6 +801,12 @@ export module puppet
     
     export type GlobalVariableResolver = (key: string) => string;
 
+    export class ResolvedResource
+    {
+        public definedType: PuppetASTDefinedType;
+        public resource: PuppetASTResource;
+    }
+
     export class Environment
     {
         private readonly _name: string;
@@ -685,6 +815,7 @@ export module puppet
         private readonly _root: Folder;
         private readonly _workspace: Workspace;
         private readonly _compiledClasses: Dictionary<string, PuppetASTClass>;
+        private readonly _compiledResources: Dictionary<string, Dictionary<string, ResolvedResource>>;
         private readonly _global: Dictionary<string, string>;
         private _modulesInfo: PuppetModulesInfo;
 
@@ -696,6 +827,7 @@ export module puppet
             this._cachePath = cachePath;
             this._root = new Folder(this, "data", this.dataPath, name);
             this._compiledClasses = new Dictionary();
+            this._compiledResources = new Dictionary();
 
             this._global = new Dictionary();
             this._global.put("environment", name);
@@ -785,6 +917,83 @@ export module puppet
             return clazz;
         }
 
+        public async resolveResource(definedTypeName: string, title: string, properties: any, global: GlobalVariableResolver): Promise<ResolvedResource>
+        {
+            if (this._compiledResources.has(definedTypeName))
+            {
+                const titles = this._compiledResources.get(definedTypeName);
+
+                if (titles.has(title))
+                {
+                    return titles.get(title);
+                }
+            }
+
+            const zis = this;
+            console.log("Compiling resource " + definedTypeName + " (with title " + title + " for environment " + this._name + ")");
+
+            const definedTypeInfo = this.findDefineTypeInfo(definedTypeName);
+
+            if (definedTypeInfo == null)
+                throw new CompilationError("No such defined type info: " + definedTypeName);
+
+            const compiledPath = definedTypeInfo.modulesInfo.getCompiledClassPath(definedTypeInfo.file);
+            let parsedJSON = null;
+
+            try
+            {
+                parsedJSON = await async.readJSON(compiledPath);
+            }
+            catch (e)
+            {
+                throw new CompilationError("Failed to parse defined type " + definedTypeName);
+            }
+
+            const obj = PuppetASTParser.Parse(parsedJSON);
+
+            if (!(obj instanceof PuppetASTDefinedType))
+                throw "Not a defined type";
+
+            const definedType: PuppetASTDefinedType = obj;
+
+            let resource: PuppetASTResource;
+            try
+            {
+                resource = await definedType.resolveAsResource(title, properties, new class extends Resolver
+                {
+                    public resolveClass(className: string): Promise<PuppetASTClass>
+                    {
+                        return zis.resolveClass(className, global);
+                    }
+
+                    public async resolveGlobalVariable(name: string): Promise<string>
+                    {
+                        return global(name);
+                    }
+                });
+            }
+            catch (e)
+            {
+                console.log(e);
+                throw new CompilationError("Failed to compile class: " + e);
+            }
+            
+            let titles = this._compiledResources.get(definedTypeName);
+            if (titles == null)
+            {
+                titles = new Dictionary();
+                this._compiledResources.put(definedTypeName, titles);
+            }
+
+            const resolved = new ResolvedResource();
+
+            resolved.definedType = definedType;
+            resolved.resource = resource;
+
+            titles.put(title, resolved);
+            return resolved;
+        }
+
         public findClassInfo(className: string): PuppetClassInfo
         {
             if (this._modulesInfo)
@@ -796,6 +1005,19 @@ export module puppet
             }
 
             return this._workspace.modulesInfo.findClass(className);
+        }
+        
+        public findDefineTypeInfo(definedTypeName: string): PuppetDefinedTypeInfo
+        {
+            if (this._modulesInfo)
+            {
+                const localClassInfo = this._modulesInfo.findDefinedType(definedTypeName);
+
+                if (localClassInfo)
+                    return localClassInfo;
+            }
+
+            return this._workspace.modulesInfo.findDefinedType(definedTypeName);
         }
 
         public get dataPath(): string
@@ -1142,9 +1364,17 @@ export module puppet
 
         public dump()
         {
+            const resourceInfo: any = {};
+
+            for (const typeName in this.configResources)
+            {
+                resourceInfo[typeName] = Object.keys(this.configResources[typeName]);
+            }
+
             return {
                 "env": this._env.name,
-                "classes": this.configClasses
+                "classes": this.configClasses,
+                "resources": resourceInfo
             }
         }
 
@@ -1161,6 +1391,11 @@ export module puppet
         public get configFacts()
         {
             return this._config["facts"] || {};
+        }
+
+        public get configResources()
+        {
+            return this._config["resources"] || {};
         }
 
         public get configClasses()
@@ -1205,6 +1440,16 @@ export module puppet
             return this._nodePath;
         }
 
+        public hasResource(definedTypeName: string, title: string): boolean
+        {
+            const titles = this.configResources[definedTypeName];
+
+            if (titles == null)
+                return false;
+
+            return titles.hasOwnProperty(title);
+        }
+
         public hasClass(className: string): boolean
         {
             return this.configClasses.indexOf(className) >= 0
@@ -1217,7 +1462,6 @@ export module puppet
 
         public async removeClass(className: string): Promise<void>
         {
-            const zis = this;
             if (!this.hasClass(className))
                 return;
 
@@ -1233,6 +1477,38 @@ export module puppet
                 this.configClasses.splice(index, 1);
                 await this.save();
             }
+        }
+
+        public async removeResource(definedTypeName: string, title: string): Promise<void>
+        {
+            if (!this.hasResource(definedTypeName, title))
+                return;
+
+            const titles = this.configResources[definedTypeName];
+
+            if (titles == null)
+                return;
+
+            delete titles[title];
+            await this.save();
+        }
+
+        public async renameResource(definedTypeName: string, title: string, newTitle: string): Promise<boolean>
+        {
+            if (!this.hasResource(definedTypeName, title))
+                return false;
+
+            if (this.hasResource(definedTypeName, newTitle))
+                return false;
+
+            const titles = this.configResources[definedTypeName];
+
+            const oldObj = titles[title];
+            delete titles[title];
+            titles[newTitle] = oldObj;
+
+            await this.save();
+            return true;
         }
 
         public async removeAllClasses(): Promise<Array<string>>
@@ -1279,6 +1555,35 @@ export module puppet
                 return zis.getGlobal(key);
             });
         }
+        
+        public async acquireResouce(definedTypeName: string, title: string): Promise<ResolvedResource>
+        {
+            const zis = this;
+            if (!this.hasResource(definedTypeName, title))
+                throw Error("No such resource: " + definedTypeName + " (title: " + title + ")");
+
+            let values: any = {};
+
+            if (this.configResources.hasOwnProperty(definedTypeName))
+            {
+                const t = this.configResources[definedTypeName][title];
+
+                if (t != null)
+                {
+                    for (const key in t)
+                    {
+                        values[key] = t[key];
+                    }
+                }
+            }
+
+            values["title"] = title;
+            
+            return await this._env.resolveResource(definedTypeName, title, values, (key: string) =>
+            {
+                return zis.getGlobal(key);
+            });
+        }
 
         public compilePropertyPath(className: string, propertyName: string): string
         {
@@ -1303,6 +1608,36 @@ export module puppet
             await this.save();
         }
 
+        public async setResourceProperty(definedTypeName: string, title: string, propertyName: string, value: any): Promise<any>
+        {
+            if (propertyName == "title")
+                return;
+
+            const definedTypeInfo = this._env.findDefineTypeInfo(definedTypeName);
+
+            if (definedTypeInfo == null)
+                return;
+
+            const compiled = await this.acquireResouce(definedTypeName, title);
+
+            if (!compiled)
+                return;
+
+            if (this.configResources[definedTypeName] == null)
+                this.configResources[definedTypeName] = {};
+
+            const d = this.configResources[definedTypeName];
+
+            if (d[title] == null)
+                d[title] = {};
+
+            const t = d[title];
+
+            t[propertyName] = value;
+
+            await this.save();
+        }
+
         public async removeClassProperty(className: string, propertyName: string): Promise<any>
         {
             const classInfo = this._env.findClassInfo(className);
@@ -1317,6 +1652,31 @@ export module puppet
 
             const propertyPath = this.compilePropertyPath(className, propertyName);
             delete this.config[propertyPath];
+
+            await this.save();
+        }
+        
+        public async removeResourceProperty(definedTypeName: string, title: string, propertyName: string): Promise<any>
+        {
+            const definedTypeInfo = this._env.findDefineTypeInfo(definedTypeName);
+
+            if (definedTypeInfo == null)
+                return;
+
+            const compiled = await this.acquireResouce(definedTypeName, title);
+
+            if (!compiled)
+                return;
+                
+            const d = this.configResources[definedTypeName];
+            if (d == null)
+                return;
+
+            const t = d[title];
+            if (t == null)
+                return;
+
+            delete t[propertyName];
 
             await this.save();
         }
@@ -1352,16 +1712,17 @@ export module puppet
             const compiled = await this.acquireClass(className);
 
             const defaultValues: any = {};
+            const types: any = {};
+            const errors: any = {};
             const values: any = {};
 
             for (const name of compiled.resolvedProperties.getKeys())
             {
                 const property = compiled.getResolvedProperty(name);
-                const p: any = {};
 
                 if (property.type != null)
                 {
-                    p["type"] = {
+                    types[name] = {
                         "type": property.type.constructor.name,
                         "data": property.type
                     };
@@ -1369,18 +1730,16 @@ export module puppet
 
                 if (property.value != null)
                 {
-                    p["value"] = property.value;
+                    defaultValues[name] = property.value;
                 }
 
                 if (property.error != null)
                 {
-                    p["error"] = {
+                    errors[name] = {
                         message: property.error.message,
                         stack: property.error.stack
                     };
                 }
-
-                defaultValues[name] = p;
 
                 const propertyPath = this.compilePropertyPath(className, name);
                 const configValue = this.config[propertyPath];
@@ -1394,7 +1753,78 @@ export module puppet
                 "icon": classInfo.options.icon,
                 "values": values,
                 "classInfo": classInfo.dump(),
-                "defaults": defaultValues
+                "defaults": defaultValues,
+                "types": types,
+                "errors": errors
+            }
+        }
+
+        public async dumpResource(definedTypeName: string, title: string): Promise<any>
+        {
+            const classInfo = this._env.findDefineTypeInfo(definedTypeName);
+
+            if (classInfo == null)
+                return {};
+
+            const compiled: ResolvedResource = await this.acquireResouce(definedTypeName, title);
+
+            const defaultValues: any = {};
+            const types: any = {};
+            const errors: any = {};
+            const values: any = {};
+
+            if (this.configResources[definedTypeName] != null)
+            {
+                const t = this.configResources[definedTypeName][title];
+
+                if (t != null)
+                {
+                    for (const k in t)
+                    {
+                        values[k] = t[k];
+                    }
+                }
+            }
+
+            for (const name of compiled.resource.resolvedProperties.getKeys())
+            {
+                const property = compiled.resource.resolvedProperties.get(name);
+
+                if (property.type != null)
+                {
+                    types[name] = {
+                        "type": property.type.constructor.name,
+                        "data": property.type
+                    };
+                }
+
+                if (property.error != null)
+                {
+                    errors[name] = {
+                        message: property.error.message,
+                        stack: property.error.stack
+                    };
+                }
+            }
+            
+            for (const name in compiled.definedType.params)
+            {
+                const def = compiled.resource.resolvedProperties.get(name);
+
+                if (def == null)
+                    continue;
+
+                defaultValues[name] = def;
+            }
+
+            return {
+                "icon": classInfo.options.icon,
+                "values": values,
+                "classInfo": classInfo.dump(),
+                "defaults": defaultValues,
+                "types": types,
+                "errors": errors,
+                "fields": Object.keys(compiled.definedType.params)
             }
         }
     }
@@ -1413,26 +1843,4 @@ export module puppet
             return this._name;
         }
     }
-
-    /*
-    enum PropertyType
-    {
-        string,
-        integer,
-    }
-
-    class Property
-    {
-
-        constructor(name: string)
-        {
-            this._name = name;
-        }
-
-        public get name():string 
-        {
-            return this._name;
-        }
-    }
-    */
 }

@@ -139,3 +139,7 @@ html, body {
     padding: 8px;
     margin: auto;
 }
+
+.flex-container hr {
+    width: 100%;
+}

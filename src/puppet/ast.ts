@@ -1,5 +1,6 @@
 
 import {Dictionary} from "../dictionary";
+import { throws } from "assert";
 
 type ResolverHint = (obj: any) => void;
 
@@ -8,6 +9,13 @@ export abstract class Resolver
     public hint: ResolverHint;
     public async abstract resolveClass(className: string): Promise<PuppetASTClass>;
     public async abstract resolveGlobalVariable(name: string): Promise<string>;
+}
+
+export interface PuppetASTContainerContext
+{
+    setProperty(name: string, pp: PuppetASTResolvedProperty): void;
+    getProperty(name: string): PuppetASTResolvedProperty;
+    getName(): string;
 }
 
 export class PuppetASTObject
@@ -20,7 +28,7 @@ export class PuppetASTObject
         return "" + this._resolved;
     }
 
-    public async resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    public async resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         if (this._resolved || this._beingResolved)
             return this._resolved;
@@ -39,7 +47,7 @@ export class PuppetASTObject
         return this._resolved;
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         throw "Not implemented";
     }
@@ -58,7 +66,7 @@ class ResolveError extends Error
 }
 
 type PuppetASTInvokeFunctor = (invoke: PuppetASTInvoke, args: Array<any>,
-                               context: PuppetASTClass, resolver: Resolver) => Promise<any>;
+                               context: PuppetASTContainerContext, resolver: Resolver) => Promise<any>;
 
 export class PuppetASTInvoke extends PuppetASTObject
 {
@@ -68,12 +76,12 @@ export class PuppetASTInvoke extends PuppetASTObject
     private static readonly InvokeFunctions: any =
     {
         "fail": async function(invoke: PuppetASTInvoke, args: Array<any>,
-                               context: PuppetASTClass, resolver: Resolver)
+                               context: PuppetASTContainerContext, resolver: Resolver)
         {
             throw new ResolveError(invoke, args[0]);
         },
         "require": async function(invoke: PuppetASTInvoke, args: Array<any>,
-                                  context: PuppetASTClass, resolver: Resolver)
+                                  context: PuppetASTContainerContext, resolver: Resolver)
         {
             await resolver.resolveClass(args[0]);
         }
@@ -88,7 +96,7 @@ export class PuppetASTInvoke extends PuppetASTObject
         this.args = obj["args"];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         const functorName: string = await this.functor.resolve(context, resolver);
 
@@ -127,7 +135,7 @@ export class PuppetASTUnknown extends PuppetASTObject
         this.args = args;
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         throw new ResolveError(this, "Unknown object of kind " + this.kind);
     }
@@ -149,7 +157,7 @@ export class PuppetASTIgnored extends PuppetASTObject
         this.what = what;
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         throw new ResolveError(this, "Entry ignored: " + this.what);
     }
@@ -182,7 +190,7 @@ export class PuppetASTAccess extends PuppetASTObject
         return "Access[" + this.what.toString() + ":" + this.values.join(",") + "]";
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         return this;
     }
@@ -206,7 +214,7 @@ export class PuppetASTSwitch extends PuppetASTObject
         this.over = (<PuppetASTList>args[1]);
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         const resolvedValue = await this.variable.resolve(context, resolver);
 
@@ -258,7 +266,7 @@ export class PuppetASTParenthesis extends PuppetASTObject
         this.condition = args[0];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         return await this.condition.resolve(context, resolver);
     }
@@ -280,7 +288,7 @@ export class PuppetASTQualifiedName extends PuppetASTObject
         this.value = args[0];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         return await this.value.resolve(context, resolver);
     }
@@ -308,7 +316,7 @@ export class PuppetASTCondition extends PuppetASTObject
         this.b = args[1];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         const resolvedA = await this.a.resolve(context, resolver);
         const resolvedB = await this.b.resolve(context, resolver);
@@ -371,7 +379,7 @@ export class PuppetASTAndCondition extends PuppetASTObject
         this.b = args[1];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         if (!await this.a.resolve(context, resolver))
             return false;
@@ -399,7 +407,7 @@ export class PuppetASTOrCondition extends PuppetASTObject
         this.b = args[1];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         if (await this.a.resolve(context, resolver))
             return true;
@@ -425,7 +433,7 @@ export class PuppetASTNot extends PuppetASTObject
         this.value = args[0];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         const v = await this.value.resolve(context, resolver);
         return !v;
@@ -454,7 +462,7 @@ export class PuppetASTIf extends PuppetASTObject
         this.else = obj["else"];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         const v = await this.test.resolve(context, resolver);
 
@@ -480,7 +488,7 @@ export class PuppetASTDefault extends PuppetASTObject
         super();
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         return "default";
     }
@@ -509,7 +517,7 @@ export class PuppetASTKeyedEntry extends PuppetASTObject
         return this.key.toString() + "=>" + this.value.toString();
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         return this;
     }
@@ -533,7 +541,7 @@ export class PuppetASTApplyOrder extends PuppetASTObject
         this.second = args[1];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         await this.first.resolve(context, resolver);
         await this.second.resolve(context, resolver);
@@ -558,7 +566,7 @@ export class PuppetASTNotifyOrder extends PuppetASTObject
         this.second = args[1];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         await this.first.resolve(context, resolver);
         await this.second.resolve(context, resolver);
@@ -567,28 +575,6 @@ export class PuppetASTNotifyOrder extends PuppetASTObject
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
     {
         return new PuppetASTNotifyOrder(args);
-    }
-}
-
-export class PuppetASTResource extends PuppetASTObject
-{
-    public readonly properties: any;
-
-    constructor(args: Array<PuppetASTObject>)
-    {
-        super();
-
-        this.properties = args[0];
-    }
-
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
-    {
-        //
-    }
-
-    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
-    {
-        return new PuppetASTResource(args);
     }
 }
 
@@ -608,7 +594,7 @@ export class PuppetASTPrimitive extends PuppetASTObject
         return "" + this.value;
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         return this.value;
     }
@@ -616,6 +602,69 @@ export class PuppetASTPrimitive extends PuppetASTObject
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
     {
         return new PuppetASTPrimitive(args);
+    }
+}
+
+export class PuppetASTRegularExpression extends PuppetASTObject
+{
+    public readonly value: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this.value = args[0];
+    }
+
+    public toString(): string
+    {
+        return "" + this.value;
+    }
+
+    public async matches(context: PuppetASTContainerContext, resolver: Resolver, object: PuppetASTObject): Promise<boolean>
+    {
+        const re = new RegExp(await this.resolve(context, resolver));
+        const value = await object.resolve(context, resolver);
+        return re.test(value);
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        return await this.value.resolve(context, resolver);
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTRegularExpression(args);
+    }
+}
+
+export class PuppetASTRegularExpressionCheck extends PuppetASTObject
+{
+    public readonly variable: PuppetASTObject;
+    public readonly regexp: PuppetASTRegularExpression;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this.variable = args[0];
+        this.regexp = <PuppetASTRegularExpression>(args[1]);
+    }
+
+    public toString(): string
+    {
+        return "" + this.regexp.toString();
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        return await this.regexp.matches(context, resolver, this.variable);
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTRegularExpressionCheck(args);
     }
 }
 
@@ -630,7 +679,7 @@ export class PuppetASTList extends PuppetASTObject
         this.entries = args;
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         for (const entry of this.entries)
         {
@@ -669,7 +718,7 @@ export class PuppetASTArray extends PuppetASTObject
         this.entries = args;
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         for (const entry of this.entries)
         {
@@ -710,7 +759,7 @@ export class PuppetASTType extends PuppetASTObject
         this.type = args[0];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         return await this.type.resolve(context, resolver)
     }
@@ -737,7 +786,7 @@ export class PuppetASTToString extends PuppetASTObject
         this.obj = args[0];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         return "" + await this.obj.resolve(context, resolver)
     }
@@ -759,7 +808,7 @@ export class PuppetASTConcat extends PuppetASTObject
         this.entries = args;
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         const resolved = [];
 
@@ -806,7 +855,7 @@ export class PuppetASTResolvedProperty
     }
 }
 
-export class PuppetASTClass extends PuppetASTObject
+export class PuppetASTClass extends PuppetASTObject implements PuppetASTContainerContext
 {
     public readonly name: string;
     public readonly params: any;
@@ -845,13 +894,28 @@ export class PuppetASTClass extends PuppetASTObject
 
         return null;
     }
+    
+    public getProperty(name: string): PuppetASTResolvedProperty
+    {
+        return this.getResolvedProperty(name);
+    }
+
+    public getName(): string
+    {
+        return this.name;
+    }
 
     public setResolvedProperty(name: string, pp: PuppetASTResolvedProperty)
     {
         this.resolvedProperties.put(name, pp);
     }
+    
+    public setProperty(name: string, pp: PuppetASTResolvedProperty)
+    {
+        this.setResolvedProperty(name, pp);
+    }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         if (this.parent)
         {
@@ -924,6 +988,174 @@ export class PuppetASTClass extends PuppetASTObject
     }
 }
 
+export class PuppetASTResource extends PuppetASTObject implements PuppetASTContainerContext
+{
+    private readonly _name: string;
+    private readonly args: any;
+    private readonly definedTypeParams: any;
+    private readonly _resolvedProperties: Dictionary<string, PuppetASTResolvedProperty>;
+    private _title: string;
+
+    constructor(args: Object, name?: string, definedTypeParams?: any)
+    {
+        super();
+
+        this.args = args;
+        this.definedTypeParams = definedTypeParams;
+        this._resolvedProperties = new Dictionary();
+        this._name = name;
+    }
+
+    public setProperty(name: string, pp: PuppetASTResolvedProperty): void
+    {
+        this._resolvedProperties.put(name, pp);
+    }
+
+    public getProperty(name: string): PuppetASTResolvedProperty
+    {
+        return this._resolvedProperties.get(name);
+    }
+    
+    public get resolvedProperties(): Dictionary<string, PuppetASTResolvedProperty>
+    {
+        return this._resolvedProperties;
+    }
+
+    public getName(): string
+    {
+        return this._name;
+    }
+
+    public getTitle(): string
+    {
+        return this._title;
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        if (this.args != null)
+        {
+            const title: PuppetASTObject = this.args.title;
+            await title.resolve(context, resolver);
+            this._title = title.toString();
+
+            const ops = this.args.ops;
+
+            if (ops instanceof PuppetASTList)
+            {
+                for (const entry of ops.entries)
+                {
+                    if (!(entry instanceof PuppetASTKeyedEntry))
+                        continue;
+
+                    const keyed = <PuppetASTKeyedEntry>entry;
+
+                    const key = await keyed.key.resolve(context, resolver);
+                    const value = await keyed.value.resolve(context, resolver);
+
+                    this._resolvedProperties.put(key, new PuppetASTResolvedProperty(null, value));
+                }
+            }
+        }
+
+        if (this.definedTypeParams != null)
+        {
+            for (const name in this.definedTypeParams)
+            {
+                const v = this.definedTypeParams[name];
+                
+                if (!(v instanceof PuppetASTKeyedEntry))
+                    continue;
+
+                const keyed = <PuppetASTKeyedEntry>v;
+
+                const key = await keyed.key.resolve(context, resolver);
+                const value = await keyed.value.resolve(context, resolver);
+
+                this._resolvedProperties.put(key, new PuppetASTResolvedProperty(null, value));
+            }
+        }
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTResource(args);
+    }
+}
+
+export class PuppetASTResourcesEntry extends PuppetASTObject
+{
+    private readonly bodies: PuppetASTList;
+    private readonly type: PuppetASTQualifiedName;
+    private readonly entries: Dictionary<string, PuppetASTResource>;
+
+    constructor(args: Array<PuppetASTObject>, name?: string)
+    {
+        super();
+
+        const values: any = args[0];
+
+        this.bodies = values.bodies;
+        this.type = values.type;
+        this.entries = new Dictionary();
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        for (const body of this.bodies.entries)
+        {
+            const resource = new PuppetASTResource(<any>(body));
+            await resource.resolve(context, resolver);
+            this.entries.put(resource.getTitle(), resource);
+        }
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTResourcesEntry(args);
+    }
+}
+
+export class PuppetASTDefinedType extends PuppetASTObject
+{
+    public readonly name: string;
+    public readonly params: any;
+    public readonly body: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        const metaData: any = args[0];
+
+        this.name = metaData["name"].value;
+        this.body = metaData["body"];
+        this.params = metaData["params"] || {};
+    }
+    
+    public async resolveAsResource(title: string, properties: any, resolver: Resolver): Promise<PuppetASTResource>
+    {
+        const resource = new PuppetASTResource(null, title, this.params);
+        for (const name in properties)
+        {
+            const value = properties[name];
+            resource.resolvedProperties.put(name, new PuppetASTResolvedProperty(null, value));
+        }
+        await resource.resolve(resource, resolver);
+        return resource;
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        throw new Error("Defined type cannot be resolved, resolve PuppetASTResource instead.")
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTDefinedType(args);
+    }
+}
+
 export class PuppetASTSetInstruction extends PuppetASTObject
 {
     public readonly receiver: PuppetASTObject;
@@ -937,7 +1169,7 @@ export class PuppetASTSetInstruction extends PuppetASTObject
         this.provider = args[1];
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         if (!(this.receiver instanceof PuppetASTVariable))
         {
@@ -961,7 +1193,7 @@ export class PuppetASTSetInstruction extends PuppetASTObject
             pp = new PuppetASTResolvedProperty(null, null, e);
         }
         
-        context.setResolvedProperty(paramName, pp);
+        context.setProperty(paramName, pp);
         return pp;
     }
 
@@ -997,14 +1229,14 @@ export class PuppetASTVariable extends PuppetASTObject
         return this.root || this.className == "";
     }
 
-    protected async _resolve(context: PuppetASTClass, resolver: Resolver): Promise<any>
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         const isRoot = this.isRoot();
 
-        if (isRoot || context.name == this.className)
+        if (isRoot || context.getName() == this.className)
         {
             // we're asking the current context, no need to resolve
-            const property = context.getResolvedProperty(this.name);
+            const property = context.getProperty(this.name);
 
             if (property)
             {
@@ -1058,13 +1290,14 @@ export class PuppetASTParser
         this.calls = {
             "block": PuppetASTBlock.Create,
             "class": PuppetASTClass.Create,
+            "define": PuppetASTDefinedType.Create,
             "=": PuppetASTSetInstruction.Create,
             "var": PuppetASTVariable.Create,
             "qr": PuppetASTType.Create,
             "qn": PuppetASTQualifiedName.Create,
             "str": PuppetASTToString.Create,
             "concat": PuppetASTConcat.Create,
-            "resource": PuppetASTResource.Create,
+            "resource": PuppetASTResourcesEntry.Create,
             "->": PuppetASTApplyOrder.Create,
             "~>": PuppetASTNotifyOrder.Create,
             "access": PuppetASTAccess.Create,
@@ -1086,7 +1319,9 @@ export class PuppetASTParser
             "exported-query": PuppetASTIgnored.Create("exported-query"),
             "collect": PuppetASTIgnored.Create("collect"),
             "invoke": PuppetASTInvoke.Create,
-            "array": PuppetASTArray.Create
+            "array": PuppetASTArray.Create,
+            "regexp": PuppetASTRegularExpression.Create,
+            "=~": PuppetASTRegularExpressionCheck.Create,
         };
     }
 
