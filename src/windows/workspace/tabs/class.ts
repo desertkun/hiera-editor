@@ -388,7 +388,7 @@ export class NodeClassTab extends WorkspaceTab
 
     protected hasDefaultValue(propertyName: string): boolean
     {
-        return this.defaults[propertyName] != null;
+        return this.defaults.hasOwnProperty(propertyName);
     }
 
     protected async setProperty(propertyName: string, value: any)

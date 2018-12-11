@@ -8,7 +8,7 @@ import {Dictionary} from "./dictionary";
 const slash = require('slash');
 const PromisePool = require('es6-promise-pool');
 
-import {PuppetASTParser, PuppetASTClass, PuppetASTDefinedType, PuppetASTResource, Resolver} from "./puppet/ast";
+import {PuppetASTParser, PuppetASTClass, PuppetASTDefinedType, PuppetASTResolvedDefinedType, Resolver} from "./puppet/ast";
 
 export module puppet
 {
@@ -804,7 +804,7 @@ export module puppet
     export class ResolvedResource
     {
         public definedType: PuppetASTDefinedType;
-        public resource: PuppetASTResource;
+        public resource: PuppetASTResolvedDefinedType;
     }
 
     export class Environment
@@ -956,7 +956,7 @@ export module puppet
 
             const definedType: PuppetASTDefinedType = obj;
 
-            let resource: PuppetASTResource;
+            let resource: PuppetASTResolvedDefinedType;
             try
             {
                 resource = await definedType.resolveAsResource(title, properties, new class extends Resolver
@@ -1720,7 +1720,7 @@ export module puppet
             {
                 const property = compiled.getResolvedProperty(name);
 
-                if (property.type != null)
+                if (property.hasType)
                 {
                     types[name] = {
                         "type": property.type.constructor.name,
@@ -1728,12 +1728,12 @@ export module puppet
                     };
                 }
 
-                if (property.value != null)
+                if (property.hasValue)
                 {
                     defaultValues[name] = property.value;
                 }
 
-                if (property.error != null)
+                if (property.hasError)
                 {
                     errors[name] = {
                         message: property.error.message,
@@ -1790,7 +1790,7 @@ export module puppet
             {
                 const property = compiled.resource.resolvedProperties.get(name);
 
-                if (property.type != null)
+                if (property.hasType)
                 {
                     types[name] = {
                         "type": property.type.constructor.name,
@@ -1798,7 +1798,7 @@ export module puppet
                     };
                 }
 
-                if (property.error != null)
+                if (property.hasError)
                 {
                     errors[name] = {
                         message: property.error.message,
@@ -1809,12 +1809,16 @@ export module puppet
             
             for (const name in compiled.definedType.params)
             {
-                const def = compiled.resource.resolvedProperties.get(name);
+                const defaultParam = compiled.definedType.params[name];
+                const property = compiled.resource.resolvedProperties.get(name);
 
-                if (def == null)
+                if (property == null || defaultParam == null)
                     continue;
 
-                defaultValues[name] = def;
+                if (property.hasValue && defaultParam.hasOwnProperty("value"))
+                {
+                    defaultValues[name] = property.value;
+                }
             }
 
             return {

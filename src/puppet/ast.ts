@@ -1,6 +1,7 @@
 
 import {Dictionary} from "../dictionary";
 import { throws } from "assert";
+import { TouchBarSlider } from "electron";
 
 type ResolverHint = (obj: any) => void;
 
@@ -841,17 +842,88 @@ export class PuppetASTBlock extends PuppetASTObject
 
 export class PuppetASTResolvedProperty
 {
-    public readonly type: any;
-    public readonly value: any;
-    public readonly error: any;
-    public readonly hints: Array<any>;
+    private _hasType: boolean;
+    private _type: any;
 
-    constructor (type: any, value: any, error?: any, hints?: Array<any>)
+    private _hasValue: boolean;
+    private _value: any;
+
+    private _hasError: boolean;
+    private _error: any;
+
+    private _hasHints: boolean;
+    private _hints: Array<any>;
+
+    constructor()
     {
-        this.type = type;
-        this.value = value;
-        this.error = error;
-        this.hints = hints;
+        this._hasType = false;
+        this._hasValue = false;
+        this._hasError = false;
+        this._hasHints = false;
+    }
+
+    public set type(value: any)
+    {
+        this._type = value;
+        this._hasType = true;
+    }
+
+    public set value(value: any)
+    {
+        this._value = value;
+        this._hasValue = true;
+    }
+
+    public set error(value: any)
+    {
+        this._error = value;
+        this._hasError = true;
+    }
+
+    public set hints(value: Array<any>)
+    {
+        this._hints = value;
+        this._hasHints = true;
+    }
+
+    public get type(): any
+    {
+        return this._type;
+    }
+
+    public get value(): any
+    {
+        return this._value;
+    }
+
+    public get error(): any
+    {
+        return this._error;
+    }
+
+    public get hints(): Array<any>
+    {
+        return this._hints;
+    }
+
+    public get hasType(): boolean
+    {
+        return this._hasType;
+    }
+
+    public get hasValue(): boolean
+    {
+        return this._hasValue;
+    }
+
+    public get hasError(): boolean
+    {
+        return this._hasError;
+    }
+
+    public get hasHints(): boolean
+    {
+        return this._hasHints && this._hints.length > 0;
     }
 }
 
@@ -969,11 +1041,23 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
             catch (e)
             {
                 console.log("Failed to resolve param " + paramName + " (" + value.constructor.name + "): " + e);
-                this.resolvedProperties.put(paramName, new PuppetASTResolvedProperty(type, null, e, hints.slice(0)));
+                const pp = new PuppetASTResolvedProperty();
+                if (type != null)
+                    pp.type = type;
+                pp.error = e;
+                pp.hints = hints.slice(0);
+                this.resolvedProperties.put(paramName, pp);
                 continue;
             }
 
-            this.resolvedProperties.put(paramName, new PuppetASTResolvedProperty(type, result));
+            const pp = new PuppetASTResolvedProperty();
+
+            pp.value = result;
+
+            if (type != null)
+                pp.type = type;
+
+            this.resolvedProperties.put(paramName, pp);
         }
 
         if (this.body)
@@ -988,22 +1072,115 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
     }
 }
 
-export class PuppetASTResource extends PuppetASTObject implements PuppetASTContainerContext
+export class PuppetASTResource extends PuppetASTObject
 {
-    private readonly _name: string;
-    private readonly args: any;
-    private readonly definedTypeParams: any;
+    private readonly ops: any;
+    private readonly title: PuppetASTObject;
+    private _resolvedTitle: string;
     private readonly _resolvedProperties: Dictionary<string, PuppetASTResolvedProperty>;
-    private _title: string;
 
-    constructor(args: Object, name?: string, definedTypeParams?: any)
+    constructor(args: any)
     {
         super();
 
-        this.args = args;
-        this.definedTypeParams = definedTypeParams;
+        this.ops = args.ops;
+        this.title = args.title;
         this._resolvedProperties = new Dictionary();
+    }
+
+    public get resolvedProperties(): Dictionary<string, PuppetASTResolvedProperty>
+    {
+        return this._resolvedProperties;
+    }
+
+    public getTitle(): string
+    {
+        return this._resolvedTitle;
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        await this.title.resolve(context, resolver);
+        this._resolvedTitle = this.title.toString();
+
+        if (this.ops instanceof PuppetASTList)
+        {
+            for (const entry of this.ops.entries)
+            {
+                if (!(entry instanceof PuppetASTKeyedEntry))
+                    continue;
+
+                const keyed = <PuppetASTKeyedEntry>entry;
+
+                const key = await keyed.key.resolve(context, resolver);
+                const value = await keyed.value.resolve(context, resolver);
+
+                const pp = new PuppetASTResolvedProperty();
+                pp.value = value;
+
+                this._resolvedProperties.put(key, pp);
+            }
+        }
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTResource(args);
+    }
+}
+
+export class PuppetASTResourcesEntry extends PuppetASTObject
+{
+    private readonly bodies: PuppetASTList;
+    private readonly type: PuppetASTQualifiedName;
+    private readonly entries: Dictionary<string, PuppetASTResource>;
+    private _resolvedType: string;
+
+    constructor(args: Array<PuppetASTObject>, name?: string)
+    {
+        super();
+
+        const values: any = args[0];
+
+        this.bodies = values.bodies;
+        this.type = values.type;
+        this.entries = new Dictionary();
+    }
+
+    public get resolvedType(): string
+    {
+        return this._resolvedType;
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        this._resolvedType = await this.type.resolve(context, resolver);
+
+        for (const body of this.bodies.entries)
+        {
+            const resource = new PuppetASTResource(<any>(body));
+            await resource.resolve(context, resolver);
+            this.entries.put(resource.getTitle(), resource);
+        }
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTResourcesEntry(args);
+    }
+}
+
+export class PuppetASTResolvedDefinedType implements PuppetASTContainerContext
+{
+    private readonly _resolvedProperties: Dictionary<string, PuppetASTResolvedProperty>;
+    private _title: string;
+    private _name: string;
+
+    constructor(title: string, name: string)
+    {
+        this._title = title;
         this._name = name;
+        this._resolvedProperties = new Dictionary();
     }
 
     public setProperty(name: string, pp: PuppetASTResolvedProperty): void
@@ -1025,95 +1202,6 @@ export class PuppetASTResource extends PuppetASTObject implements PuppetASTConta
     {
         return this._name;
     }
-
-    public getTitle(): string
-    {
-        return this._title;
-    }
-
-    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
-    {
-        if (this.args != null)
-        {
-            const title: PuppetASTObject = this.args.title;
-            await title.resolve(context, resolver);
-            this._title = title.toString();
-
-            const ops = this.args.ops;
-
-            if (ops instanceof PuppetASTList)
-            {
-                for (const entry of ops.entries)
-                {
-                    if (!(entry instanceof PuppetASTKeyedEntry))
-                        continue;
-
-                    const keyed = <PuppetASTKeyedEntry>entry;
-
-                    const key = await keyed.key.resolve(context, resolver);
-                    const value = await keyed.value.resolve(context, resolver);
-
-                    this._resolvedProperties.put(key, new PuppetASTResolvedProperty(null, value));
-                }
-            }
-        }
-
-        if (this.definedTypeParams != null)
-        {
-            for (const name in this.definedTypeParams)
-            {
-                const v = this.definedTypeParams[name];
-                
-                if (!(v instanceof PuppetASTKeyedEntry))
-                    continue;
-
-                const keyed = <PuppetASTKeyedEntry>v;
-
-                const key = await keyed.key.resolve(context, resolver);
-                const value = await keyed.value.resolve(context, resolver);
-
-                this._resolvedProperties.put(key, new PuppetASTResolvedProperty(null, value));
-            }
-        }
-    }
-
-    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
-    {
-        return new PuppetASTResource(args);
-    }
-}
-
-export class PuppetASTResourcesEntry extends PuppetASTObject
-{
-    private readonly bodies: PuppetASTList;
-    private readonly type: PuppetASTQualifiedName;
-    private readonly entries: Dictionary<string, PuppetASTResource>;
-
-    constructor(args: Array<PuppetASTObject>, name?: string)
-    {
-        super();
-
-        const values: any = args[0];
-
-        this.bodies = values.bodies;
-        this.type = values.type;
-        this.entries = new Dictionary();
-    }
-
-    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
-    {
-        for (const body of this.bodies.entries)
-        {
-            const resource = new PuppetASTResource(<any>(body));
-            await resource.resolve(context, resolver);
-            this.entries.put(resource.getTitle(), resource);
-        }
-    }
-
-    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
-    {
-        return new PuppetASTResourcesEntry(args);
-    }
 }
 
 export class PuppetASTDefinedType extends PuppetASTObject
@@ -1121,6 +1209,11 @@ export class PuppetASTDefinedType extends PuppetASTObject
     public readonly name: string;
     public readonly params: any;
     public readonly body: PuppetASTObject;
+
+    public getName(): string
+    {
+        return this.name;
+    }
 
     constructor(args: Array<PuppetASTObject>)
     {
@@ -1133,21 +1226,89 @@ export class PuppetASTDefinedType extends PuppetASTObject
         this.params = metaData["params"] || {};
     }
     
-    public async resolveAsResource(title: string, properties: any, resolver: Resolver): Promise<PuppetASTResource>
+    public async resolveAsResource(title: string, properties: any, resolver: Resolver): Promise<PuppetASTResolvedDefinedType>
     {
-        const resource = new PuppetASTResource(null, title, this.params);
+        const r = new PuppetASTResolvedDefinedType(this.name, title);
         for (const name in properties)
         {
-            const value = properties[name];
-            resource.resolvedProperties.put(name, new PuppetASTResolvedProperty(null, value));
+            const pp = new PuppetASTResolvedProperty();
+            pp.value = properties[name];
+            r.resolvedProperties.put(name, pp);
         }
-        await resource.resolve(resource, resolver);
-        return resource;
+        await this.resolve(r, resolver);
+        return r;
     }
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
-        throw new Error("Defined type cannot be resolved, resolve PuppetASTResource instead.")
+        console.log("Resolving defined type " + this.name);
+
+        const hints: Array<any> = [];
+
+        resolver.hint = function (obj: any)
+        {
+            hints.push(obj);
+        };
+
+        for (const paramName in this.params)
+        {
+            hints.length = 0;
+
+            const param = this.params[paramName];
+
+            let type = param.type;
+            const value = param.value;
+
+            if (type instanceof PuppetASTObject)
+            {
+                try
+                {
+                    type = await type.resolve(context, resolver);
+                }
+                catch (e)
+                {
+                    console.log("Failed to resolve type for param " + paramName + " (" + type.constructor.name + "): " + e);
+                    type = null;
+                }
+            }
+
+            if (!(value instanceof PuppetASTObject))
+            {
+                continue;
+            }
+
+            let result: any;
+
+            try
+            {
+                result = await value.resolve(context, resolver);
+            }
+            catch (e)
+            {
+                console.log("Failed to resolve param " + paramName + " (" + value.constructor.name + "): " + e);
+                const pp = new PuppetASTResolvedProperty();
+                if (type != null)
+                    pp.type = type;
+                pp.error = e;
+                pp.hints = hints.slice(0);
+                context.setProperty(paramName, pp);
+                continue;
+            }
+
+            const pp = new PuppetASTResolvedProperty();
+
+            pp.value = result;
+
+            if (type != null)
+                pp.type = type;
+
+            context.setProperty(paramName, pp);
+        }
+
+        if (this.body)
+            await this.body.resolve(context, resolver);
+
+        console.log("Defined type has been resolved");
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
@@ -1182,15 +1343,15 @@ export class PuppetASTSetInstruction extends PuppetASTObject
         }
 
         const paramName = this.receiver.name;
-        let pp;
+        const pp = new PuppetASTResolvedProperty();
+
         try
         {
-            const result = await this.provider.resolve(context, resolver);
-            pp = new PuppetASTResolvedProperty(null, result);
+            pp.value = await this.provider.resolve(context, resolver);
         }
         catch (e)
         {
-            pp = new PuppetASTResolvedProperty(null, null, e);
+            pp.error = e;
         }
         
         context.setProperty(paramName, pp);
