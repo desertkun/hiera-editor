@@ -4,7 +4,7 @@ import { workspace_window } from "../../global"
 import { BrowserWindow, ipcMain } from "electron";
 import { throws } from "assert";
 
-export class AssignClassWindow extends Window
+export class CreateResourceWindow extends Window
 {
     private selected: boolean;
     private readonly nodePath: string;
@@ -21,7 +21,7 @@ export class AssignClassWindow extends Window
     {
         return new Promise<string>((resolve, reject) => {
 
-            this.openWindow(600, 400, "assign_class.html", null, {
+            this.openWindow(600, 400, "create_resource.html", null, {
                 resizable: false,
                 modal: true,
                 autoHideMenuBar: true,
@@ -30,19 +30,19 @@ export class AssignClassWindow extends Window
                 browserWindow.webContents.send('init', this.nodePath);
             });
     
-            ipcMain.on("class-selected", (event: any, className: string) => 
+            ipcMain.on("resource-selected", (event: any, definedTypeName: string) => 
             {
-                if (className != null)
+                if (definedTypeName != null)
                 {
                     this.selected = true;
-                    resolve(className);
+                    resolve(definedTypeName);
                 }
 
                 this.close();
             });
 
             this.onClosed = () => {
-                ipcMain.removeAllListeners("class-selected");
+                ipcMain.removeAllListeners("resource-selected");
 
                 if (!this.selected)
                 {

@@ -2,6 +2,7 @@
 import { dialog, OpenDialogOptions } from "electron";
 import { projects_list, projects_window, workspace_window, setCurrentWorkspace, getCurrentWorkspace } from "../global"
 import { AssignClassWindow } from "../windows/assign_class/window"
+import { CreateResourceWindow } from "../windows/create_resource/window"
 import { ProjectsModel, ProjectModel } from "../projects"
 import { puppet } from "../puppet"
 
@@ -330,6 +331,38 @@ export class IpcServer implements IpcAPI
 
         return className;
     }
+
+    public async chooseDefinedType(nodePath: string): Promise<string>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return null;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return null;
+    
+        const window = new CreateResourceWindow(nodePath);
+        const result = await window.show();
+        return result;
+    }
+
+    public async createNewResourceToNode(nodePath: string, definedTypeName: string, title: string): Promise<boolean>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return false;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return false;
+    
+        return await node.createResource(definedTypeName, title);
+    }
     
     public async removeClassFromNode(nodePath: string, className: string): Promise<void>
     {
@@ -419,6 +452,21 @@ export class IpcServer implements IpcAPI
             return [];
 
         return await node.env.searchClasses(search);
+    }
+
+    public async searchDefinedTypes(nodePath: string, search: string): Promise<any[]>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return [];
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return [];
+
+        return await node.env.searchDefinedTypes(search);
     }
 }
 

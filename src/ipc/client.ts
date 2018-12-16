@@ -28,4 +28,7 @@ class IpcProxy implements ProxyHandler<any>
     }
 }
 
-export const ipc: IpcAPI = new Proxy<any>({}, new IpcProxy()) as IpcAPI;
+export function IPC(): IpcAPI
+{
+    return new Proxy<any>({}, new IpcProxy()) as IpcAPI;
+}

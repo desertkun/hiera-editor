@@ -1,6 +1,8 @@
 import { NodeClassTab } from "./class";
-import {ipc} from "../../../ipc/client";
+import { IPC } from "../../../ipc/client";
 import {WorkspaceRenderer} from "../renderer";
+
+const ipc = IPC();
 
 export class NodeResourceTab extends NodeClassTab
 {

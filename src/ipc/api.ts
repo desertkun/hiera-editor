@@ -17,6 +17,7 @@ export interface IpcAPI
     getCurrentWorkspacePath(): Promise<string>;
     assignNewClassToNode(nodePath: string): Promise<string>;
     searchClasses(nodePath: string, search: string): Promise<any[]>;
+    searchDefinedTypes(nodePath: string, search: string): Promise<any[]>;
     removeClassFromNode(nodePath: string, className: string): Promise<void>;
     removeClassesFromNode(nodePath: string): Promise<Array<string>>;
     acquireNodeResource(nodePath: string, definedTypeName: string, title: string): Promise<any>;
@@ -25,4 +26,6 @@ export interface IpcAPI
     removeResourceFromNode(nodePath: string, definedTypeName: string, title: string): Promise<void>;
     renameNodeResource(nodePath: string, definedTypeName: string, title: string, newTitle: string): Promise<boolean>;
     removeResourcesFromNode(nodePath: string, definedTypeName: string): Promise<string[]>;
+    chooseDefinedType(nodePath: string): Promise<string>;
+    createNewResourceToNode(nodePath: string, definedTypeName: string, title: string): Promise<any>;
 }

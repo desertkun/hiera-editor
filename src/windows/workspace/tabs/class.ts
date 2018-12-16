@@ -1,6 +1,8 @@
-import {ipc} from "../../../ipc/client";
+import { IPC } from "../../../ipc/client";
 import {WorkspaceTab} from "./tab";
 import {WorkspaceRenderer} from "../renderer";
+
+const ipc = IPC();
 
 const $ = require("jquery");
 

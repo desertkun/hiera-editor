@@ -1,6 +1,7 @@
-import {ipc} from "../../ipc/client";
-
+import { IPC } from "../../ipc/client";
 import {Dictionary} from "../../dictionary";
+
+const ipc = IPC();
 
 const Dialogs = require('dialogs');
 const $ = require("jquery");
@@ -160,11 +161,22 @@ class NodeTreeItemRenderer
                     label: "Create New Resource",
                     click: async () => 
                     {
-                        /*
-                        await ipc.removeResourceFromNode(zis.localPath, definedTypeName);
+                        const newTitle = await new Promise<string>((resolve: any) => {
+                            dialogs.prompt("Enter a title for new resource " + definedTypeName, "", (result: string) =>
+                            {
+                                resolve(result);
+                            })
+                        });
+    
+                        if (newTitle == null)
+                            return;
+    
+                        if (!(await ipc.createNewResourceToNode(zis.localPath, definedTypeName, newTitle)))
+                            return;
+    
                         await renderer.refresh();
-                        await renderer.closeTabKind("class", [zis.localPath, className]);
-                        */
+                        await renderer.closeTabKind("resource", 
+                            [zis.localPath, definedTypeName, newTitle]);
                     }
                 },
                 {
@@ -345,10 +357,31 @@ class NodeTreeItemRenderer
         }, "node-" + zis.localPath + "-resources", renderer.openNodes);
         
         n_resources.contextMenu([
+            
             {
                 label: "Create New Resource",
-                click: () => {
-                    //
+                click: async () => 
+                {
+                    const definedTypeName = await ipc.chooseDefinedType(zis.localPath);
+                    if (!definedTypeName)
+                        return;
+
+                    const newTitle = await new Promise<string>((resolve: any) => {
+                        dialogs.prompt("Enter a title for new resource " + definedTypeName, "", (result: string) =>
+                        {
+                            resolve(result);
+                        })
+                    });
+
+                    if (newTitle == null)
+                        return;
+
+                    if (!(await ipc.createNewResourceToNode(zis.localPath, definedTypeName, newTitle)))
+                        return;
+
+                    await renderer.refresh();
+                    await renderer.closeTabKind("resource", 
+                        [zis.localPath, definedTypeName, newTitle]);
                 }
             },
             {

@@ -9,6 +9,7 @@ const slash = require('slash');
 const PromisePool = require('es6-promise-pool');
 
 import {PuppetASTParser, PuppetASTClass, PuppetASTDefinedType, PuppetASTResolvedDefinedType, Resolver} from "./puppet/ast";
+import { throws } from "assert";
 
 export module puppet
 {
@@ -329,6 +330,24 @@ export module puppet
                     puppetClass.file.indexOf(search) >= 0)
                 {
                     results.push(puppetClass.dump());
+                }
+            }
+
+            results.sort((a: any, b: any) => 
+            {
+                return a.name.localeCompare(b.name);
+            })
+        }
+
+        public async searchDefinedTypes(search: string, results: Array<any>): Promise<void>
+        {
+            for (const puppetDefinedType of this._definedTypes.getValues())
+            {
+                if (puppetDefinedType.name.indexOf(search) >= 0 ||
+                    puppetDefinedType.description.indexOf(search) >= 0 ||
+                    puppetDefinedType.file.indexOf(search) >= 0)
+                {
+                    results.push(puppetDefinedType.dump());
                 }
             }
 
@@ -854,6 +873,16 @@ export module puppet
 
             this._modulesInfo.searchClasses(search, results);
             this._workspace.modulesInfo.searchClasses(search, results)
+
+            return results;
+        }
+
+        public async searchDefinedTypes(search: string): Promise<any[]>
+        {
+            const results: Array<any> = [];
+
+            this._modulesInfo.searchDefinedTypes(search, results);
+            this._workspace.modulesInfo.searchDefinedTypes(search, results)
 
             return results;
         }
@@ -1561,6 +1590,24 @@ export module puppet
 
             this.configClasses.push(className);
             await this.save();
+        }
+
+        public async createResource(definedTypeName: string, title: string): Promise<boolean>
+        {
+            const zis = this;
+            if (this.hasResource(definedTypeName, title))
+                return false;
+
+            if (this._config["resources"] == null)
+                this._config["resources"] = [];
+
+            if (this.configResources[definedTypeName] == null)
+                this.configResources[definedTypeName] = {};
+
+            this.configResources[definedTypeName][title] = {};
+            
+            await this.save();
+            return true;
         }
 
         public async acquireClass(className: string): Promise<PuppetASTClass>

@@ -8,18 +8,20 @@ const remote = require('electron').remote;
 
 const ipc = IPC();
 
-let renderer: AssignClassRenderer;
+let renderer: CreateResourceRenderer;
 
-class AssignClassRenderer
+class CreateResourceRenderer
 {
     private nodePath: string;
+    private definedTypeName: string;
     private searchTimer: any;
     private searchResults: any;
     private searching: boolean;
 
-    constructor(nodePath: string)
+    constructor(nodePath: string, definedTypeName?: string)
     {
         this.nodePath = nodePath;
+        this.definedTypeName = definedTypeName;
     }
 
     private renderNoResults(): void
@@ -27,17 +29,17 @@ class AssignClassRenderer
         this.searchResults.html('<div class="search-result-message"><span><i class="fas fa-question"></i> Search yielded no results</span></div>');
     }
 
-    private selectEntry(classInfo: any)
+    private selectEntry(definedTypeInfo: any)
     {
-        if (classInfo.tags["api"] == "private") {
-            if (!confirm("The class you are about to add is marked as api private. " +
+        if (definedTypeInfo.tags["api"] == "private") {
+            if (!confirm("The resource you are about to create is marked as api private. " +
                 "That means it is not meant to be used directly by end user. Are you sure?"))
             {
                 return;
             }
         }
 
-        ipcRenderer.send("class-selected", classInfo.name);
+        ipcRenderer.send("resource-selected", definedTypeInfo.name);
     }
 
     private renderSearchResults(results: Array<any>): void
@@ -46,27 +48,27 @@ class AssignClassRenderer
 
         this.searchResults.html('').scrollTop(0);
 
-        for (const classInfo of results)
+        for (const definedTypeInfo of results)
         {
             const entry = $('<a class="search-result-entry w-100"></a>').appendTo(this.searchResults).click(() => {
-                zis.selectEntry(classInfo);
+                zis.selectEntry(definedTypeInfo);
             })
 
             // icon
             {
                 const icon = $('<span class="search-result-icon"></span>').appendTo(entry);
 
-                if (classInfo.options.icon != null)
+                if (definedTypeInfo.options.icon != null)
                 {
-                    $('<img src="' + classInfo.options.icon + '">').appendTo(icon);
+                    $('<img src="' + definedTypeInfo.options.icon + '">').appendTo(icon);
                 }
                 else
                 {
-                    $('<i class="fas fa-2x fa-puzzle-piece"></i>').appendTo(icon);
+                    $('<i class="far fa-2x fa-clone"></i>').appendTo(icon);
                 }
             }
                 
-            if (classInfo.tags["api"] == "private")
+            if (definedTypeInfo.tags["api"] == "private")
             {
                 entry.addClass("api-private");
                 $('<span class="badge badge-secondary">private</span>').appendTo(entry);
@@ -74,7 +76,7 @@ class AssignClassRenderer
 
             // name
             {
-                const name = $('<span class="search-result-name">' + classInfo.name + '</span>').appendTo(entry);
+                const name = $('<span class="search-result-name">' + definedTypeInfo.name + '</span>').appendTo(entry);
             }
 
         }
@@ -82,16 +84,16 @@ class AssignClassRenderer
 
     private renderIntro(): void
     {
-        this.searchResults.html('<div class="search-result-message"><span class="text-muted">Start searching classes by typing class name</span></div>');
+        this.searchResults.html('<div class="search-result-message"><span class="text-muted">Start searching defined types by typing type name</span></div>');
     }
 
-    private async searchClasses()
+    private async searchDefinedTypes()
     {
         this.searching = true;
 
         try
         {
-            const search = $("#class-name-filter").val();
+            const search = $("#resource-name-filter").val();
 
             if (!search)
             {
@@ -99,7 +101,7 @@ class AssignClassRenderer
                 return;
             }
 
-            const results = await ipc.searchClasses(this.nodePath, search);
+            const results = await ipc.searchDefinedTypes(this.nodePath, search);
 
             if (results.length > 0)
             {
@@ -122,7 +124,7 @@ class AssignClassRenderer
 
         const zis = this;
 
-        $("#class-name-filter").on("change keyup paste", () => 
+        $("#resource-name-filter").on("change keyup paste", () => 
         {
             if (zis.searching)
                 return;
@@ -135,9 +137,14 @@ class AssignClassRenderer
             zis.searchTimer = setTimeout(() => 
             {
                 zis.searchTimer = null;
-                zis.searchClasses();
+                zis.searchDefinedTypes();
             }, 200);
 
+        });
+
+        $('#cancel').click(() => 
+        {
+            window.close();
         });
 
         document.addEventListener('keydown', event => 
@@ -146,11 +153,6 @@ class AssignClassRenderer
             {
                 window.close();
             }
-        });
-
-        $('#cancel').click(() => 
-        {
-            window.close();
         });
 
         this.renderIntro();
@@ -163,8 +165,8 @@ window.eval = global.eval = function () {
     throw new Error(`Sorry, this app does not support window.eval().`)
 };
 
-ipcRenderer.on('init', function (event: any, nodePath: string) 
+ipcRenderer.on('init', function (event: any, nodePath: string, definedTypeName: string) 
 {
-    renderer = new AssignClassRenderer(nodePath);
+    renderer = new CreateResourceRenderer(nodePath, definedTypeName);
     renderer.init();
 });
