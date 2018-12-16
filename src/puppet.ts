@@ -1440,6 +1440,11 @@ export module puppet
             return this._nodePath;
         }
 
+        public hasResources(definedTypeName: string): boolean
+        {
+            return this.configResources[definedTypeName] != null;
+        }
+
         public hasResource(definedTypeName: string, title: string): boolean
         {
             const titles = this.configResources[definedTypeName];
@@ -1491,6 +1496,20 @@ export module puppet
 
             delete titles[title];
             await this.save();
+        }
+
+        public async removeResources(definedTypeName: string): Promise<string[]>
+        {
+            if (!this.hasResources(definedTypeName))
+                return;
+
+            const titles = this.configResources[definedTypeName];
+            const names = Object.keys(titles);
+
+            delete this.configResources[definedTypeName];
+            await this.save();
+
+            return names;
         }
 
         public async renameResource(definedTypeName: string, title: string, newTitle: string): Promise<boolean>

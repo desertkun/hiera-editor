@@ -8,6 +8,7 @@ interface RenderedProperty
 {
     value(): any;
     set(value: any): void;
+    modified(value: boolean): void;
 }
 
 type PropertyChangedCallback = (value: any) => void;
@@ -21,6 +22,8 @@ class StringPropertyRenderer implements PropertyRenderer
 {
     public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
+        const zis = this;
+
         const textField = $('<input type="text" class="form-control form-control-sm" id="' + propertyId + '">')
             .appendTo(group)
             .val(value)
@@ -42,6 +45,10 @@ class StringPropertyRenderer implements PropertyRenderer
             set(value: any): void
             {
                 textField.val(value);
+            },
+            modified(value: boolean): void
+            {
+
             }
         };
     }
@@ -57,6 +64,8 @@ class EnumPropertyRenderer implements PropertyRenderer
 
     public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
+        const zis = this;
+
         const select = $('<select class="selectpicker" id="' + propertyId + '"></select>').appendTo(group);
 
         for (const value_ of this.values)
@@ -81,6 +90,10 @@ class EnumPropertyRenderer implements PropertyRenderer
             {
                 select.val(value);
                 select.selectpicker('refresh');
+            },
+            modified(value: boolean): void
+            {
+                
             }
         };
     }
@@ -100,6 +113,8 @@ class NumberPropertyRenderer implements PropertyRenderer
 
     public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
+        const zis = this;
+
         const textField = $('<input type="text" class="form-control form-control-sm" id="' + propertyId + '">')
             .appendTo(group)
             .val(value)
@@ -122,6 +137,10 @@ class NumberPropertyRenderer implements PropertyRenderer
             set(value: any): void
             {
                 textField.val(value);
+            },
+            modified(value: boolean): void
+            {
+                
             }
         };
     }
@@ -131,6 +150,8 @@ class BooleanPropertyRenderer implements PropertyRenderer
 {
     public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
+        const zis = this;
+
         const textField = $('<input type="checkbox" id="' + propertyId + '">')
             .appendTo(group)
             .bootstrapSwitch({
@@ -150,6 +171,10 @@ class BooleanPropertyRenderer implements PropertyRenderer
             set(value: any): void
             {
                 textField.bootstrapSwitch('state', value, true);
+            },
+            modified(value: boolean): void
+            {
+                
             }
         };
     }
@@ -295,6 +320,7 @@ export class NodeClassTab extends WorkspaceTab
         {
             modified.show();
             $(label).addClass("text-primary");
+            $(node).addClass("modified");
         }
 
         const group = $('<div class="input-group"></div>').appendTo(node);
@@ -321,6 +347,7 @@ export class NodeClassTab extends WorkspaceTab
             {
                 modified.show();
                 label.addClass("text-primary");
+                node.addClass("modified");
             }
         });
         
@@ -328,6 +355,7 @@ export class NodeClassTab extends WorkspaceTab
             await zis.removeProperty(propertyName);
             modified.hide();
             label.removeClass("text-primary");
+            node.removeClass("modified");
             renderedProperty.set(defaultValue);
         }).tooltip();
         

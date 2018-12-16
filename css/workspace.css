@@ -30,3 +30,12 @@ body {
 #workspace {
   border-top: 1px solid #f0f0f0;
 }
+
+.modified input {
+    border: 1px solid #0275d8;
+}
+
+.modified .bootstrap-select {
+    border: 1px solid #0275d8;
+    border-radius: 3px;
+}

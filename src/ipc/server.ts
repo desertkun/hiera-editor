@@ -360,6 +360,21 @@ export class IpcServer implements IpcAPI
 
         await node.removeResource(definedTypeName, title);
     }
+
+    public async removeResourcesFromNode(nodePath: string, definedTypeName: string): Promise<string[]>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return;
+
+        return await node.removeResources(definedTypeName);
+    }
     
     public async renameNodeResource(nodePath: string, definedTypeName: string, title: string, newTitle: string): Promise<boolean>
     {

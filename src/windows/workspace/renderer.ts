@@ -157,7 +157,7 @@ class NodeTreeItemRenderer
             
             resourceNode.contextMenu([
                 {
-                    label: "Remove",
+                    label: "Create New Resource",
                     click: async () => 
                     {
                         /*
@@ -165,6 +165,21 @@ class NodeTreeItemRenderer
                         await renderer.refresh();
                         await renderer.closeTabKind("class", [zis.localPath, className]);
                         */
+                    }
+                },
+                {
+                    type: "separator"
+                },
+                {
+                    label: "Remove All",
+                    click: async () => 
+                    {
+                        const names = await ipc.removeResourcesFromNode(zis.localPath, definedTypeName);
+                        await renderer.refresh();
+                        for (const name of names)
+                        {
+                            await renderer.closeTabKind("resource", [zis.localPath, definedTypeName, name]);
+                        }
                     }
                 }
             ]);

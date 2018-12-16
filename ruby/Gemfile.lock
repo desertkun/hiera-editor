@@ -1,6 +1,9 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    CFPropertyList (2.3.6)
+    facter (2.5.1)
+      CFPropertyList (~> 2.2)
     facter (2.5.1-x86-mingw32)
       ffi (~> 1.9.5)
     fast_gettext (1.1.2)
@@ -9,6 +12,13 @@ GEM
     locale (2.1.2)
     minitar (0.6.1)
     multi_json (1.13.1)
+    puppet (5.5.6)
+      CFPropertyList (~> 2.2)
+      facter (> 2.0.1, < 4)
+      fast_gettext (~> 1.1.2)
+      hiera (>= 3.2.1, < 4)
+      locale (~> 2.1)
+      multi_json (~> 1.10)
     puppet (5.5.6-x86-mingw32)
       facter (> 2.0.1, < 4)
       fast_gettext (~> 1.1.2)
@@ -37,6 +47,7 @@ GEM
     yard (0.9.16)
 
 PLATFORMS
+  ruby
   x86-mingw32
 
 DEPENDENCIES
@@ -44,6 +55,3 @@ DEPENDENCIES
   puppet-strings
   rdoc
   yard
-
-BUNDLED WITH
-   1.16.6
