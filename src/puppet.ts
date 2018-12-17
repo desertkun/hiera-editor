@@ -1524,7 +1524,31 @@ export module puppet
                 return;
 
             delete titles[title];
+
+            if (Object.keys(titles).length === 0)
+            {
+                delete this.configResources[definedTypeName];
+            }
+
             await this.save();
+        }
+
+        public async removeAllResources(): Promise<any[]>
+        {
+            const result: any[] = [];
+
+            for (const definedTypeName in this.configResources)
+            {
+                for (const title in this.configResources[definedTypeName])
+                {
+                    result.push([definedTypeName, title])
+                }
+            }
+
+            this._config["resources"] = {};
+
+            await this.save();
+            return result;
         }
 
         public async removeResources(definedTypeName: string): Promise<string[]>

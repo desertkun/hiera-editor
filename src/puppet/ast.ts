@@ -300,6 +300,40 @@ export class PuppetASTQualifiedName extends PuppetASTObject
     }
 }
 
+export class PuppetASTHash extends PuppetASTObject
+{
+    public readonly dict: any;
+    public readonly args: Array<PuppetASTKeyedEntry>;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+        
+        this.dict = {};
+        this.args = <Array<PuppetASTKeyedEntry>>args;
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        for (const arg of this.args)
+        {
+            await arg.resolve(context, resolver)
+
+            const key = await arg.key.resolve(context, resolver);
+            const value = await arg.value.resolve(context, resolver);
+
+            this.dict[key] = value;
+        }
+
+        return this.dict;
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTHash(args);
+    }
+}
+
 type PuppetASTConditionTest = (a: any, b: any) => boolean;
 
 export class PuppetASTCondition extends PuppetASTObject
@@ -1483,6 +1517,7 @@ export class PuppetASTParser
             "array": PuppetASTArray.Create,
             "regexp": PuppetASTRegularExpression.Create,
             "=~": PuppetASTRegularExpressionCheck.Create,
+            "hash": PuppetASTHash.Create
         };
     }
 

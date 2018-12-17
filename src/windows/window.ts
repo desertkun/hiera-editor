@@ -89,7 +89,7 @@ export abstract class Window
         if (this._window == null)
             return;
 
-        this._window.close();
+        this._window.destroy();
         this._window = null;
     }
 

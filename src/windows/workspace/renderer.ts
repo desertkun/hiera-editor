@@ -389,8 +389,17 @@ class NodeTreeItemRenderer
             },
             {
                 label: "Remove All Resources",
-                click: () => {
-                    //
+                click: async () => 
+                {
+                    const removed = await ipc.removeAllResourcesFromNode(zis.localPath);
+
+                    await renderer.refresh();
+
+                    for (const obj of removed)
+                    {
+                        await renderer.closeTabKind("resource", 
+                            [zis.localPath, obj[0], obj[1]]);
+                    }
                 }
             }
         ]);
