@@ -203,7 +203,7 @@ class NodeTreeItemRenderer
                 const resourceNameNode = resourceNode.addChild( 
                     (node) => 
                 {
-                    node.icon = $('<i class="node-entry-icon fas fa-file"></i>');
+                    node.icon = $('<i class="node-entry-icon far fa-clone"></i>');
                     node.title = title;
                     node.selectable = true;
                     node.leaf = true;

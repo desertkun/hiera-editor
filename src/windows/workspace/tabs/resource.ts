@@ -2,6 +2,7 @@ import { NodeClassTab } from "./class";
 import { IPC } from "../../../ipc/client";
 import {WorkspaceRenderer} from "../renderer";
 
+const $ = require("jquery");
 const ipc = IPC();
 
 export class NodeResourceTab extends NodeClassTab
@@ -47,5 +48,19 @@ export class NodeResourceTab extends NodeClassTab
     get fullTitle(): string
     {
         return this.title + " of " + this.path.join("/");
+    }
+
+    public getIcon(): any
+    {
+        const iconData = this.info.icon;
+
+        if (iconData != null)
+        {
+            return $('<img class="node-entry-icon" src="' + iconData + '" style="width: 16px; height: 16px;">');
+        }
+        else
+        {
+            return $('<i class="far fa-clone"></i>');
+        }
     }
 }
