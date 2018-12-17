@@ -5,6 +5,7 @@ import {WorkspaceRenderer} from "../renderer";
 const ipc = IPC();
 
 const $ = require("jquery");
+const JSONEditor = require("jsoneditor");
 
 interface RenderedProperty
 {
@@ -47,6 +48,47 @@ class StringPropertyRenderer implements PropertyRenderer
             set(value: any): void
             {
                 textField.val(value);
+            },
+            modified(value: boolean): void
+            {
+
+            }
+        };
+    }
+}
+
+class HashPropertyRenderer implements PropertyRenderer
+{
+    public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    {
+        const zis = this;
+
+        group.parent().css('width', '100%');
+
+        const div = $('<div class="hash-editor" id="' + propertyId + '"></div>')
+            .appendTo(group);
+
+        const editor = new JSONEditor(div[0], {
+            modes: ['tree', 'code'],
+            onChangeJSON: () => 
+            {
+                changed(editor.get());
+            }
+        });
+
+        if (defaultValue)
+        {
+            editor.set(defaultValue);
+        }
+
+        return {
+            value(): any
+            {
+                return editor.get();
+            },
+            set(value: any): void
+            {
+                editor.set(value);
             },
             modified(value: boolean): void
             {
@@ -245,6 +287,10 @@ export class NodeClassTab extends WorkspaceTab
                     case "Boolean":
                     {
                         return new BooleanPropertyRenderer();
+                    }
+                    case "Hash":
+                    {
+                        return new HashPropertyRenderer();
                     }
                 }
             }

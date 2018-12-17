@@ -147,3 +147,8 @@ html, body {
 .input-group input.form-control-sm {
     line-height: 25px;
 }
+
+.hash-editor {
+    width: 100%;
+    height: 300px;
+}

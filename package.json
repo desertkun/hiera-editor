@@ -49,6 +49,7 @@
     "es6-promise-pool": "^2.5.0",
     "install": "^0.10.2",
     "jquery": "^3.2.1",
+    "jsoneditor": "^5.26.3",
     "npm": "^5.10.0",
     "slash": "^2.0.0",
     "text-ellipsis": "^1.0.3",
