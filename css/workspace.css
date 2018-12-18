@@ -39,3 +39,7 @@ body {
     border: 1px solid #0275d8;
     border-radius: 3px;
 }
+
+.container-w-padding {
+    padding: 8px;
+}

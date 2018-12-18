@@ -49,7 +49,7 @@ async function testRealWorkspace(workspaceName: string, environmentName: string,
 }
 
 async function testSimpleWorkspace(files: any, nodeYAML: any,
-                             f: WorkspaceTestCallback = null): Promise<puppet.Node>
+                             f: WorkspaceTestCallback = null, nodeYAMLCommentBefore?: string): Promise<puppet.Node>
 {
     const d = tmp.dirSync();
 
@@ -69,7 +69,7 @@ async function testSimpleWorkspace(files: any, nodeYAML: any,
         await async.makeDirectory(path.join(d.name, "environments", "dev"));
         const _d = path.join(d.name, "environments", "dev", "data");
         await async.makeDirectory(_d);
-        await async.writeYAML(path.join(_d, "test.yaml"), nodeYAML);
+        await async.writeYAML(path.join(_d, "test.yaml"), nodeYAML, nodeYAMLCommentBefore);
     }
     catch (e)
     {
@@ -214,14 +214,14 @@ describe('Workspaces', () =>
                   $v = "Hello, $\{::hostname\}!"
                 }
             `
-        }, {"classes": ["test"], "facts": {"hostname": "myhost"}}, async (
+        }, {"classes": ["test"]}, async (
             workspace: puppet.Workspace,
             environment: puppet.Environment,
             node: puppet.Node) =>
         {
             const class_ = await node.acquireClass("test");
             expect(class_.getResolvedProperty("v").value).to.equal("Hello, myhost!");
-        });
+        }, "hostname = myhost");
     });
 
     it('resources', () =>

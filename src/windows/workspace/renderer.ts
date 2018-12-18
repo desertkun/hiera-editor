@@ -18,6 +18,7 @@ import {WorkspaceTab, WorkspaceTabConstructor} from "./tabs/tab";
 import {DefaultTab} from "./tabs/default";
 import {NodeClassTab} from "./tabs/class";
 import {NodeResourceTab} from "./tabs/resource";
+import {FactsTab} from "./tabs/facts";
 
 import {puppet} from "../../puppet";
 import {TreeView, TreeViewNode} from "./treeview";
@@ -405,6 +406,20 @@ class NodeTreeItemRenderer
         ]);
 
         this.renderResources(n_resources, null);
+        
+        const n_facts = this.n_node.addChild( 
+            (node) => 
+        {
+            node.icon = $('<i class="fas fa-bars"></i>');
+            node.title = "Facts";
+            node.leaf = true;
+            node.selectable = true;
+            node.onSelect = (node: TreeViewNode) => 
+            {
+                renderer.openTab("facts", [zis.localPath]);
+            };
+        }, "node-" + zis.localPath + "-facts", renderer.openNodes);
+        
     }
 }
 
@@ -578,10 +593,12 @@ export class WorkspaceRenderer
         this.tabs = new Dictionary();
 
         this.tabClasses = new Dictionary();
+        
         this.tabClasses.put("node", NodeTab);
         this.tabClasses.put("default", DefaultTab);
         this.tabClasses.put("class", NodeClassTab);
         this.tabClasses.put("resource", NodeResourceTab);
+        this.tabClasses.put("facts", FactsTab);
 
         this.init();
     }

@@ -483,6 +483,51 @@ export class IpcServer implements IpcAPI
 
         return await node.env.searchDefinedTypes(search);
     }
+    
+    public async acquireNodeFacts(nodePath: string): Promise<any>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return null;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return null;
+
+        return await node.acquireFacts();
+    }
+
+    public async setNodeFact(nodePath: string, fact: string, value: string): Promise<void>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return;
+            
+        await node.setFact(fact, value);
+    }
+
+    public async removeNodeFact(nodePath: string, fact: string): Promise<void>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return;
+            
+        await node.removeFact(fact);
+    }
 }
 
 const server: IpcServer = new IpcServer();

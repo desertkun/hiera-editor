@@ -3,11 +3,8 @@ import {Dictionary} from "../dictionary";
 import { throws } from "assert";
 import { TouchBarSlider } from "electron";
 
-type ResolverHint = (obj: any) => void;
-
 export abstract class Resolver
 {
-    public hint: ResolverHint;
     public async abstract resolveClass(className: string): Promise<PuppetASTClass>;
     public async abstract resolveGlobalVariable(name: string): Promise<string>;
 }
@@ -19,10 +16,23 @@ export interface PuppetASTContainerContext
     getName(): string;
 }
 
+export abstract class PuppetHint
+{
+    public kind: string;
+    public message: string;
+
+    constructor(kind: string, message: string)
+    {
+        this.kind = kind;
+        this.message = message;
+    }
+}
+
 export class PuppetASTObject
 {
     protected _resolved: any;
     private _beingResolved: boolean;
+    private _hints: PuppetHint[];
 
     public toString(): string
     {
@@ -46,6 +56,38 @@ export class PuppetASTObject
         }
 
         return this._resolved;
+    }
+
+    protected carryHints(hints: PuppetHint[])
+    {
+        if (hints == null)
+            return;
+
+        for (const hint of hints)
+        {
+            this.hint(hint);
+        }
+    }
+
+    protected hint(hint: PuppetHint)
+    {
+        if (this._hints == null)
+        {
+            this._hints = [];
+        }
+
+        for (const existing of this._hints)
+        {
+            if (existing.toString() == hint.toString())
+                return;
+        }
+
+        this._hints.push(hint);
+    }
+
+    public get hints()
+    {
+        return this._hints;
     }
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
@@ -718,21 +760,7 @@ export class PuppetASTList extends PuppetASTObject
     {
         for (const entry of this.entries)
         {
-            try
-            {
-                await entry.resolve(context, resolver);
-            }
-            catch (e)
-            {
-                if (e instanceof ResolveError)
-                {
-                    console.log("Failed to resolve body entry " + e.obj.toString() + ": " + e.message);
-                }
-                else
-                {
-                    console.log(e);
-                }
-            }
+            await entry.resolve(context, resolver);
         }
     }
 
@@ -757,23 +785,7 @@ export class PuppetASTArray extends PuppetASTObject
     {
         for (const entry of this.entries)
         {
-            try
-            {
-                await entry.resolve(context, resolver);
-            }
-            catch (e)
-            {
-                if (e instanceof ResolveError)
-                {
-                    console.log("Failed to resolve array entry " + e.obj.toString() + ": " + e.message);
-                }
-                else
-                {
-                    console.log(e);
-                }
-
-                throw e
-            }
+            await entry.resolve(context, resolver);
         }
     }
 
@@ -823,7 +835,9 @@ export class PuppetASTToString extends PuppetASTObject
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
-        return "" + await this.obj.resolve(context, resolver)
+        const result = "" + await this.obj.resolve(context, resolver)
+        this.carryHints(this.obj.hints);
+        return result;
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
@@ -850,6 +864,7 @@ export class PuppetASTConcat extends PuppetASTObject
         for (const entry of this.entries)
         {
             resolved.push(await entry.resolve(context, resolver));
+            this.carryHints(entry.hints);
         }
 
         return resolved.join("");
@@ -885,15 +900,14 @@ export class PuppetASTResolvedProperty
     private _hasError: boolean;
     private _error: any;
 
-    private _hasHints: boolean;
-    private _hints: Array<any>;
+    private _hints: Array<PuppetHint>;
 
     constructor()
     {
+        this._hints = [];
         this._hasType = false;
         this._hasValue = false;
         this._hasError = false;
-        this._hasHints = false;
     }
 
     public set type(value: any)
@@ -914,10 +928,29 @@ export class PuppetASTResolvedProperty
         this._hasError = true;
     }
 
-    public set hints(value: Array<any>)
+    public hasHint(hint: PuppetHint): boolean
     {
-        this._hints = value;
-        this._hasHints = true;
+        for (const existing of this._hints)
+        {
+            if (existing.toString() == hint.toString())
+                return true;
+        }   
+
+        return false;
+    }
+
+    public addHints(value: Array<PuppetHint>)
+    {
+        if (value == null)
+            return;
+
+        for (const hint of value)
+        {
+            if (this.hasHint(hint))
+                continue;
+
+            this._hints.push(hint);
+        }
     }
 
     public get type(): any
@@ -957,7 +990,7 @@ export class PuppetASTResolvedProperty
 
     public get hasHints(): boolean
     {
-        return this._hasHints && this._hints.length > 0;
+        return this._hints.length > 0;
     }
 }
 
@@ -1032,17 +1065,8 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
 
         console.log("Resolving class " + this.name);
 
-        const hints: Array<any> = [];
-
-        resolver.hint = function (obj: any)
-        {
-            hints.push(obj);
-        };
-
         for (const paramName in this.params)
         {
-            hints.length = 0;
-
             const param = this.params[paramName];
 
             let type = param.type;
@@ -1079,7 +1103,7 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
                 if (type != null)
                     pp.type = type;
                 pp.error = e;
-                pp.hints = hints.slice(0);
+                pp.addHints(value.hints);
                 this.resolvedProperties.put(paramName, pp);
                 continue;
             }
@@ -1090,6 +1114,8 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
 
             if (type != null)
                 pp.type = type;
+
+            pp.addHints(value.hints);
 
             this.resolvedProperties.put(paramName, pp);
         }
@@ -1269,7 +1295,16 @@ export class PuppetASTDefinedType extends PuppetASTObject
             pp.value = properties[name];
             r.resolvedProperties.put(name, pp);
         }
-        await this.resolve(r, resolver);
+        
+        try
+        {
+            await this.resolve(r, resolver);
+        }
+        catch (e)
+        {
+            console.log(e.toString());
+        }
+
         return r;
     }
 
@@ -1277,17 +1312,8 @@ export class PuppetASTDefinedType extends PuppetASTObject
     {
         console.log("Resolving defined type " + this.name);
 
-        const hints: Array<any> = [];
-
-        resolver.hint = function (obj: any)
-        {
-            hints.push(obj);
-        };
-
         for (const paramName in this.params)
         {
-            hints.length = 0;
-
             const param = this.params[paramName];
 
             let type = param.type;
@@ -1324,13 +1350,14 @@ export class PuppetASTDefinedType extends PuppetASTObject
                 if (type != null)
                     pp.type = type;
                 pp.error = e;
-                pp.hints = hints.slice(0);
+                pp.addHints(value.hints);
                 context.setProperty(paramName, pp);
                 continue;
             }
 
             const pp = new PuppetASTResolvedProperty();
 
+            pp.addHints(value.hints);
             pp.value = result;
 
             if (type != null)
@@ -1387,6 +1414,8 @@ export class PuppetASTSetInstruction extends PuppetASTObject
         {
             pp.error = e;
         }
+
+        pp.addHints(this.provider.hints);
         
         context.setProperty(paramName, pp);
         return pp;
@@ -1395,6 +1424,17 @@ export class PuppetASTSetInstruction extends PuppetASTObject
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
     {
         return new PuppetASTSetInstruction(args);
+    }
+}
+
+export class PuppetHintVariableNotFound extends PuppetHint
+{
+    public variable: string;
+
+    constructor(variable: string)
+    {
+        super("VariableNotFound", "Variable not found: " + variable);
+        this.variable = variable;
     }
 }
 
@@ -1435,6 +1475,7 @@ export class PuppetASTVariable extends PuppetASTObject
 
             if (property)
             {
+                this.carryHints(property.hints);
                 return property.value;
             }
             else if (isRoot)
@@ -1455,6 +1496,8 @@ export class PuppetASTVariable extends PuppetASTObject
 
             if (property)
             {
+                this.carryHints(property.hints);
+
                 if (property.error)
                 {
                     throw property.error;
@@ -1464,8 +1507,8 @@ export class PuppetASTVariable extends PuppetASTObject
             }
         }
 
-        if (resolver.hint) resolver.hint("Variable not found: " + this.fullName);
-        console.log("Variable not found: " + this.fullName);
+        this.hint(new PuppetHintVariableNotFound(this.fullName));
+
         return "";
     }
 

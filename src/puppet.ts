@@ -1368,6 +1368,7 @@ export module puppet
         private readonly _nodePath: string;
         private readonly _env: Environment;
         private _config: any;
+        private _facts: any;
 
         constructor(env: Environment, name: string, filePath: string, nodePath: string)
         {
@@ -1376,6 +1377,7 @@ export module puppet
             this._filePath = filePath;
             this._nodePath = nodePath;
             this._config = {};
+            this._facts = {};
         }
 
         static NodePath(name: string): string
@@ -1419,7 +1421,7 @@ export module puppet
 
         public get configFacts()
         {
-            return this._config["facts"] || {};
+            return this._facts;
         }
 
         public get configResources()
@@ -1434,11 +1436,32 @@ export module puppet
 
         public async init()
         {
-            await this.refresh();
+            await this.parse();
+        }
+        
+        public async acquireFacts(): Promise<any>
+        {
+            return this.configFacts;
+        }
+
+        public async setFact(fact: string, value: string): Promise<void>
+        {
+            this.configFacts[fact] = value;
+        }
+
+        public async removeFact(fact: string): Promise<void>
+        {
+            delete this.configFacts[fact];
         }
 
         public async save()
         {
+            const facts = [];
+            for (const key in this._facts)
+            {
+                facts.push(" " + key + " = " + this._facts[key]);
+            }
+
             const ordered: any = {};
 
             for (const key of Object.keys(this._config).sort())
@@ -1446,12 +1469,33 @@ export module puppet
               ordered[key] = this._config[key];
             }
 
-            await async.writeYAML(this.path, ordered);
+            await async.writeYAML(this.path, ordered, facts.join("\n"));
         }
 
-        public async refresh()
+        private async parseCommentBefore(comment: string)
         {
-            this._config = await async.readYAML(this.path);
+            this._facts = {};
+            const facts = this._facts;
+
+            if (comment == null)
+                return;
+
+            comment.replace(/\s*(.*?)\s*=\s*([^\s]+)\s*/g, (noStep3: string, a, b) => { 
+                facts[a] = b; 
+                return ""; 
+            });
+        }
+
+        public async parse()
+        {
+            const document = await async.readYAML(this.path);
+            this._config = document.toJSON();
+            const contents: any = document.contents;
+
+            if (contents.items.length > 0)
+            {
+                await this.parseCommentBefore(contents.items[0].commentBefore);
+            }
         }
 
         public get name():string
@@ -1804,6 +1848,7 @@ export module puppet
             const defaultValues: any = {};
             const types: any = {};
             const errors: any = {};
+            const hints: any = {};
             const values: any = {};
 
             for (const name of compiled.resolvedProperties.getKeys())
@@ -1831,6 +1876,11 @@ export module puppet
                     };
                 }
 
+                if (property.hasHints)
+                {
+                    hints[name] = property.hints;
+                }
+
                 const propertyPath = this.compilePropertyPath(className, name);
                 const configValue = this.config[propertyPath];
                 if (configValue != null)
@@ -1845,7 +1895,8 @@ export module puppet
                 "classInfo": classInfo.dump(),
                 "defaults": defaultValues,
                 "types": types,
-                "errors": errors
+                "errors": errors,
+                "hints": hints
             }
         }
 
@@ -1861,6 +1912,7 @@ export module puppet
             const defaultValues: any = {};
             const types: any = {};
             const errors: any = {};
+            const hints: any = {};
             const values: any = {};
 
             if (this.configResources[definedTypeName] != null)
@@ -1895,6 +1947,11 @@ export module puppet
                         stack: property.error.stack
                     };
                 }
+
+                if (property.hasHints)
+                {
+                    hints[name] = property.hints;
+                }
             }
             
             for (const name in compiled.definedType.params)
@@ -1918,6 +1975,7 @@ export module puppet
                 "defaults": defaultValues,
                 "types": types,
                 "errors": errors,
+                "hints": hints,
                 "fields": Object.keys(compiled.definedType.params)
             }
         }

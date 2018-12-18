@@ -412,14 +412,44 @@ export class NodeClassTab extends WorkspaceTab
         {
             const p_ = $('<div class="input-group-append"></div>').appendTo(group);
             const tooltipTitle = "Cannot resolve defaults:<br/>" + error.message;
-            const b_ = $('<button class="btn btn-sm btn-outline-warning" type="button" data-toggle="tooltip" data-placement="left">' + 
-                '<i class="fas fa-exclamation-triangle"></i></button>').appendTo(p_).tooltip({
+            $('<button class="btn btn-sm btn-outline-danger" type="button" data-toggle="tooltip" data-placement="left">' + 
+                '<i class="fas fa-times"></i></button>').appendTo(p_).tooltip({
                     title: tooltipTitle,
                     html: true
                 });
         }
+        else
+        {
+            const hints = this.getPropertyHints(propertyName);
 
+            if (hints != null && hints.length > 0)
+            {
+                const p_ = $('<div class="input-group-append"></div>').appendTo(group);
+
+                const texts = [];
+
+                for (const hint of hints)
+                {
+                    texts.push(hint.message);
+                }
+
+                const tooltipTitle = texts.join("<br/>");
+
+                $('<button class="btn btn-sm btn-outline-warning" type="button" data-toggle="tooltip" data-placement="left">' + 
+                '<i class="fas fa-exclamation-triangle"></i></button>').appendTo(p_).tooltip({
+                    title: tooltipTitle,
+                    html: true
+                }).click(async () => {
+                    
+                });
+            }
+        }
         
+    }
+
+    protected getPropertyHints(propertyName: string): any[]
+    {
+        return this.info.hints[propertyName];
     }
 
     protected getPropertyErrorInfo(propertyName: string): any

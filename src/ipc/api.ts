@@ -29,4 +29,7 @@ export interface IpcAPI
     chooseDefinedType(nodePath: string): Promise<string>;
     createNewResourceToNode(nodePath: string, definedTypeName: string, title: string): Promise<any>;
     removeAllResourcesFromNode(nodePath: string): Promise<any[]>;
+    acquireNodeFacts(nodePath: string): Promise<any>;
+    setNodeFact(nodePath: string, fact: string, value: string): Promise<void>;
+    removeNodeFact(nodePath: string, fact: string): Promise<void>;
 }

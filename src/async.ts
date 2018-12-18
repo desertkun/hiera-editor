@@ -277,10 +277,9 @@ export function execFileInOut(path: string, args: Array<string>, cwd: string, da
     });
 }
 
-
-export function readYAML(filePath: string): Promise<any>
+export function readYAML(filePath: string): Promise<YAML.ast.Document>
 {
-    return new Promise<any>((resolve, reject) =>
+    return new Promise<YAML.ast.Document>((resolve, reject) =>
     {
         fs.readFile(filePath, "UTF-8", (error, data) =>
         {
@@ -290,12 +289,10 @@ export function readYAML(filePath: string): Promise<any>
             }
             else
             {
-
-                let parsed;
                 try
                 {
-                    parsed = YAML.parse(data);
-                    resolve(parsed);
+                    const document = YAML.parseDocument(data);
+                    resolve(document);
                 }
                 catch (e)
                 {
@@ -382,15 +379,16 @@ export function write(filePath: string, data: any): Promise<any>
     });
 }
 
-export function writeYAML(filePath: string, data: any): Promise<any>
+export function writeYAML(filePath: string, data: any, commentBefore?: string): Promise<any>
 {
     return new Promise<any>((resolve, reject) =>
     {
-        let dumped;
+        const document = new YAML.Document();
 
         try
         {
-            dumped = YAML.stringify(data, {});
+            document.contents = <YAML.ast.AstNode>YAML.createNode(data);
+            document.commentBefore = commentBefore;
         }
         catch (e)
         {
@@ -398,7 +396,7 @@ export function writeYAML(filePath: string, data: any): Promise<any>
             return;
         }
 
-        fs.writeFile(filePath, dumped, "UTF-8", (error) =>
+        fs.writeFile(filePath, document.toString(), "UTF-8", (error) =>
         {
             if (error)
             {
