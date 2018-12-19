@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <title>Workspace</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src * 'self' data: https:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src * 'self' data: https:; worker-src blob: *; script-src 'self' 'unsafe-inline' sha256-/qYQgVE1KbY3VvaNmrS42czlO8svPKf0nqwWzM1FguE= 'unsafe-eval';">
     <link rel="stylesheet" href="../css/bootstrap.min.css">
     <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
     <link rel="stylesheet" href="../css/bootstrap-switch.min.css">
@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="../css/icons.css">
     <link rel="stylesheet" href="../css/node.css">
     <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
-    <link rel="stylesheet" href="../node_modules/jsoneditor/dist/jsoneditor.css">
+    <link rel="stylesheet" href="../css/jsoneditor.min.css">
     <script type="text/javascript">
       window.$ = window.jQuery = require('jquery');
     </script>
@@ -25,6 +25,7 @@
     <script src="../js/bootstrap.min.js"></script>
     <script src="../js/bootstrap-switch.min.js"></script>
     <script src="../js/bootstrap-select.min.js"></script>
+    <script src="../js/jsoneditor.min.js"></script>
     <script>
       window.$.fn.selectpicker.Constructor.BootstrapVersion = '4';
       require('../dist/windows/workspace/renderer.js')

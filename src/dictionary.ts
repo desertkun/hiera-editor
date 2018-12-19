@@ -5,6 +5,7 @@ export interface IDictionary<K, V> {
     has(key: K): boolean;
     put(key: K, val: V): void;
     remove(key:K): void;
+    clear(): void;
   }
   
   export class Dictionary<K extends string, V> implements IDictionary<K, V> {
@@ -49,5 +50,11 @@ export interface IDictionary<K, V> {
   
     public remove(key: K): void {
       delete this.internalDict[key];
+    }
+
+    public clear(): void {
+      for (var key in this.internalDict) {
+          delete this.internalDict[key];
+      }
     }
   }

@@ -20,6 +20,14 @@ export class NodeResourceTab extends NodeClassTab
         return await super.init();
     }
     
+    public async focusIn(): Promise<void>
+    {
+        if (!(await ipc.isNodeDefinedTypeValid(this.nodePath, this.className, this.title)))
+        {
+            await this.refresh();
+        }
+    }
+    
     protected async acquireInfo(): Promise<any>
     {
         return await ipc.acquireNodeResource(this.nodePath, this.className, this.title);

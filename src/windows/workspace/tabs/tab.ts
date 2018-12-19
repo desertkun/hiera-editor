@@ -55,9 +55,15 @@ export abstract class WorkspaceTab
         $(this.buttonNode).find('a span').html(title);
     }
     
-    public refresh(): any
+    public async focusIn(): Promise<void>
+    {
+    }
+
+    public async refresh(): Promise<void>
     {
         $(this.contentNode).html('');
+        await this.release();
+        await this.init();
         this.render();
     }
 

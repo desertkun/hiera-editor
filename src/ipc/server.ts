@@ -514,7 +514,7 @@ export class IpcServer implements IpcAPI
         await node.setFact(fact, value);
     }
 
-    public async removeNodeFact(nodePath: string, fact: string): Promise<void>
+    public async updateNodeFacts(nodePath: string, facts: any): Promise<void>
     {
         const workspace: puppet.Workspace = getCurrentWorkspace();
 
@@ -526,7 +526,53 @@ export class IpcServer implements IpcAPI
         if (node == null)
             return;
             
-        await node.removeFact(fact);
+        await node.updateFacts(facts);
+    }
+
+    public async invalidateNode(nodePath: string): Promise<void>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return;
+            
+        await node.invalidate();
+    }
+    
+    public async isNodeClassValid(nodePath: string, className: string): Promise<boolean>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return;
+            
+        return await node.isClassValid(className);
+    }
+
+    public async isNodeDefinedTypeValid(nodePath: string, definedTypeName: string, title: string): Promise<boolean>
+    {
+        
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return;
+            
+        return await node.isDefinedTypeValid(definedTypeName, title);
     }
 }
 

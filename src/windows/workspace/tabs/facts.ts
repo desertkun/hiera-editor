@@ -4,13 +4,14 @@ import {WorkspaceRenderer} from "../renderer";
 
 const ipc = IPC();
 
-const JSONEditor = require("jsoneditor");
+declare const JSONEditor: any;
 const $ = require("jquery");
 
 export class FactsTab extends WorkspaceTab 
 {
     private nodePath: string;
     private facts: any;
+    private editor: any;
 
     async init(): Promise<any>
     {
@@ -30,22 +31,22 @@ export class FactsTab extends WorkspaceTab
 
     render(): any
     {
-        const container = $('<div class="flex-container h-100"></div>').appendTo(this.contentNode);
+        const zis = this;
 
-        const notice = $('<div class="flex-item container-w-padding"></div>').appendTo(container);
-
-        $('<h3><i class="fas fa-bars"></i> Facts for node ' + this.nodePath + '</h3>').appendTo(notice);
-        $('<span class="text-muted">This page can configure fake facts for this node, thus allowing to resolve ' +
-            'defaults correctly. Addting a variable with name \"hostname\" will implement the ${hostname} variable ' +
-            'in Puppet accordingly.</span>').appendTo(notice);
-
-        const factsEditor = $('<div>').appendTo(this.contentNode);
+        const factsEditor = $('<div class="container-w-padding w-100 h-100"></div>').appendTo(this.contentNode);
         
-        new JSONEditor(factsEditor[0], {
-            modes: ['tree', 'code'],
-            onChangeJSON: () => 
+        this.editor = new JSONEditor(factsEditor[0], {
+            modes: ['code', 'tree'],
+            schema: {
+                "type": "object",
+                "propertyNames": {
+                    "pattern": "^[A-Za-z_-][A-Za-z0-9_-]+$"
+                },
+                "additionalProperties": { "type": "string" }
+            },
+            onChange: async () => 
             {
-                //changed(editor.get());
+                await ipc.updateNodeFacts(zis.nodePath, zis.editor.get());
             }
         }, this.facts);
     }

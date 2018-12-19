@@ -833,8 +833,6 @@ export module puppet
         private readonly _cachePath: string;
         private readonly _root: Folder;
         private readonly _workspace: Workspace;
-        private readonly _compiledClasses: Dictionary<string, PuppetASTClass>;
-        private readonly _compiledResources: Dictionary<string, Dictionary<string, ResolvedResource>>;
         private readonly _global: Dictionary<string, string>;
         private _modulesInfo: PuppetModulesInfo;
 
@@ -845,8 +843,6 @@ export module puppet
             this._path = path;
             this._cachePath = cachePath;
             this._root = new Folder(this, "data", this.dataPath, name);
-            this._compiledClasses = new Dictionary();
-            this._compiledResources = new Dictionary();
 
             this._global = new Dictionary();
             this._global.put("environment", name);
@@ -885,142 +881,6 @@ export module puppet
             this._workspace.modulesInfo.searchDefinedTypes(search, results)
 
             return results;
-        }
-
-        public async resolveClass(className: string, global: GlobalVariableResolver): Promise<PuppetASTClass>
-        {
-            if (this._compiledClasses.has(className))
-            {
-                return this._compiledClasses.get(className);
-            }
-
-            const zis = this;
-            console.log("Compiling class " + className + " (for environment " + this._name + ")");
-
-            const classInfo = this.findClassInfo(className);
-
-            if (classInfo == null)
-                throw new CompilationError("No such class info: " + className);
-
-            const compiledPath = classInfo.modulesInfo.getCompiledClassPath(classInfo.file);
-            let parsedJSON = null;
-
-            try
-            {
-                parsedJSON = await async.readJSON(compiledPath);
-            }
-            catch (e)
-            {
-                throw new CompilationError("Failed to parse class " + className);
-            }
-
-            const obj = PuppetASTParser.Parse(parsedJSON);
-
-            if (!(obj instanceof PuppetASTClass))
-                throw "Not a class";
-
-            const clazz: PuppetASTClass = obj;
-
-            try
-            {
-                await clazz.resolve(clazz, new class extends Resolver
-                {
-                    public resolveClass(className: string): Promise<PuppetASTClass>
-                    {
-                        return zis.resolveClass(className, global);
-                    }
-
-                    public async resolveGlobalVariable(name: string): Promise<string>
-                    {
-                        return global(name);
-                    }
-                });
-            }
-            catch (e)
-            {
-                console.log(e);
-                throw new CompilationError("Failed to compile class: " + e);
-            }
-
-            this._compiledClasses.put(className, clazz);
-            return clazz;
-        }
-
-        public async resolveResource(definedTypeName: string, title: string, properties: any, global: GlobalVariableResolver): Promise<ResolvedResource>
-        {
-            if (this._compiledResources.has(definedTypeName))
-            {
-                const titles = this._compiledResources.get(definedTypeName);
-
-                if (titles.has(title))
-                {
-                    return titles.get(title);
-                }
-            }
-
-            const zis = this;
-            console.log("Compiling resource " + definedTypeName + " (with title " + title + " for environment " + this._name + ")");
-
-            const definedTypeInfo = this.findDefineTypeInfo(definedTypeName);
-
-            if (definedTypeInfo == null)
-                throw new CompilationError("No such defined type info: " + definedTypeName);
-
-            const compiledPath = definedTypeInfo.modulesInfo.getCompiledClassPath(definedTypeInfo.file);
-            let parsedJSON = null;
-
-            try
-            {
-                parsedJSON = await async.readJSON(compiledPath);
-            }
-            catch (e)
-            {
-                throw new CompilationError("Failed to parse defined type " + definedTypeName);
-            }
-
-            const obj = PuppetASTParser.Parse(parsedJSON);
-
-            if (!(obj instanceof PuppetASTDefinedType))
-                throw "Not a defined type";
-
-            const definedType: PuppetASTDefinedType = obj;
-
-            let resource: PuppetASTResolvedDefinedType;
-            try
-            {
-                resource = await definedType.resolveAsResource(title, properties, new class extends Resolver
-                {
-                    public resolveClass(className: string): Promise<PuppetASTClass>
-                    {
-                        return zis.resolveClass(className, global);
-                    }
-
-                    public async resolveGlobalVariable(name: string): Promise<string>
-                    {
-                        return global(name);
-                    }
-                });
-            }
-            catch (e)
-            {
-                console.log(e);
-                throw new CompilationError("Failed to compile class: " + e);
-            }
-            
-            let titles = this._compiledResources.get(definedTypeName);
-            if (titles == null)
-            {
-                titles = new Dictionary();
-                this._compiledResources.put(definedTypeName, titles);
-            }
-
-            const resolved = new ResolvedResource();
-
-            resolved.definedType = definedType;
-            resolved.resource = resource;
-
-            titles.put(title, resolved);
-            return resolved;
         }
 
         public findClassInfo(className: string): PuppetClassInfo
@@ -1370,6 +1230,9 @@ export module puppet
         private _config: any;
         private _facts: any;
 
+        private readonly _compiledClasses: Dictionary<string, PuppetASTClass>;
+        private readonly _compiledResources: Dictionary<string, Dictionary<string, ResolvedResource>>;
+
         constructor(env: Environment, name: string, filePath: string, nodePath: string)
         {
             this._env = env;
@@ -1378,6 +1241,9 @@ export module puppet
             this._nodePath = nodePath;
             this._config = {};
             this._facts = {};
+
+            this._compiledClasses = new Dictionary();
+            this._compiledResources = new Dictionary();
         }
 
         static NodePath(name: string): string
@@ -1391,6 +1257,165 @@ export module puppet
                 return null;
 
             return pathName.substr(0, pathName.length - 5);
+        }
+
+        public async isClassValid(className: string): Promise<boolean>
+        {
+            return this._compiledClasses.has(className);
+        }
+
+        public async isDefinedTypeValid(definedTypeName: string, title: string): Promise<boolean>
+        {
+            if (this._compiledResources.has(definedTypeName))
+            {
+                const titles = this._compiledResources.get(definedTypeName);
+
+                return titles.has(title);
+            }
+
+            return false;
+        }
+
+        public async invalidate(): Promise<void>
+        {
+            this._compiledClasses.clear();
+            this._compiledResources.clear();
+        }
+        
+        public async resolveClass(className: string, global: GlobalVariableResolver): Promise<PuppetASTClass>
+        {
+            if (this._compiledClasses.has(className))
+            {
+                return this._compiledClasses.get(className);
+            }
+
+            const zis = this;
+            console.log("Compiling class " + className + " (for environment " + this._name + ")");
+
+            const classInfo = this.env.findClassInfo(className);
+
+            if (classInfo == null)
+                throw new CompilationError("No such class info: " + className);
+
+            const compiledPath = classInfo.modulesInfo.getCompiledClassPath(classInfo.file);
+            let parsedJSON = null;
+
+            try
+            {
+                parsedJSON = await async.readJSON(compiledPath);
+            }
+            catch (e)
+            {
+                throw new CompilationError("Failed to parse class " + className);
+            }
+
+            const obj = PuppetASTParser.Parse(parsedJSON);
+
+            if (!(obj instanceof PuppetASTClass))
+                throw "Not a class";
+
+            const clazz: PuppetASTClass = obj;
+
+            try
+            {
+                await clazz.resolve(clazz, new class extends Resolver
+                {
+                    public resolveClass(className: string): Promise<PuppetASTClass>
+                    {
+                        return zis.resolveClass(className, global);
+                    }
+
+                    public async resolveGlobalVariable(name: string): Promise<string>
+                    {
+                        return global(name);
+                    }
+                });
+            }
+            catch (e)
+            {
+                console.log(e);
+                throw new CompilationError("Failed to compile class: " + e);
+            }
+
+            this._compiledClasses.put(className, clazz);
+            return clazz;
+        }
+
+        public async resolveResource(definedTypeName: string, title: string, properties: any, global: GlobalVariableResolver): Promise<ResolvedResource>
+        {
+            if (this._compiledResources.has(definedTypeName))
+            {
+                const titles = this._compiledResources.get(definedTypeName);
+
+                if (titles.has(title))
+                {
+                    return titles.get(title);
+                }
+            }
+
+            const zis = this;
+            console.log("Compiling resource " + definedTypeName + " (with title " + title + " for environment " + this._name + ")");
+
+            const definedTypeInfo = this.env.findDefineTypeInfo(definedTypeName);
+
+            if (definedTypeInfo == null)
+                throw new CompilationError("No such defined type info: " + definedTypeName);
+
+            const compiledPath = definedTypeInfo.modulesInfo.getCompiledClassPath(definedTypeInfo.file);
+            let parsedJSON = null;
+
+            try
+            {
+                parsedJSON = await async.readJSON(compiledPath);
+            }
+            catch (e)
+            {
+                throw new CompilationError("Failed to parse defined type " + definedTypeName);
+            }
+
+            const obj = PuppetASTParser.Parse(parsedJSON);
+
+            if (!(obj instanceof PuppetASTDefinedType))
+                throw "Not a defined type";
+
+            const definedType: PuppetASTDefinedType = obj;
+
+            let resource: PuppetASTResolvedDefinedType;
+            try
+            {
+                resource = await definedType.resolveAsResource(title, properties, new class extends Resolver
+                {
+                    public resolveClass(className: string): Promise<PuppetASTClass>
+                    {
+                        return zis.resolveClass(className, global);
+                    }
+
+                    public async resolveGlobalVariable(name: string): Promise<string>
+                    {
+                        return global(name);
+                    }
+                });
+            }
+            catch (e)
+            {
+                console.log(e);
+                throw new CompilationError("Failed to compile class: " + e);
+            }
+            
+            let titles = this._compiledResources.get(definedTypeName);
+            if (titles == null)
+            {
+                titles = new Dictionary();
+                this._compiledResources.put(definedTypeName, titles);
+            }
+
+            const resolved = new ResolvedResource();
+
+            resolved.definedType = definedType;
+            resolved.resource = resource;
+
+            titles.put(title, resolved);
+            return resolved;
         }
 
         public dump()
@@ -1444,9 +1469,20 @@ export module puppet
             return this.configFacts;
         }
 
+        public async updateFacts(facts: any): Promise<void>
+        {
+            this._facts = facts;
+
+            await this.invalidate();
+            await this.save();
+        }
+
         public async setFact(fact: string, value: string): Promise<void>
         {
             this.configFacts[fact] = value;
+
+            await this.invalidate();
+            await this.save();
         }
 
         public async removeFact(fact: string): Promise<void>
@@ -1684,7 +1720,7 @@ export module puppet
             if (!this.hasClass(className))
                 throw Error("No such class: " + className);
 
-            return await this._env.resolveClass(className, (key: string) =>
+            return await this.resolveClass(className, (key: string) =>
             {
                 return zis.getGlobal(key);
             });
@@ -1713,7 +1749,7 @@ export module puppet
 
             values["title"] = title;
             
-            return await this._env.resolveResource(definedTypeName, title, values, (key: string) =>
+            return await this.resolveResource(definedTypeName, title, values, (key: string) =>
             {
                 return zis.getGlobal(key);
             });

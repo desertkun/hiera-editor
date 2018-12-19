@@ -420,6 +420,16 @@ class NodeTreeItemRenderer
             };
         }, "node-" + zis.localPath + "-facts", renderer.openNodes);
         
+        n_facts.contextMenu([
+            {
+                label: "About Facts",
+                click: async () => {
+                    alert('This page can configure fake facts for this node, thus allowing to resolve ' +
+                        'defaults correctly. For example, addting a variable with name \"hostname\" will implement the ${hostname} variable ' +
+                        'in Puppet accordingly.');
+                }
+            }
+        ])
     }
 }
 
@@ -773,7 +783,9 @@ export class WorkspaceRenderer
             });
         }
 
-        _a.tab('show');
+        _a.tab('show').on('shown.bs.tab', async () => {
+            await _tab.focusIn();
+        });
 
         this.tabs.put(key, _tab);
 

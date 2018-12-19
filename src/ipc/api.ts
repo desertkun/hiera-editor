@@ -31,5 +31,8 @@ export interface IpcAPI
     removeAllResourcesFromNode(nodePath: string): Promise<any[]>;
     acquireNodeFacts(nodePath: string): Promise<any>;
     setNodeFact(nodePath: string, fact: string, value: string): Promise<void>;
-    removeNodeFact(nodePath: string, fact: string): Promise<void>;
+    updateNodeFacts(nodePath: string, facts: any): Promise<void>;
+    invalidateNode(nodePath: string): Promise<void>;
+    isNodeClassValid(nodePath: string, className: string): Promise<boolean>;
+    isNodeDefinedTypeValid(nodePath: string, definedTypeName: string, title: string): Promise<boolean>;
 }

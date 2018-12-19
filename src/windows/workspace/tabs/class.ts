@@ -1,11 +1,14 @@
 import { IPC } from "../../../ipc/client";
 import {WorkspaceTab} from "./tab";
 import {WorkspaceRenderer} from "../renderer";
+import { dialog } from "electron";
 
 const ipc = IPC();
 
+const Dialogs = require('dialogs');
 const $ = require("jquery");
-const JSONEditor = require("jsoneditor");
+declare const JSONEditor: any;
+const dialogs = Dialogs();
 
 interface RenderedProperty
 {
@@ -238,6 +241,14 @@ export class NodeClassTab extends WorkspaceTab
 
         this.renderedProperties = {};
     }
+    
+    public async focusIn(): Promise<void>
+    {
+        if (!(await ipc.isNodeClassValid(this.nodePath, this.className)))
+        {
+            await this.refresh();
+        }
+    }
 
     public async init(): Promise<any>
     {
@@ -441,6 +452,35 @@ export class NodeClassTab extends WorkspaceTab
                     html: true
                 }).click(async () => {
                     
+                    for (const hint of hints)
+                    {
+                        if (hint.kind == "VariableNotFound")
+                        {
+                            if (await new Promise<boolean>((resolve: any) => {
+                                dialogs.confirm("Wold you like to define fake fact ${" + hint.variable + "}?", (result: boolean) =>
+                                {
+                                    resolve(result);
+                                })
+                            }))
+                            {
+                                const value = await new Promise<string>((resolve: any) => {
+                                    dialogs.prompt("Enter a value for ${" + hint.variable + "}", "", (result: string) =>
+                                    {
+                                        resolve(result);
+                                    })
+                                });
+            
+                                if (value == null)
+                                    return;
+
+                                await ipc.setNodeFact(zis.nodePath, hint.variable, value);
+                                await zis.refresh();
+                            }
+
+                            return;
+                        }
+                    }
+
                 });
             }
         }
