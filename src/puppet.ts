@@ -115,7 +115,10 @@ export module puppet
                         const text = tag["text"];
                         if (text)
                         {
-                            this._tags[tag_name] = text;
+                            if (this._tags[tag_name] == null)
+                                this._tags[tag_name] = {};
+
+                            this._tags[tag_name][name] = text;
                         }
                     }
                 }
@@ -213,7 +216,10 @@ export module puppet
                         const text = tag["text"];
                         if (text)
                         {
-                            this._tags[tag_name] = text;
+                            if (this._tags[tag_name] == null)
+                                this._tags[tag_name] = {};
+
+                            this._tags[tag_name][name] = text;
                         }
                     }
                 }

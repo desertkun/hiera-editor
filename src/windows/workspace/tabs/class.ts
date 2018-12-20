@@ -341,8 +341,29 @@ export class NodeClassTab extends WorkspaceTab
     public render(): any
     {
         const editorHolder = $('<div class="w-100 node-class-properties"></div>').appendTo(this.contentNode);
-
         this.renderProperties(editorHolder);
+        
+        const description = this.getDescription();
+        if (description != null && description != "")
+        {
+            const pad = $('<div class="container-w-padding-x2"></div>').appendTo(this.contentNode);
+            const i = $('<i class="fas fa-question" title="' + description + '">').tooltip().appendTo(pad);
+        }
+    }
+
+    protected getDescription(): string
+    {
+        return this.info.classInfo.description;
+    }
+
+    protected getTag(tag: string, name: string): string
+    {
+        const tags = this.info.classInfo.tags;
+
+        if (tags[tag] == null)
+            return null;
+
+        return tags[tag][name];
     }
 
     private fixedPropertyName(name: string): string
@@ -369,6 +390,13 @@ export class NodeClassTab extends WorkspaceTab
             '<i class="fas fa-trash"></i></a>').appendTo(label);
         const l = $('<label for="' + propertyId + '">' + humanName + '</label>').appendTo(label);
 
+        const description = this.getTag("param", propertyName);
+
+        if (description != null && description != "")
+        {
+            $('<i class="fas fa-question text-muted" style="padding-left: 8px;" title="' + description + '">').tooltip().appendTo(l);
+        }
+        
         if (required)
         {
             $(l).css('font-weight', "bold");

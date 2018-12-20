@@ -43,3 +43,7 @@ body {
 .container-w-padding {
     padding: 8px;
 }
+
+.container-w-padding-x2 {
+    padding: 16px;
+}
