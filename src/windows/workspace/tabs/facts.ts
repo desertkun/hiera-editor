@@ -41,8 +41,7 @@ export class FactsTab extends WorkspaceTab
                 "type": "object",
                 "propertyNames": {
                     "pattern": "^[A-Za-z_-][A-Za-z0-9_-]+$"
-                },
-                "additionalProperties": { "type": "string" }
+                }
             },
             onChange: async () => 
             {

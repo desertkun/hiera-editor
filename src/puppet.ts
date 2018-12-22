@@ -1287,9 +1287,24 @@ export module puppet
             this._compiledClasses.clear();
             this._compiledResources.clear();
         }
+
+        public static fixClassName(className: string): string
+        {
+            const path = className.split("::");
+        
+            if (path.length < 2)
+                return className;
+
+            if (path[0] == "")
+                path.splice(0, 1);
+
+            return path.join("::");
+        }
         
         public async resolveClass(className: string, global: GlobalVariableResolver): Promise<PuppetASTClass>
         {
+            className = Node.fixClassName(className);
+
             if (this._compiledClasses.has(className))
             {
                 return this._compiledClasses.get(className);

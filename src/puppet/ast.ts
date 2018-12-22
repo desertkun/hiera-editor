@@ -77,6 +77,9 @@ export class PuppetASTObject
     protected async _access(args: Array<PuppetASTObject>, context: PuppetASTContainerContext, resolver: Resolver): Promise<PuppetASTObject>
     {
         const resolved = await this.resolve(context, resolver);
+        if (resolved == null)
+            return new PuppetASTValue(null);
+
         const key = await args[0].resolve(context, resolver);
         const value = resolved[key];
         return new PuppetASTValue(value);
@@ -140,6 +143,12 @@ export class PuppetASTInvoke extends PuppetASTObject
                                   context: PuppetASTContainerContext, resolver: Resolver)
         {
             await resolver.resolveClass(args[0]);
+        },
+        "include": async function(invoke: PuppetASTInvoke, args: Array<any>,
+                                  context: PuppetASTContainerContext, resolver: Resolver)
+        {
+            const className = args[0];
+            await resolver.resolveClass(className);
         }
     };
 
@@ -215,7 +224,7 @@ export class PuppetASTIgnored extends PuppetASTObject
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
-        throw new ResolveError(this, "Entry ignored: " + this.what);
+        console.log("Entry ignored: " + this.what);
     }
 
     public static Create(what: string)
