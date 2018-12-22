@@ -1501,7 +1501,7 @@ export module puppet
             const facts = [];
             for (const key in this._facts)
             {
-                facts.push(" " + key + " = " + this._facts[key]);
+                facts.push(" " + key + " = " + JSON.stringify(this._facts[key]));
             }
 
             const ordered: any = {};
@@ -1522,10 +1522,29 @@ export module puppet
             if (comment == null)
                 return;
 
-            comment.replace(/\s*(.*?)\s*=\s*([^\s]+)\s*/g, (noStep3: string, a, b) => { 
+            const comments = comment.split("\n");
+
+            for (comment of comments)
+            {
+                const m = comment.match(/^\s*(.+?)\s*=\s*(.+?)\s*$/);
+
+                if (m == null)
+                    continue;
+
+                const a = m[1];
+                let b = m[2];
+
+                try
+                {
+                    b = JSON.parse(b);
+                }
+                catch (e)
+                {
+                    return "";
+                }
+
                 facts[a] = b; 
-                return ""; 
-            });
+            }
         }
 
         public async parse()
@@ -1577,6 +1596,11 @@ export module puppet
         
         public getGlobal(key: string): string
         {
+            if (key == "facts")
+            {
+                return this.configFacts;
+            }
+
             return this.configFacts[key] || this._env.global.get(key) || this._env.workspace.global.get(key);
         }
 
