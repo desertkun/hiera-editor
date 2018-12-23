@@ -574,6 +574,76 @@ export class IpcServer implements IpcAPI
             
         return await node.isDefinedTypeValid(definedTypeName, title);
     }
+    
+    public async createFolder(path: string, name: string): Promise<boolean>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const directory = await workspace.findFolder(path);
+    
+        if (directory == null)
+            return;
+
+        return await directory.createFolder(name) != null;
+    }
+
+    public async createNode(path: string, name: string): Promise<boolean>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const directory = await workspace.findFolder(path);
+    
+        if (directory == null)
+            return;
+
+        return await directory.createNode(name) != null;
+    }
+
+    public async removeFolder(path: string): Promise<boolean>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const directory = await workspace.findFolder(path);
+    
+        if (directory == null)
+            return;
+
+        return await directory.remove();
+    }
+
+    public async removeNode(path: string): Promise<boolean>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(path);
+    
+        if (node == null)
+            return;
+
+        return await node.remove();
+    }
+    
+    public async removeEnvironment(name: string): Promise<boolean>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return false;
+    
+        return await workspace.removeEnvironment(name);
+    }
 }
 
 const server: IpcServer = new IpcServer();

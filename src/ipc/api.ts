@@ -35,4 +35,9 @@ export interface IpcAPI
     invalidateNode(nodePath: string): Promise<void>;
     isNodeClassValid(nodePath: string, className: string): Promise<boolean>;
     isNodeDefinedTypeValid(nodePath: string, definedTypeName: string, title: string): Promise<boolean>;
+    createFolder(path: string, name: string): Promise<boolean>;
+    createNode(path: string, name: string): Promise<boolean>;
+    removeFolder(path: string): Promise<boolean>;
+    removeNode(path: string): Promise<boolean>;
+    removeEnvironment(name: string): Promise<boolean>;
 }

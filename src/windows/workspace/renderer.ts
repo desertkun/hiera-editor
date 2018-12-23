@@ -27,6 +27,26 @@ const dialogs = Dialogs();
 let renderer: WorkspaceRenderer;
 let selectedNode: any = null;
 
+function confirm(title: string): Promise<boolean>
+{
+    return new Promise<boolean>((resolve: any) => {
+        dialogs.confirm(title, (result: boolean) =>
+        {
+            resolve(result);
+        })
+    });
+}
+
+function prompt(title: string, value: string): Promise<string>
+{
+    return new Promise<string>((resolve: any) => {
+        dialogs.prompt(title, value, (result: string) =>
+        {
+            resolve(result);
+        })
+    });
+}
+
 class NodeTreeItemRenderer
 {
     private renderer: WorkspaceRenderer;
@@ -162,12 +182,7 @@ class NodeTreeItemRenderer
                     label: "Create New Resource",
                     click: async () => 
                     {
-                        const newTitle = await new Promise<string>((resolve: any) => {
-                            dialogs.prompt("Enter a title for new resource " + definedTypeName, "", (result: string) =>
-                            {
-                                resolve(result);
-                            })
-                        });
+                        const newTitle = await prompt("Enter a title for new resource " + definedTypeName, "");
     
                         if (newTitle == null)
                             return;
@@ -219,12 +234,7 @@ class NodeTreeItemRenderer
                         label: "Rename",
                         click: async () => 
                         {
-                            const newTitle = await new Promise<string>((resolve: any) => {
-                                dialogs.prompt("Enter new name for resource " + definedTypeName, title, (result: string) =>
-                                {
-                                    resolve(result);
-                                })
-                            });
+                            const newTitle = await prompt("Enter new name for resource " + definedTypeName, title);
 
                             if (newTitle == null || newTitle == title)
                                 return;
@@ -298,8 +308,17 @@ class NodeTreeItemRenderer
             },
             {
                 label: "Remove",
-                click: () => {
-                    //
+                click: async () => 
+                {
+                    if (!await confirm("Are you sure you would like to delete this node?"))
+                        return;
+                    
+                    if (!await ipc.removeNode(zis.localPath))
+                    {
+                        return;
+                    }
+
+                    await renderer.refresh();
                 }
             }
         ])
@@ -367,12 +386,7 @@ class NodeTreeItemRenderer
                     if (!definedTypeName)
                         return;
 
-                    const newTitle = await new Promise<string>((resolve: any) => {
-                        dialogs.prompt("Enter a title for new resource " + definedTypeName, "", (result: string) =>
-                        {
-                            resolve(result);
-                        })
-                    });
+                    const newTitle = await prompt("Enter a title for new resource " + definedTypeName, "");
 
                     if (newTitle == null)
                         return;
@@ -478,18 +492,57 @@ class FolderTreeItemRenderer
 
             this.n_nodes.contextMenu([
                 {
-                    label: "Create New Node",
-                    click: () => {
-                        //
+                    label: "New Node",
+                    click: async () => 
+                    {
+                        const nodeName = await prompt("Enter a title for new node", "");
+    
+                        if (nodeName == null || nodeName.length == 0)
+                            return;
+                        
+                        if (!await ipc.createNode(zis.localPath, nodeName))
+                        {
+                            alert("Failed to create a node");
+                            return;
+                        }
+
+                        await renderer.refresh();
+                    }
+                },
+                {
+                    label: "New Folder",
+                    click: async () => 
+                    {
+                        const folderName = await prompt("Enter a title for new folder", "");
+    
+                        if (folderName == null || folderName.length == 0)
+                            return;
+                        
+                        if (!await ipc.createFolder(zis.localPath, folderName))
+                        {
+                            alert("Failed to create a folder");
+                            return;
+                        }
+
+                        await renderer.refresh();
                     }
                 },
                 {
                     type: "separator"
                 },
                 {
-                    label: "Delete This Directory",
-                    click: () => {
-                        //
+                    label: "Delete",
+                    click: async () => 
+                    {
+                        if (!await confirm("Are you sure you would like to delete this folder?"))
+                            return;
+                        
+                        if (!await ipc.removeFolder(zis.localPath))
+                        {
+                            return;
+                        }
+
+                        await renderer.refresh();
                     }
                 }
             ])
@@ -544,7 +597,7 @@ class EnvironmentTreeItemRenderer
         this.n_treeView = treeView;
 
         this.render();
-        this.root = new FolderTreeItemRenderer(renderer, "root", this.n_environment, "root", true);
+        this.root = new FolderTreeItemRenderer(renderer, "root", this.n_environment, name, true);
     }
 
     private render()
@@ -560,6 +613,63 @@ class EnvironmentTreeItemRenderer
             node.icon = $('<i class="ic ic-environment"/>');
         }, "environment-" + this.name, renderer.openNodes);
         
+        this.n_environment.contextMenu([
+            
+            {
+                label: "New Node",
+                click: async () => 
+                {
+                    const nodeName = await prompt("Enter a title for new node", "");
+
+                    if (nodeName == null || nodeName.length == 0)
+                        return;
+                    
+                    if (!await ipc.createNode(zis.name, nodeName))
+                    {
+                        alert("Failed to create a node");
+                        return;
+                    }
+
+                    await renderer.refresh();
+                }
+            },
+            {
+                label: "New Folder",
+                click: async () => 
+                {
+                    const folderName = await prompt("Enter a title for new folder", "");
+
+                    if (folderName == null || folderName.length == 0)
+                        return;
+                    
+                    if (!await ipc.createFolder(zis.name, folderName))
+                    {
+                        alert("Failed to create a folder");
+                        return;
+                    }
+
+                    await renderer.refresh();
+                }
+            },
+            {
+                type: "separator"
+            },
+            {
+                label: "Delete",
+                click: async () => 
+                {
+                    if (!await confirm("Are you sure you would like to delete this environment?"))
+                        return;
+                    
+                    if (!await ipc.removeEnvironment(zis.name))
+                    {
+                        return;
+                    }
+
+                    await renderer.refresh();
+                }
+            }
+        ]);
     }
 
     public async init()

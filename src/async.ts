@@ -1,7 +1,7 @@
 
 import { app } from "electron";
 
-import * as fs from "fs";
+import * as fs from "fs-extra";
 import * as path from "path";
 import * as child_process from "child_process";
 
@@ -208,6 +208,28 @@ export function isFile(path: string): Promise<boolean>
             {
                 resolve(false);
             }
+        });
+    });
+}
+
+export function createDirectory(path: string): Promise<boolean>
+{
+    return new Promise<boolean>((resolve, reject) =>
+    {
+        fs.mkdir(path, 777, (err) =>
+        {
+            resolve(err == null);
+        });
+    });
+}
+
+export function remove(path: string): Promise<boolean>
+{
+    return new Promise<boolean>((resolve, reject) =>
+    {
+        fs.remove(path, (err) =>
+        {
+            resolve(err == null);
         });
     });
 }

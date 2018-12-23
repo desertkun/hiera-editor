@@ -574,6 +574,57 @@ export module puppet
             return this._modulesInfo;
         }
 
+        public async createEnvironment(name: string): Promise<boolean>
+        {
+            if (await this.getEnvironment(name) != null)
+                return false;
+
+            const environmentsPath = this.environmentsPath;
+
+            if (!await async.createDirectory(path.join(environmentsPath, name)))
+                return false;
+
+            const env = await this.getEnvironment(name);
+            await env.create();
+            return true;
+        }
+
+        public async removeEnvironment(name: string): Promise<boolean>
+        {
+            const env = await this.getEnvironment(name);
+
+            if (env == null)
+                return false;
+
+            if (!await async.remove(env.path))
+                return false;
+
+            this._environments.remove(name);
+
+            return true;
+        }
+
+        public async findFolder(path: string): Promise<Folder>
+        {
+            if (path == null || path == "")
+                return null;
+
+            const entries = path.split("/");
+
+            const environment = entries[0];
+            const env: Environment = await this.getEnvironment(environment);
+
+            if (entries.length == 1)
+            {
+                return env.root;
+            }
+
+            if (env == null)
+                return null;
+            entries.splice(0, 1);
+            return await env.root.findFolder(entries);
+        }
+
         public async findNode(path: string): Promise<Node>
         {
             const entries = path.split("/");
@@ -706,9 +757,14 @@ export module puppet
             return this._modulesInfo;
         }
 
+        public get environmentsPath(): string
+        {
+            return path.join(this._path, "environments");
+        }
+
         public async getEnvironment(name: string): Promise<Environment>
         {
-            const environmentsPath = path.join(this._path, "environments");
+            const environmentsPath = this.environmentsPath;
 
             if (!await async.isDirectory(environmentsPath))
             {
@@ -848,7 +904,7 @@ export module puppet
             this._workspace = workspace;
             this._path = path;
             this._cachePath = cachePath;
-            this._root = new Folder(this, "data", this.dataPath, name);
+            this._root = new Folder(this, "data", this.dataPath, name, null);
 
             this._global = new Dictionary();
             this._global.put("environment", name);
@@ -915,6 +971,18 @@ export module puppet
             return this._workspace.modulesInfo.findDefinedType(definedTypeName);
         }
 
+        public async create()
+        {
+            if (!await async.isDirectory(this.dataPath))
+                await async.createDirectory(this.dataPath);
+                
+            if (!await async.isDirectory(this.modulesPath))
+                await async.createDirectory(this.modulesPath);
+            
+            if (!await async.isDirectory(this.manifestsPath))
+                await async.createDirectory(this.manifestsPath);
+        }
+
         public get dataPath(): string
         {
             return path.join(this._path, "data");
@@ -938,6 +1006,11 @@ export module puppet
         private get cacheModulesFilePath(): string
         {
             return path.join(this.cachePath, "modules.json");
+        }
+
+        private get manifestsPath(): string
+        {
+            return path.join(this.path, "manifests");
         }
 
         private get modulesPath(): string
@@ -1040,23 +1113,24 @@ export module puppet
         }
     }
 
-
     export class Folder
     {
         private readonly _name: string;
         private readonly _path: string;
         private readonly _env: Environment;
         private readonly _localPath: string;
+        private readonly _parent: Folder;
 
         private readonly _nodes: Dictionary<string, Node>;
         private readonly _folders: Dictionary<string, Folder>;
 
-        constructor(env: Environment, name: string, path: string, localPath: string)
+        constructor(env: Environment, name: string, path: string, localPath: string, parent: Folder)
         {
             this._env = env;
             this._name = name;
             this._path = path;
             this._localPath = localPath;
+            this._parent = parent;
 
             this._nodes = new Dictionary();
             this._folders = new Dictionary();
@@ -1072,6 +1146,107 @@ export module puppet
             }
 
             return await this.getNode(localPath[0]);
+        }
+
+        public async createNode(name: string): Promise<Node>
+        {
+            const entryPath = path.join(this._path, Node.NodePath(name));
+
+            if (await async.isDirectory(entryPath))
+            {
+                return null;
+            }
+
+            if (await async.isFile(entryPath))
+            {
+                return null;
+            }
+
+            const node = await this.acquireNode(this._env, name, entryPath, slash(path.join(this._localPath, name)));
+
+            if (node == null)
+                return null;
+
+            await node.save();
+            return node;
+        }
+
+        public async createFolder(name: string): Promise<Folder>
+        {
+            const entryPath = path.join(this._path, name);
+
+            if (await async.isDirectory(entryPath))
+            {
+                return null;
+            }
+
+            if (await async.isFile(entryPath))
+            {
+                return null;
+            }
+
+            if (!await async.createDirectory(entryPath))
+            {
+                return null;
+            }
+
+            return await this.getFolder(name);
+        }
+
+        public async remove(): Promise<boolean>
+        {
+            if (this._parent == null)
+                return;
+
+            return await this._parent.removeFolder(this._name);
+        }
+
+        public async removeFolder(name: string): Promise<boolean>
+        {
+            const folder = await this.getFolder(name);
+
+            if (folder == null)
+                return false;
+                
+            const entryPath = path.join(this._path, name);
+
+            if (!await async.remove(entryPath))
+            {
+                return false;
+            }
+
+            this._folders.remove(name);
+            return true;
+        }
+
+        public async removeNode(name: string): Promise<boolean>
+        {
+            const node = await this.getNode(name);
+
+            if (node == null)
+                return false;
+                
+            const entryPath = path.join(this._path, Node.NodePath(name));
+
+            if (!await async.remove(entryPath))
+            {
+                return false;
+            }
+
+            this._nodes.remove(name);
+            return true;
+        }
+
+        public async findFolder(localPath: Array<string>): Promise<Folder>
+        {
+            if (localPath.length > 1)
+            {
+                const dir = await this.getFolder(localPath[0]);
+                localPath.splice(0, 1);
+                return await dir.findFolder(localPath);
+            }
+
+            return await this.getFolder(localPath[0]);
         }
 
         public async tree(): Promise<any>
@@ -1108,7 +1283,7 @@ export module puppet
                 return this._folders.get(name);
             }
 
-            const newFolder = new Folder(env, name, path, localPath);
+            const newFolder = new Folder(env, name, path, localPath, this);
             this._folders.put(name, newFolder);
             return newFolder;
         }
@@ -1120,7 +1295,7 @@ export module puppet
                 return this._nodes.get(name);
             }
 
-            const newNode = new Node(env, name, filePath, nodePath);
+            const newNode = new Node(env, name, filePath, nodePath, this);
             this._nodes.put(name, newNode);
             await newNode.init();
             return newNode;
@@ -1233,13 +1408,14 @@ export module puppet
         private readonly _filePath: string;
         private readonly _nodePath: string;
         private readonly _env: Environment;
+        private readonly _parent: Folder;
         private _config: any;
         private _facts: any;
 
         private readonly _compiledClasses: Dictionary<string, PuppetASTClass>;
         private readonly _compiledResources: Dictionary<string, Dictionary<string, ResolvedResource>>;
 
-        constructor(env: Environment, name: string, filePath: string, nodePath: string)
+        constructor(env: Environment, name: string, filePath: string, nodePath: string, parent: Folder)
         {
             this._env = env;
             this._name = name;
@@ -1247,6 +1423,7 @@ export module puppet
             this._nodePath = nodePath;
             this._config = {};
             this._facts = {};
+            this._parent = parent;
 
             this._compiledClasses = new Dictionary();
             this._compiledResources = new Dictionary();
@@ -1286,6 +1463,14 @@ export module puppet
         {
             this._compiledClasses.clear();
             this._compiledResources.clear();
+        }
+
+        public async remove(): Promise<boolean>
+        {
+            if (this._parent == null)
+                return;
+
+            return await this._parent.removeNode(this._name);
         }
         
         public async resolveClass(className: string, global: GlobalVariableResolver): Promise<PuppetASTClass>
@@ -1467,7 +1652,16 @@ export module puppet
 
         public async init()
         {
-            await this.parse();
+            if (await async.isFile(this.path))
+            {
+                await this.parse();
+            }
+
+            if (this._config["resources"] == null)
+                this._config["resources"] = {};
+            
+            if (this._config["classes"] == null)
+                this._config["classes"] = [];
         }
         
         public async acquireFacts(): Promise<any>
