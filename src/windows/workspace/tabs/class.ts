@@ -2,6 +2,7 @@ import { IPC } from "../../../ipc/client";
 import {WorkspaceTab} from "./tab";
 import {WorkspaceRenderer} from "../renderer";
 import { dialog } from "electron";
+import { isNumber, isObject, isBoolean } from "util";
 
 const ipc = IPC();
 
@@ -72,16 +73,16 @@ class HashPropertyRenderer implements PropertyRenderer
             .appendTo(group);
 
         const editor = new JSONEditor(div[0], {
-            modes: ['tree', 'code'],
-            onChangeJSON: () => 
+            modes: ['code', 'tree'],
+            onChange: () => 
             {
                 changed(editor.get());
             }
         });
 
-        if (defaultValue != null)
+        if (value != null)
         {
-            editor.set(defaultValue);
+            editor.set(value);
         }
 
         return {
@@ -279,8 +280,13 @@ export class NodeClassTab extends WorkspaceTab
         return properties
     }
 
-    private getPropertyRenderer(type: any): PropertyRenderer
+    private getPropertyRenderer(type: any, value?: any): PropertyRenderer
     {
+        if (type == null)
+        {
+            return this.getDefaultPropertyRenderer(value);
+        }
+        
         switch (type.type)
         {
             case "String":
@@ -302,6 +308,10 @@ export class NodeClassTab extends WorkspaceTab
                     case "Hash":
                     {
                         return new HashPropertyRenderer();
+                    }
+                    default:
+                    {
+                        return this.getDefaultPropertyRenderer(value);
                     }
                 }
             }
@@ -331,7 +341,34 @@ export class NodeClassTab extends WorkspaceTab
 
                         return new EnumPropertyRenderer(values);
                     }
+                    default:
+                    {
+                        return this.getDefaultPropertyRenderer(value);
+                    }
                 }
+            }
+        }
+
+        return this.getDefaultPropertyRenderer(value);
+    }
+
+    private getDefaultPropertyRenderer(value: any)
+    {
+        if (value != null)
+        {
+            if (isBoolean(value))
+            {
+                return new BooleanPropertyRenderer();
+            }
+
+            if (isObject(value))
+            {
+                return new HashPropertyRenderer();
+            }
+
+            if (isNumber(value))
+            {
+                return new NumberPropertyRenderer();
             }
         }
 
@@ -347,7 +384,14 @@ export class NodeClassTab extends WorkspaceTab
         if (description != null && description != "")
         {
             const pad = $('<div class="container-w-padding-x2"></div>').appendTo(this.contentNode);
-            const i = $('<i class="fas fa-question" title="' + description + '">').tooltip().appendTo(pad);
+            const i = $('<i class="fas fa-question" title="Click to show documentation">').tooltip().appendTo(pad);
+
+            const documentation = $('<pre></pre>').html(description).css("display", "none").appendTo(pad);
+
+            i.click(() => {
+                $(i).remove();
+                $(documentation).show();
+            });
         }
     }
 
@@ -418,11 +462,11 @@ export class NodeClassTab extends WorkspaceTab
 
         if (typeInfo != null)
         {
-            renderer = this.getPropertyRenderer(typeInfo);
+            renderer = this.getPropertyRenderer(typeInfo, value);
         }
         else
         {
-            renderer = new StringPropertyRenderer();
+            renderer = this.getDefaultPropertyRenderer(value);
         }
 
         const renderedProperty = this.renderedProperties[propertyName] = 

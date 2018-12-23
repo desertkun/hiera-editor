@@ -144,6 +144,11 @@ export class PuppetASTInvoke extends PuppetASTObject
         {
             await resolver.resolveClass(args[0]);
         },
+        "contain": async function(invoke: PuppetASTInvoke, args: Array<any>,
+                                  context: PuppetASTContainerContext, resolver: Resolver)
+        {
+            await resolver.resolveClass(args[0]);
+        },
         "include": async function(invoke: PuppetASTInvoke, args: Array<any>,
                                   context: PuppetASTContainerContext, resolver: Resolver)
         {
@@ -167,7 +172,8 @@ export class PuppetASTInvoke extends PuppetASTObject
 
         if (!PuppetASTInvoke.InvokeFunctions.hasOwnProperty(functorName))
         {
-            throw new ResolveError(this, "Unknown function: " + functorName);
+            console.log("Warning: Unknown function: " + functorName);
+            return null;
         }
 
         const f: PuppetASTInvokeFunctor = PuppetASTInvoke.InvokeFunctions[functorName];
@@ -537,6 +543,17 @@ export class PuppetASTCondition extends PuppetASTObject
             return a != b;
         }, args);
     }
+
+    public static In(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTCondition((a: any, b: any) => 
+        {
+            if (b == null)
+                return false;
+
+            return a in b;
+        }, args);
+    }
 }
 
 export class PuppetASTAndCondition extends PuppetASTObject
@@ -879,10 +896,13 @@ export class PuppetASTArray extends PuppetASTObject
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
+        const result: any[] = [];
         for (const entry of this.entries)
         {
-            await entry.resolve(context, resolver);
+            const value = await entry.resolve(context, resolver);
+            result.push(value);
         }
+        return result;
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
@@ -1241,7 +1261,23 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
         }
 
         if (this.body)
-            await this.body.resolve(this, resolver);
+        {
+            try
+            {
+                await this.body.resolve(this, resolver);
+            }
+            catch (e)
+            {
+                if (e instanceof ResolveError)
+                {
+                    console.log("Failed to resolve class body: " + e.message);
+                }
+                else
+                {
+                    throw e;
+                }
+            }
+        }
 
         console.log("Class " + this.name + " has been resolved");
     }
@@ -1681,6 +1717,8 @@ export class PuppetASTParser
             "str": PuppetASTToString.Create,
             "concat": PuppetASTConcat.Create,
             "resource": PuppetASTResourcesEntry.Create,
+            "resource-override": PuppetASTIgnored.Create("resource-override"),
+            "resource-defaults": PuppetASTIgnored.Create("resource-defaults"),
             "->": PuppetASTApplyOrder.Create,
             "~>": PuppetASTNotifyOrder.Create,
             "access": PuppetASTAccess.Create,
@@ -1695,6 +1733,7 @@ export class PuppetASTParser
             ">=": PuppetASTCondition.MoreOrEqual,
             "==": PuppetASTCondition.Equal,
             "!=": PuppetASTCondition.NotEqual,
+            "in": PuppetASTCondition.In,
             "and": PuppetASTAndCondition.Create,
             "or": PuppetASTOrCondition.Create,
             "paren": PuppetASTParenthesis.Create,

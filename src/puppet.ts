@@ -1521,6 +1521,8 @@ export module puppet
                 throw "Not a class";
 
             const clazz: PuppetASTClass = obj;
+            
+            this._compiledClasses.put(className, clazz);
 
             try
             {
@@ -1540,10 +1542,10 @@ export module puppet
             catch (e)
             {
                 console.log(e);
+                this._compiledClasses.remove(className);
                 throw new CompilationError("Failed to compile class: " + e);
             }
 
-            this._compiledClasses.put(className, clazz);
             return clazz;
         }
 

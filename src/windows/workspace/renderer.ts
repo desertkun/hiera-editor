@@ -113,12 +113,6 @@ class NodeTreeItemRenderer
             
             classNode.contextMenu([
                 {
-                    label: "Copy",
-                    click: () => {
-                        //
-                    }
-                },
-                {
                     label: "Reset To Defaults",
                     click: async () => 
                     {
