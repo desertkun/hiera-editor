@@ -5,7 +5,7 @@ const rmdir = require('rimraf');
 import * as path from "path";
 import * as tmp from "tmp";
 import { puppet } from "../puppet";
-import {PuppetASTAccess, PuppetASTPrimitive, PuppetASTQualifiedName, PuppetASTType} from "../puppet/ast";
+import {PuppetASTAccess, PuppetASTPrimitive, PuppetASTQualifiedName, PuppetASTType, PuppetASTTypeOf} from "../puppet/ast";
 
 const async = require("../async");
 const chai = require('chai');
@@ -221,7 +221,7 @@ describe('Workspaces', () =>
         {
             const class_ = await node.acquireClass("test");
             expect(class_.getResolvedProperty("v").value).to.equal("Hello, myhost!");
-        }, "hostname = myhost");
+        }, "hostname = \"myhost\"");
     });
 
     it('resources', () =>
@@ -319,21 +319,23 @@ describe('Workspaces', () =>
 
             {
                 const _t: any = class_.getResolvedProperty("log_level").type;
-                if (!(_t instanceof PuppetASTAccess))
-                    assert.fail("log_level expected to be access");
-                expect(_t.what).to.be.instanceOf(PuppetASTType);
-                expect(_t.values[0]).to.be.instanceOf(PuppetASTPrimitive).and.have.property("value", "info");
-                expect(_t.values[1]).to.be.instanceOf(PuppetASTPrimitive).and.have.property("value", "error");
-                expect(_t.values[2]).to.be.instanceOf(PuppetASTPrimitive).and.have.property("value", "warning");
+                if (!(_t instanceof PuppetASTTypeOf))
+                    assert.fail("log_level expected to be PuppetASTTypeOf");
+                const _tof = <PuppetASTTypeOf>_t;
+                expect(_tof.type).to.be.instanceOf(PuppetASTType);
+                expect(_tof.args[0]).to.be.instanceOf(PuppetASTPrimitive).and.have.property("value", "info");
+                expect(_tof.args[1]).to.be.instanceOf(PuppetASTPrimitive).and.have.property("value", "error");
+                expect(_tof.args[2]).to.be.instanceOf(PuppetASTPrimitive).and.have.property("value", "warning");
             }
 
             {
                 const _t: any = class_.getResolvedProperty("ensure").type;
-                if (!(_t instanceof PuppetASTAccess))
+                if (!(_t instanceof PuppetASTTypeOf))
                     assert.fail("log_level expected to be access");
-                expect(_t.what).to.be.instanceOf(PuppetASTType);
-                expect(_t.values[0]).to.be.instanceOf(PuppetASTQualifiedName).and.have.deep.property("value", {"value": "absent"});
-                expect(_t.values[1]).to.be.instanceOf(PuppetASTQualifiedName).and.have.deep.property("value", {"value": "present"});
+                const _tof = <PuppetASTTypeOf>_t;
+                expect(_tof.type).to.be.instanceOf(PuppetASTType);
+                expect(_tof.args[0]).to.be.instanceOf(PuppetASTQualifiedName).and.have.deep.property("value", {"value": "absent"});
+                expect(_tof.args[1]).to.be.instanceOf(PuppetASTQualifiedName).and.have.deep.property("value", {"value": "present"});
             }
         });
     });
@@ -422,6 +424,115 @@ describe('Workspaces', () =>
         {
             await expect(node.acquireClass("test")).to.be.rejectedWith("Welp");
         });
+    });
+
+    it('access[optional]', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test (
+                    Optional[Boolean] $test = true
+                ) {
+                    
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            const class_ = await node.acquireClass("test");
+            
+            {
+                const test = class_.resolvedProperties.get("test");
+                expect(test.type).to.be.instanceOf(PuppetASTTypeOf);
+            }
+        });
+    });
+
+    it('access[a][b]', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test (
+                    Hash $h = {'a' => {'b' => 5}},
+                    String $test = $h['a']['b']
+                ) {
+                    
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            const class_ = await node.acquireClass("test");
+            
+            {
+                const test = class_.resolvedProperties.get("test");
+                expect(test.value).to.equal(5);
+            }
+        });
+    });
+
+    it('facts', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test (
+                    String $testAV = $facts['testA'],
+                    Number $testBV = $facts['testB'],
+                    Number $testDirectV = $testFactsDirect
+                ) {
+                    
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            const class_ = await node.acquireClass("test");
+            
+            {
+                const test = class_.resolvedProperties.get("testAV");
+                expect(test.value).to.equal("string");
+            }
+
+            {
+                const test = class_.resolvedProperties.get("testBV");
+                expect(test.value).to.equal(5);
+            }
+
+            {
+                const test = class_.resolvedProperties.get("testDirectV");
+                expect(test.value).to.equal(99);
+            }
+        }, 'testA = "string" \n testB = 5 \n testFactsDirect = 99');
+    });
+
+    it('access $facts[a][b]', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test (
+                    String $test = $facts['a']['b']
+                ) {
+                    
+                }
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            const class_ = await node.acquireClass("test");
+            
+            {
+                const test = class_.resolvedProperties.get("test");
+                expect(test.value).to.equal(10);
+            }
+        }, 'a = {"b": 10}');
     });
 });
 

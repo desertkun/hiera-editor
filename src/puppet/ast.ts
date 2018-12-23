@@ -69,6 +69,22 @@ export class PuppetASTObject
         }
     }
 
+    public async access(args: Array<PuppetASTObject>, context: PuppetASTContainerContext, resolver: Resolver): Promise<PuppetASTObject>
+    {
+        return await this._access(args, context, resolver);
+    }
+
+    protected async _access(args: Array<PuppetASTObject>, context: PuppetASTContainerContext, resolver: Resolver): Promise<PuppetASTObject>
+    {
+        const resolved = await this.resolve(context, resolver);
+        if (resolved == null)
+            return new PuppetASTValue(null);
+
+        const key = await args[0].resolve(context, resolver);
+        const value = resolved[key];
+        return new PuppetASTValue(value);
+    }
+
     protected hint(hint: PuppetHint)
     {
         if (this._hints == null)
@@ -127,6 +143,12 @@ export class PuppetASTInvoke extends PuppetASTObject
                                   context: PuppetASTContainerContext, resolver: Resolver)
         {
             await resolver.resolveClass(args[0]);
+        },
+        "include": async function(invoke: PuppetASTInvoke, args: Array<any>,
+                                  context: PuppetASTContainerContext, resolver: Resolver)
+        {
+            const className = args[0];
+            await resolver.resolveClass(className);
         }
     };
 
@@ -202,7 +224,7 @@ export class PuppetASTIgnored extends PuppetASTObject
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
-        throw new ResolveError(this, "Entry ignored: " + this.what);
+        console.log("Entry ignored: " + this.what);
     }
 
     public static Create(what: string)
@@ -218,6 +240,7 @@ export class PuppetASTAccess extends PuppetASTObject
 {
     public readonly what: PuppetASTObject;
     public readonly values: Array<PuppetASTObject>;
+    private accessOf: PuppetASTObject;
 
     constructor(args: Array<PuppetASTObject>)
     {
@@ -230,12 +253,13 @@ export class PuppetASTAccess extends PuppetASTObject
 
     public toString(): string
     {
-        return "Access[" + this.what.toString() + ":" + this.values.join(",") + "]";
+        return this.accessOf.toString();
     }
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
-        return this;
+        this.accessOf = await this.what.access(this.values, context, resolver);
+        return await this.accessOf.resolve(context, resolver);
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
@@ -295,6 +319,71 @@ export class PuppetASTSwitch extends PuppetASTObject
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
     {
         return new PuppetASTSwitch(args);
+    }
+}
+
+export class PuppetASTCase extends PuppetASTObject
+{
+    public readonly variable: PuppetASTObject;
+    public readonly cases: PuppetASTList;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this.variable = args[0];
+        this.cases = (<PuppetASTList>args[1]);
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        const resolvedValue = await this.variable.resolve(context, resolver);
+
+        let default_: PuppetASTObject = null;
+
+        for (const entry of this.cases.entries)
+        {
+            const obj: any = entry;
+
+            const when: PuppetASTList = obj.when;
+            const then: PuppetASTObject = obj.then;
+
+            let matches = false;
+
+            for (const val of when.entries)
+            {
+                if (val instanceof PuppetASTDefault)
+                {
+                    default_ = then;
+                    continue;
+                }
+
+                const possibleValue = await val.resolve(context, resolver);
+
+                if (possibleValue == resolvedValue)
+                {
+                    matches = true;
+                    break;
+                }
+            }
+
+            if (matches)
+            {
+                return await then.resolve(context, resolver);
+            }
+        }
+
+        if (default_ == null)
+        {
+            throw new ResolveError(this, "Failed to resolve switch: default value was hit and not provided")
+        }
+
+        return await default_.resolve(context, resolver);
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTCase(args);
     }
 }
 
@@ -368,6 +457,13 @@ export class PuppetASTHash extends PuppetASTObject
         }
 
         return this.dict;
+    }
+
+    protected async _access(args: Array<PuppetASTObject>, context: PuppetASTContainerContext, resolver: Resolver): Promise<PuppetASTObject>
+    {
+        const key = await args[0].resolve(context, resolver);
+        const value = this.dict[key];
+        return new PuppetASTValue(value);
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
@@ -795,6 +891,25 @@ export class PuppetASTArray extends PuppetASTObject
     }
 }
 
+export class PuppetASTTypeOf extends PuppetASTObject
+{
+    public readonly type: PuppetASTObject;
+    public readonly args: Array<PuppetASTObject>;
+
+    constructor(type: PuppetASTType, args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this.type = type;
+        this.args = args;
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        return this;
+    }
+}
+
 export class PuppetASTType extends PuppetASTObject
 {
     public readonly type: PuppetASTObject;
@@ -809,6 +924,11 @@ export class PuppetASTType extends PuppetASTObject
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         return await this.type.resolve(context, resolver)
+    }
+
+    protected async _access(args: Array<PuppetASTObject>, context: PuppetASTContainerContext, resolver: Resolver): Promise<PuppetASTObject>
+    {
+        return new PuppetASTTypeOf(this, args);
     }
 
     public toString(): string
@@ -1438,6 +1558,23 @@ export class PuppetHintVariableNotFound extends PuppetHint
     }
 }
 
+export class PuppetASTValue extends PuppetASTObject
+{
+    private value: any;
+
+    constructor(value: any)
+    {
+        super();
+
+        this.value = value;
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        return this.value;
+    }
+}
+
 export class PuppetASTVariable extends PuppetASTObject
 {
     public readonly fullName: string;
@@ -1457,6 +1594,14 @@ export class PuppetASTVariable extends PuppetASTObject
         this.name = split[split.length - 1];
         split.splice(split.length - 1, 1);
         this.className = split.join("::");
+    }
+
+    protected async _access(args: Array<PuppetASTObject>, context: PuppetASTContainerContext, resolver: Resolver): Promise<PuppetASTObject>
+    {
+        const resolved = await this.resolve(context, resolver);
+        const key = await args[0].resolve(context, resolver);
+        const value = resolved[key];
+        return new PuppetASTValue(value);
     }
 
     public isRoot()
@@ -1542,6 +1687,7 @@ export class PuppetASTParser
             "=>": PuppetASTKeyedEntry.Create,
             "default": PuppetASTDefault.Create,
             "?": PuppetASTSwitch.Create,
+            "case": PuppetASTCase.Create,
             "!": PuppetASTNot.Create,
             "<": PuppetASTCondition.Less,
             ">": PuppetASTCondition.More,

@@ -79,7 +79,7 @@ class HashPropertyRenderer implements PropertyRenderer
             }
         });
 
-        if (defaultValue)
+        if (defaultValue != null)
         {
             editor.set(defaultValue);
         }
@@ -171,7 +171,7 @@ class NumberPropertyRenderer implements PropertyRenderer
                 changed(parseInt($(this).val()));
             });
 
-        if (defaultValue)
+        if (defaultValue != null)
         {
             $(textField).attr('placeholder', defaultValue);
         }
