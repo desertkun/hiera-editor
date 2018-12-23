@@ -93,6 +93,7 @@ html, body {
 }
 
 .nav-tabs.compact .nav-link {
+    height: 27px;
 }
 
 .nav-tabs.compact .nav-link.active {

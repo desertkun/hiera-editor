@@ -604,7 +604,7 @@ class EnvironmentTreeItemRenderer
             node.title = zis.name;
             node.bold = true;
             node.emptyText = "No nodes";
-            node.icon = $('<i class="ic ic-environment"/>');
+            node.icon = $('<i class="ic ic-environment"/></i>');
         }, "environment-" + this.name, renderer.openNodes);
         
         this.n_environment.contextMenu([
@@ -762,7 +762,7 @@ export class WorkspaceRenderer
             document.title = ellipsis(path, 80, {side: 'start'});
         }
 
-        this.workspaceTree = new TreeView($('#workspace'));
+        this.workspaceTree = new TreeView($('#workspace-tree'));
 
         const environments: string[] = await ipc.getEnvironmentList();
 
