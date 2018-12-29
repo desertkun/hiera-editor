@@ -40,4 +40,6 @@ export interface IpcAPI
     removeFolder(path: string): Promise<boolean>;
     removeNode(path: string): Promise<boolean>;
     removeEnvironment(name: string): Promise<boolean>;
+    getGlobalModules(): Promise<any>;
+    getEnvironmentModules(env: string): Promise<any>;
 }

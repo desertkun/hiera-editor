@@ -872,6 +872,45 @@ export module puppet
             return (this._name != null);
         }
 
+        public async getGlobalModules(): Promise<any>
+        {
+            const modulesPath = this.modulesPath;
+
+            if (!await async.isDirectory(modulesPath))
+                return {};
+
+            const files = await async.listFiles(modulesPath);
+
+            const result: any = {};
+
+            for (const file of files)
+            {
+                const modulePath = path.join(modulesPath, file);
+                const metadataPath = path.join(modulePath, "metadata.json");
+                const manifestsPath = path.join(modulePath, "manifests");
+                const filesPath = path.join(modulePath, "files");
+
+                if (await async.isFile(metadataPath) ||
+                    await async.isDirectory(manifestsPath) ||
+                    await async.isDirectory(filesPath) )
+                {
+                    result[file] = {};
+                }
+            }
+
+            return result;
+        }
+
+        public async getEnvironmentModules(name: string): Promise<any>
+        {
+            const env = await this.getEnvironment(name);
+
+            if (env == null)
+                return {};
+
+            return await env.getModules();
+        }
+
         public dump(): any
         {
             return {
@@ -1110,6 +1149,35 @@ export module puppet
             const data: any = await async.readJSON(this.cacheModulesFilePath);
             this._modulesInfo = new PuppetModulesInfo(this.modulesPath, this.cachePath, data);
             return this._modulesInfo;
+        }
+
+        public async getModules(): Promise<any>
+        {
+            const modulesPath = this.modulesPath;
+
+            if (!await async.isDirectory(modulesPath))
+                return {};
+
+            const files = await async.listFiles(modulesPath);
+
+            const result: any = {};
+
+            for (const file of files)
+            {
+                const modulePath = path.join(modulesPath, file);
+                const metadataPath = path.join(modulePath, "metadata.json");
+                const manifestsPath = path.join(modulePath, "manifests");
+                const filesPath = path.join(modulePath, "files");
+
+                if (await async.isFile(metadataPath) ||
+                    await async.isDirectory(manifestsPath) ||
+                    await async.isDirectory(filesPath) )
+                {
+                    result[file] = {};
+                }
+            }
+
+            return result;
         }
     }
 

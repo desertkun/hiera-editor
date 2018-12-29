@@ -644,6 +644,26 @@ export class IpcServer implements IpcAPI
     
         return await workspace.removeEnvironment(name);
     }
+
+    public async getGlobalModules(): Promise<any>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return false;
+    
+        return await workspace.getGlobalModules();
+    }
+
+    public async getEnvironmentModules(env: string): Promise<any>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return false;
+    
+        return await workspace.getEnvironmentModules(env);
+    }
 }
 
 const server: IpcServer = new IpcServer();

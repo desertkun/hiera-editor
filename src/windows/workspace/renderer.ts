@@ -668,19 +668,86 @@ class EnvironmentTreeItemRenderer
 
     public async init()
     {
-        electron.ipcRenderer.on('refreshWorkspaceCategory', function(event: any, text: number)
-        {
-            $('#loading-category').text(text);
-        });
-
-        electron.ipcRenderer.on('refreshWorkspaceProgress', function(event: any, progress: number)
-        {
-            const p = Math.floor(progress * 100);
-            $('#loading-progress').css('width', "" + p + "%");
-        });
-
         const tree = await ipc.getEnvironmentTree(this.name);
         await this.root.populate(tree);
+    }
+}
+
+class EnvironmentModulesRenderer
+{
+    private renderer: WorkspaceRenderer;
+    private modules: any;
+    private name: string;
+    private n_modules: TreeViewNode;
+    private readonly n_treeView: TreeViewNode;
+
+    constructor(renderer: WorkspaceRenderer, name: string, treeView: TreeViewNode)
+    {
+        this.renderer = renderer;
+        this.name = name;
+
+        this.n_treeView = treeView;
+
+        this.render();
+    }
+
+    private render()
+    {
+        const zis = this;
+
+        this.n_modules = this.n_treeView.addChild( 
+            (node) => 
+        {
+            node.title = zis.global ? "global" : zis.name;
+            node.bold = true;
+            node.emptyText = "No modules";
+            node.icon = $(zis.global ? '<i class="fas text-danger fa-sitemap"></i>' : '<i class="fas text-primary fa-sitemap"></i>');
+        }, this.global ? "modules" : ("modules-" + this.name), this.renderer.openNodes);
+        
+        this.n_modules.contextMenu([
+            
+            {
+                label: "Install New Module",
+                click: async () => 
+                {
+                    //
+                }
+            }
+        ]);
+    }
+
+    public get global()
+    {
+        return this.name == "";
+    }
+
+    public async init()
+    {
+        if (this.global)
+        {
+            this.modules = await ipc.getGlobalModules();
+        }
+        else
+        {
+            this.modules = await ipc.getEnvironmentModules(this.name);
+        }
+
+        const names = Object.keys(this.modules);
+        names.sort();
+
+        for (const moduleName of names)
+        {
+            const n_module = this.n_modules.addChild( 
+                (node) => 
+            {
+                node.title = moduleName;
+                node.bold = false;
+                node.leaf = true;
+                node.icon = $('<i class="fas fa-folder"></i>');
+            }, this.global ? ("module-" + moduleName) : ("module-" + this.name + "-" + moduleName), 
+            this.renderer.openNodes);
+            
+        }
     }
 }
 
@@ -688,8 +755,10 @@ export class WorkspaceRenderer
 {
     settingsTimer: NodeJS.Timer;
     environments: Dictionary<string, EnvironmentTreeItemRenderer>;
+    modules: Dictionary<string, EnvironmentModulesRenderer>;
     tabs: Dictionary<string, WorkspaceTab>;
     private workspaceTree: TreeView;
+    private modulesTree: TreeView;
     private cachedClassInfo: any;
 
     private readonly tabClasses: Dictionary<string, WorkspaceTabConstructor>;
@@ -704,6 +773,7 @@ export class WorkspaceRenderer
         this.cachedClassInfo = {};
 
         this.environments = new Dictionary();
+        this.modules = new Dictionary();
         this.tabs = new Dictionary();
 
         this.tabClasses = new Dictionary();
@@ -734,6 +804,12 @@ export class WorkspaceRenderer
         return classInfo;
     }
 
+    public async refreshModules()
+    {
+        this.modulesTree.clear();
+
+    }
+
     public async refresh()
     {
         this.workspaceTree.clear();
@@ -762,19 +838,65 @@ export class WorkspaceRenderer
             document.title = ellipsis(path, 80, {side: 'start'});
         }
 
-        this.workspaceTree = new TreeView($('#workspace-tree'));
-
-        const environments: string[] = await ipc.getEnvironmentList();
-
         await ipc.refreshWorkspace();
+
+        await this.initUI();
+        await this.initWorkspace();
+        await this.initModules();
+
+        await this.enable();
+    }
+
+    private async initUI()
+    {
+        electron.ipcRenderer.on('refreshWorkspaceCategory', function(event: any, text: number)
+        {
+            $('#loading-category').text(text);
+        });
+
+        electron.ipcRenderer.on('refreshWorkspaceProgress', function(event: any, progress: number)
+        {
+            const p = Math.floor(progress * 100);
+            $('#loading-progress').css('width', "" + p + "%");
+        });
+    }
+
+    private async initWorkspace()
+    {
+        this.workspaceTree = new TreeView($('#workspace-tree'));
+        const environments: string[] = await ipc.getEnvironmentList();
 
         for (const environment of environments)
         {
             const env = this.addEnvironment(environment);
             await env.init();
         }
+    }
 
-        await this.enable();
+    private async initModules()
+    {
+        this.modulesTree = new TreeView($('#workspace-modules'));
+
+        {
+            // global modules
+            const modules = this.addModules("");
+            await modules.init();
+        }
+
+        const environments: string[] = await ipc.getEnvironmentList();
+
+        for (const environment of environments)
+        {
+            const modules = this.addModules(environment);
+            await modules.init();
+        }
+    }
+
+    public addModules(env: string): EnvironmentModulesRenderer
+    {
+        const modules = new EnvironmentModulesRenderer(this, env, this.modulesTree.root);
+        this.modules.put(env, modules);
+        return modules;
     }
 
     public addEnvironment(name: string): EnvironmentTreeItemRenderer
