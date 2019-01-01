@@ -1,6 +1,6 @@
 
-import { dialog, OpenDialogOptions } from "electron";
-import { projects_list, projects_window, workspace_window, setCurrentWorkspace, getCurrentWorkspace } from "../global"
+import { dialog, OpenDialogOptions, Menu } from "electron";
+import { projects_list, projects_window, workspace_window, setCurrentWorkspace, getCurrentWorkspace, workspace_menu } from "../global"
 import { AssignClassWindow } from "../windows/assign_class/window"
 import { CreateResourceWindow } from "../windows/create_resource/window"
 import { ProjectsModel, ProjectModel } from "../projects"
@@ -25,6 +25,7 @@ export class IpcServer implements IpcAPI
 
         setCurrentWorkspace(project.workspace);
         workspace_window.show(path);
+        Menu.setApplicationMenu(workspace_menu);
         projects_window.close();
     }
 

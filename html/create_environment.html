@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Create an Environment</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src * 'self' data: https:;">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-reboot.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/create-resource.css">
+    <link rel="stylesheet" href="../css/font-awesome.min.css">
+    <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
+    <script type="text/javascript">
+      window.$ = window.jQuery = require('jquery');
+    </script>
+    <script src="../js/tether.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+  </head>
+  <body>
+    <div class="create-resource-container w-100 h-100">
+        <div class="input-group mb-3" id="search-filter">
+            <input type="text" class="form-control form-control-sm" placeholder="Environment Name" 
+            aria-label="Environment Name" aria-describedby="envirnonemt-name-label" id="envirnonemt-name" autofocus>
+        </div>
+        <div class="w-100 d-flex justify-content-end bottom-buttons">
+            <input type="button" id="create" class="btn btn-sm btn-space btn-primary" value="Create">
+            <input type="button" id="cancel" class="btn btn-sm btn-space btn-danger" value="Cancel">
+        </div>
+    </div>
+
+    <script>
+      require('../dist/windows/create_environment/renderer.js')
+    </script>
+  </body>
+</html>

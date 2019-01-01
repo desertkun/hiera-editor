@@ -19,6 +19,7 @@ import {DefaultTab} from "./tabs/default";
 import {NodeClassTab} from "./tabs/class";
 import {NodeResourceTab} from "./tabs/resource";
 import {FactsTab} from "./tabs/facts";
+import { ipcRenderer } from 'electron';
 
 import {puppet} from "../../puppet";
 import {TreeView, TreeViewNode} from "./treeview";
@@ -1090,6 +1091,11 @@ export class WorkspaceRenderer
         $('#workspace').removeClass('disabled');
         this.openEditor();
         await this.checkEmpty();
+
+        ipcRenderer.on('refresh', async function (event: any)
+        {
+            await renderer.refresh();
+        });
     }
 
     private initSidebar()

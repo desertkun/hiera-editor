@@ -768,14 +768,16 @@ export module puppet
 
             if (!await async.isDirectory(environmentsPath))
             {
-                throw new WorkspaceError("Workspace does not have environments folder")
+                // Workspace does not have environments folder
+                return null;
             }
 
             const environmentPath = path.join(environmentsPath, name);
 
-            if (!await async.isDirectory(environmentsPath))
+            if (!await async.isDirectory(environmentPath))
             {
-                throw new NoSuchEnvironmentError("Environment " + name + " does not exists");
+                // Environment does not exists
+                return null;
             }
 
             return this.acquireEnvironment(name, environmentPath, this.cachePath);
