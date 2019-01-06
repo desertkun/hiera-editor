@@ -840,9 +840,8 @@ export class WorkspaceRenderer
             document.title = ellipsis(path, 80, {side: 'start'});
         }
 
-        await ipc.refreshWorkspace();
-
         await this.initUI();
+        await ipc.refreshWorkspace();
         await this.initWorkspace();
         await this.initModules();
 
