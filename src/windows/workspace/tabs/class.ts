@@ -375,8 +375,29 @@ export class NodeClassTab extends WorkspaceTab
         return new StringPropertyRenderer();
     }
 
+    protected noClassInfoText(): string
+    {
+        return "This object does not seem to be recognized, because of compilation issues."
+    }
+
     public render(): any
     {
+        if (this.info.classInfo == null)
+        {
+            const pad = $('<div class="container-w-padding-x2"></div>').appendTo(this.contentNode);
+            $('<div class="alert alert-danger" role="alert"></div>').appendTo(pad).html(this.noClassInfoText());
+        }
+
+        if (this.hasHints())
+        {
+            const pad = $('<div class="container-w-padding-x2"></div>').appendTo(this.contentNode);
+
+            for (const hint of this.getHints())
+            {
+                $('<div class="alert alert-warning" role="alert"></div>').appendTo(pad).html(hint.message);
+            }
+        }
+
         const editorHolder = $('<div class="w-100 node-class-properties"></div>').appendTo(this.contentNode);
         this.renderProperties(editorHolder);
         
@@ -397,11 +418,17 @@ export class NodeClassTab extends WorkspaceTab
 
     protected getDescription(): string
     {
+        if (this.info.classInfo == null)
+            return null;
+
         return this.info.classInfo.description;
     }
 
     protected getTag(tag: string, name: string): string
     {
+        if (this.info.classInfo == null)
+            return null;
+            
         const tags = this.info.classInfo.tags;
 
         if (tags[tag] == null)
@@ -559,9 +586,19 @@ export class NodeClassTab extends WorkspaceTab
         
     }
 
+    protected hasHints(): boolean
+    {
+        return this.info.hints != null && this.info.hints.length > 0;
+    }
+
+    protected getHints(): any[]
+    {
+        return this.info.hints;
+    }
+
     protected getPropertyHints(propertyName: string): any[]
     {
-        return this.info.hints[propertyName];
+        return this.info.propertyHints[propertyName];
     }
 
     protected getPropertyErrorInfo(propertyName: string): any
@@ -571,6 +608,9 @@ export class NodeClassTab extends WorkspaceTab
 
     public getProperties(): Array<string>
     {
+        if (this.info.classInfo == null)
+            return [];
+
         return this.info.classInfo.fields;
     }
 

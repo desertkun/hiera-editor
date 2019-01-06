@@ -106,6 +106,11 @@ export class PuppetASTObject
         return this._hints;
     }
 
+    public get hasHints()
+    {
+        return this._hints.length > 0;
+    }
+
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         throw "Not implemented";
@@ -1288,6 +1293,7 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
             {
                 if (e instanceof ResolveError)
                 {
+                    this.hint(new PuppetHintBodyCompilationError("Failed to resolve class body: " + e.message));
                     console.log("Failed to resolve class body: " + e.message);
                 }
                 else
@@ -1609,6 +1615,14 @@ export class PuppetHintVariableNotFound extends PuppetHint
     {
         super("VariableNotFound", "Variable not found: " + variable);
         this.variable = variable;
+    }
+}
+
+export class PuppetHintBodyCompilationError extends PuppetHint
+{
+    constructor(message: string)
+    {
+        super("BodyCompilationError", message);
     }
 }
 

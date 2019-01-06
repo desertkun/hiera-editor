@@ -89,7 +89,7 @@ class NodeTreeItemRenderer
         for (const className of nodeClassNames)
         {
             const classInfo = this.classInfo.classes[className];
-            const iconData = classInfo.options.icon;
+            const iconData = classInfo != null ? classInfo.options.icon : null;
 
             const classNode = node.addChild( 
                 (node) => 

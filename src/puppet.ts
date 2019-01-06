@@ -2198,6 +2198,7 @@ export module puppet
             const errors: any = {};
             const hints: any = {};
             const values: any = {};
+            const classHints: any = compiled.hints;
 
             for (const name of compiled.resolvedProperties.getKeys())
             {
@@ -2244,7 +2245,8 @@ export module puppet
                 "defaults": defaultValues,
                 "types": types,
                 "errors": errors,
-                "hints": hints
+                "propertyHints": hints,
+                "hints": classHints
             }
         }
 
@@ -2323,7 +2325,7 @@ export module puppet
                 "defaults": defaultValues,
                 "types": types,
                 "errors": errors,
-                "hints": hints,
+                "propertyHints": hints,
                 "fields": Object.keys(compiled.definedType.params)
             }
         }
