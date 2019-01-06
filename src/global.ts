@@ -2,7 +2,6 @@
 import { ProjectsModel } from "./projects"
 import { ProjectsWindow } from "./windows/projects/window"
 import { WorkspaceWindow } from "./windows/workspace/window"
-import { CreateEnvironmentWindow } from "./windows/create_environment/window"
 import { puppet } from "./puppet"
 import { Menu } from "electron";
 
@@ -18,32 +17,6 @@ let current_workspace: puppet.Workspace;
 function initMenu()
 {
     workspace_menu = Menu.buildFromTemplate([
-        {
-            label: 'Edit',
-            submenu: [
-                {
-                    label: 'New Environment',
-                    async click () 
-                    { 
-                        const window = new CreateEnvironmentWindow();
-
-                        const env = await window.show();
-                        if (env == null)
-                            return;
-
-                        const workspace: puppet.Workspace = getCurrentWorkspace();
-                        if (workspace == null)
-                            return;
-
-                        const success = await workspace.createEnvironment(env);
-                        if (!success)
-                            return;
-
-                        workspace_window.browserWindow.webContents.send('refresh');
-                    }
-                }
-            ]
-        },
         {
             label: 'View',
             submenu: [

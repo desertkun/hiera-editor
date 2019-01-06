@@ -42,4 +42,5 @@ export interface IpcAPI
     removeEnvironment(name: string): Promise<boolean>;
     getGlobalModules(): Promise<any>;
     getEnvironmentModules(env: string): Promise<any>;
+    createEnvironment(): Promise<boolean>;
 }

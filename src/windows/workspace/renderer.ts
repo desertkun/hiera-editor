@@ -8,6 +8,7 @@ const $ = require("jquery");
 const ellipsis = require('text-ellipsis');
 const electron = require('electron');
 const remote = electron.remote;
+const {Menu, MenuItem} = remote;
 const app = remote.app;
 const path = require('path');
 const nativeImage = electron.nativeImage;
@@ -1091,6 +1092,27 @@ export class WorkspaceRenderer
         $('#workspace').removeClass('disabled');
         this.openEditor();
         await this.checkEmpty();
+
+        $('#workspace-menu').click(function (event: any)
+        {
+            event.preventDefault();
+
+            const contextMenu = new Menu();
+
+            contextMenu.append(new MenuItem({
+                label: 'New Environment',
+                async click () 
+                { 
+                    const success = await ipc.createEnvironment();
+                    if (!success)
+                        return;
+
+                    await renderer.refresh();
+                }
+            }));
+
+            contextMenu.popup({window: remote.getCurrentWindow()})
+        });
 
         ipcRenderer.on('refresh', async function (event: any)
         {

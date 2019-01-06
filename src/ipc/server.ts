@@ -3,6 +3,7 @@ import { dialog, OpenDialogOptions, Menu } from "electron";
 import { projects_list, projects_window, workspace_window, setCurrentWorkspace, getCurrentWorkspace, workspace_menu } from "../global"
 import { AssignClassWindow } from "../windows/assign_class/window"
 import { CreateResourceWindow } from "../windows/create_resource/window"
+import { CreateEnvironmentWindow } from "../windows/create_environment/window"
 import { ProjectsModel, ProjectModel } from "../projects"
 import { puppet } from "../puppet"
 
@@ -664,6 +665,21 @@ export class IpcServer implements IpcAPI
             return false;
     
         return await workspace.getEnvironmentModules(env);
+    }
+
+    public async createEnvironment(): Promise<boolean>
+    {
+        const window = new CreateEnvironmentWindow();
+
+        const env = await window.show();
+        if (env == null)
+            return;
+
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+        if (workspace == null)
+            return;
+
+        return await workspace.createEnvironment(env);
     }
 }
 
