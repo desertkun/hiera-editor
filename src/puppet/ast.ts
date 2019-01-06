@@ -689,6 +689,24 @@ export class PuppetASTDefault extends PuppetASTObject
     }
 }
 
+export class PuppetASTNOP extends PuppetASTObject
+{
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        // do nothing
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTNOP(args);
+    }
+}
+
 export class PuppetASTKeyedEntry extends PuppetASTObject
 {
     public readonly key: PuppetASTObject;
@@ -1745,7 +1763,8 @@ export class PuppetASTParser
             "array": PuppetASTArray.Create,
             "regexp": PuppetASTRegularExpression.Create,
             "=~": PuppetASTRegularExpressionCheck.Create,
-            "hash": PuppetASTHash.Create
+            "hash": PuppetASTHash.Create,
+            "nop": PuppetASTNOP.Create
         };
     }
 
