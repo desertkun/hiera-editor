@@ -13,25 +13,22 @@ import { throws } from "assert";
 
 export module puppet
 {
+    export class RubyPath
+    {
+        public path: string;
+        public rubyPath: string;
+        public gemPath: string;
+    }
+
     export class Ruby
     {
-        public static Path(): string
+        public static Path(): RubyPath
         {
-            if (process.platform == "darwin")
-            {
-                return require('traveling-ruby-osx');
-            }
-
             if (process.platform == "win32")
             {
-                return require('traveling-ruby-win32');
+                return require('rubyjs-win32');
             }
             
-            if (process.platform == "linux")
-            {
-                return require('traveling-ruby-linux-x86_64');
-            }
-
             return null;
         }
 
@@ -50,7 +47,7 @@ export module puppet
         
             try
             {
-                await async.execFile(Ruby.Path(), argsTotal, cwd);
+                await async.execFile(Ruby.Path().rubyPath, argsTotal, cwd);
                 return true;
             }
             catch (e)
@@ -73,7 +70,7 @@ export module puppet
                 argsTotal.push(arg);
             }
 
-            return async.execFileInOut(Ruby.Path(), argsTotal, cwd, data);
+            return async.execFileInOut(Ruby.Path().rubyPath, argsTotal, cwd, data);
         }
     }
 
