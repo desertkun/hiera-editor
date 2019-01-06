@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "postinstall": "npx npmpd && npx run-script-os",
-    "install:darwin": "BUNDLE_GEMFILE=./ruby/Gemfile ./node_modules/traveling-ruby-osx/bin/bundle install",
+    "install:darwin": "./node_modules/rubyjs-darwin/bin/gem install bundler && BUNDLE_GEMFILE=./ruby/Gemfile ./node_modules/rubyjs-darwin/bin/bundle install",
     "install:win32": "cmd /C \"set BUNDLE_GEMFILE=ruby\\Gemfile && node_modules\\rubyjs-win32\\bin\\gem install bundler && node_modules\\rubyjs-win32\\bin\\bundle install\"",
     "test": "mocha --timeout 15000 dist/tests/**/*.js",
     "package-mac": "npx electron-packager . --overwrite --platform=darwin --arch=x64 --icon=assets/icons/icon.icns --prune=true --out=release-builds",
@@ -58,7 +58,7 @@
     "yaml": "^1.0.1"
   },
   "darwinDependencies": {
-    "traveling-ruby-osx": "latest"
+    "rubyjs-darwin": "latest"
   },
   "win32Dependencies": {
     "rubyjs-win32": "latest"

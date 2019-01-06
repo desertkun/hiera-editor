@@ -28,6 +28,10 @@ export module puppet
             {
                 return require('rubyjs-win32');
             }
+            else if (process.platform == "darwin")
+            {
+                return require('rubyjs-darwin');
+            }
             
             return null;
         }

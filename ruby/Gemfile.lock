@@ -1,6 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    facter (2.5.1)
     facter (2.5.1-x64-mingw32)
       ffi (~> 1.9.5)
     facter (2.5.1-x86-mingw32)
@@ -14,6 +15,15 @@ GEM
     locale (2.1.2)
     minitar (0.6.1)
     multi_json (1.13.1)
+    puppet (6.1.0)
+      facter (> 2.0.1, < 4)
+      fast_gettext (~> 1.1.2)
+      hiera (>= 3.2.1, < 4)
+      httpclient (~> 2.8)
+      locale (~> 2.1)
+      multi_json (~> 1.10)
+      puppet-resource_api (~> 1.5)
+      semantic_puppet (~> 1.0)
     puppet (6.1.0-x64-mingw32)
       facter (> 2.0.1, < 4)
       fast_gettext (~> 1.1.2)
@@ -63,6 +73,7 @@ GEM
     yard (0.9.16)
 
 PLATFORMS
+  ruby
   x64-mingw32
   x86-mingw32
 
