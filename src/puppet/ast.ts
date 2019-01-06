@@ -6,6 +6,7 @@ import { TouchBarSlider } from "electron";
 export abstract class Resolver
 {
     public async abstract resolveClass(className: string): Promise<PuppetASTClass>;
+    public async abstract resolveFunction(name: string): Promise<PuppetASTFunction>;
     public async abstract resolveGlobalVariable(name: string): Promise<string>;
 }
 
@@ -41,7 +42,7 @@ export class PuppetASTObject
 
     public async resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
-        if (this._resolved || this._beingResolved)
+        if (this._beingResolved)
             return this._resolved;
 
         this._beingResolved = true;
@@ -132,6 +133,18 @@ class ResolveError extends Error
 type PuppetASTInvokeFunctor = (invoke: PuppetASTInvoke, args: Array<any>,
                                context: PuppetASTContainerContext, resolver: Resolver) => Promise<any>;
 
+class PuppetASTReturn extends Error
+{
+    public value: any;
+
+    constructor(value: any)
+    {
+        super();
+
+        this.value = value;
+    }
+}
+
 export class PuppetASTInvoke extends PuppetASTObject
 {
     public readonly functor: PuppetASTQualifiedName;
@@ -159,6 +172,11 @@ export class PuppetASTInvoke extends PuppetASTObject
         {
             const className = args[0];
             await resolver.resolveClass(className);
+        },
+        "return": async function(invoke: PuppetASTInvoke, args: Array<any>,
+                                  context: PuppetASTContainerContext, resolver: Resolver)
+        {
+            throw new PuppetASTReturn(args[0]);
         }
     };
 
@@ -166,9 +184,9 @@ export class PuppetASTInvoke extends PuppetASTObject
     {
         super();
 
-        const obj: any = args[0];
-        this.functor = obj["functor"];
-        this.args = obj["args"];
+        const obj: OrderedDictionary = <OrderedDictionary>args[0];
+        this.functor = obj.get("functor");
+        this.args = obj.get("args");
     }
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
@@ -354,10 +372,10 @@ export class PuppetASTCase extends PuppetASTObject
 
         for (const entry of this.cases.entries)
         {
-            const obj: any = entry;
+            const obj: OrderedDictionary = <OrderedDictionary>entry;
 
-            const when: PuppetASTList = obj.when;
-            const then: PuppetASTObject = obj.then;
+            const when: PuppetASTList = obj.get("when");
+            const then: PuppetASTObject = obj.get("then");
 
             let matches = false;
 
@@ -561,6 +579,59 @@ export class PuppetASTCondition extends PuppetASTObject
     }
 }
 
+type PuppetASTMathTest = (a: number, b: number) => number;
+
+export class PuppetASTMath extends PuppetASTObject
+{
+    public readonly test: PuppetASTMathTest;
+    public readonly a: PuppetASTObject;
+    public readonly b: PuppetASTObject;
+
+    constructor(test: PuppetASTMathTest, args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this.test = test;
+        this.a = args[0];
+        this.b = args[1];
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        const resolvedA = await this.a.resolve(context, resolver);
+        const resolvedB = await this.b.resolve(context, resolver);
+        return this.test(resolvedA, resolvedB);
+    }
+
+    public static Plus(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTMath((a: any, b: any) => {
+            return a + b;
+        }, args);
+    }
+
+    public static Minus(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTMath((a: any, b: any) => {
+            return a - b;
+        }, args);
+    }
+
+    public static Multiply(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTMath((a: any, b: any) => {
+            return a * b;
+        }, args);
+    }
+
+    public static Divide(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTMath((a: any, b: any) => {
+            return a / b;
+        }, args);
+    }
+}
+
 export class PuppetASTAndCondition extends PuppetASTObject
 {
     public readonly a: PuppetASTObject;
@@ -650,11 +721,11 @@ export class PuppetASTIf extends PuppetASTObject
     {
         super();
 
-        const obj: any = args[0];
+        const obj: OrderedDictionary = <OrderedDictionary>args[0];
 
-        this.test = obj["test"];
-        this.then = obj["then"];
-        this.else = obj["else"];
+        this.test = obj.get("test");
+        this.then = obj.get("then");
+        this.else = obj.get("else");
     }
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
@@ -1052,6 +1123,176 @@ export class PuppetASTBlock extends PuppetASTObject
     }
 }
 
+export class PuppetASTFunctionCall implements PuppetASTContainerContext
+{
+    private readonly name: string;
+    private readonly body: PuppetASTList;
+    private readonly params: OrderedDictionary;
+
+    public readonly args: Array<PuppetASTObject>;
+    public readonly resolvedLocals: Dictionary<string, PuppetASTResolvedProperty>;
+
+    constructor(name: string, body: PuppetASTList, params: OrderedDictionary, args: PuppetASTObject[])
+    {        
+        this.name = name;
+        this.body = body;
+        this.params = params;
+        this.args = args;
+
+        this.resolvedLocals = new Dictionary();
+    }
+
+    public async apply(caller: PuppetASTObject, resolver: Resolver): Promise<any>
+    {
+        const passedArgs = this.args.length;
+        const haveArgs = this.params.length;
+
+        if (passedArgs > haveArgs)
+        {
+            throw new ResolveError(caller, "Passed way too many arguments");
+        }
+
+        for (let i = 0; i < passedArgs; i++)
+        {
+            const arg = this.args[i];
+            const name = this.params.keys[i];
+            const param: OrderedDictionary = this.params.get(name);
+
+            const pp = new PuppetASTResolvedProperty();
+
+            if (param.get("type") != null)
+                pp.type = param.get("type");
+
+            pp.value = await arg.resolve(this, resolver);
+
+            this.setProperty(name, pp)
+        }
+
+        for (let i = passedArgs; i < haveArgs; i++)
+        {
+            const name = this.params.keys[i];
+            const param: OrderedDictionary = this.params.get(name);
+
+            if (!param.has("value"))
+                throw new ResolveError(caller, "Param " + name + " is has no default value and was not provided");
+                            
+            const pp = new PuppetASTResolvedProperty();
+
+            if (param.get("type") != null)
+                pp.type = param.get("type");
+
+            const value: PuppetASTObject = param.get("value");
+
+            pp.value = await value.resolve(this, resolver);
+
+            this.setProperty(name, pp)
+        }
+
+        try
+        {
+            await this.body.resolve(this, resolver);
+        }
+        catch (e)
+        {
+            if (e instanceof PuppetASTReturn)
+            {
+                return e.value;
+            }
+            else
+            {
+                throw e;
+            }
+        }
+
+        return null;
+    }
+
+    public setProperty(name: string, pp: PuppetASTResolvedProperty): void
+    {
+        this.resolvedLocals.put(name, pp);
+    }
+
+    public getProperty(name: string): PuppetASTResolvedProperty
+    {
+        return this.resolvedLocals.get(name);
+    }
+
+    public getName(): string
+    {
+        return this.name;
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTFunction(args);
+    }
+}
+
+export class PuppetASTFunction extends PuppetASTObject
+{
+    private readonly name: PuppetASTObject;
+    private readonly body: PuppetASTList;
+    private readonly params: OrderedDictionary;
+
+    public readonly args: Array<PuppetASTObject>;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        const _args: OrderedDictionary = <OrderedDictionary>args[0];
+        this.name = _args.get("name");
+        this.body = _args.get("body");
+        this.params = _args.get("params");
+    }
+
+    public async apply(context: PuppetASTContainerContext, resolver: Resolver, args: PuppetASTObject[]): Promise<any>
+    {
+        const name = await this.name.resolve(context, resolver);
+        const call = new PuppetASTFunctionCall(name, this.body, this.params, args);
+        return await call.apply(this, resolver);
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTFunction(args);
+    }
+}
+
+export class PuppetASTCall extends PuppetASTObject
+{
+    public readonly args: Array<PuppetASTObject>;
+    public readonly functor: PuppetASTObject;
+    public readonly functorArgs: PuppetASTList;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        const args_: OrderedDictionary = <OrderedDictionary>args[0];
+
+        this.functor = args_.get("functor");
+        this.functorArgs = args_.get("args");
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        const functorName = await this.functor.resolve(context, resolver);
+        const function_ = await resolver.resolveFunction(functorName);
+        return await function_.apply(context, resolver, this.functorArgs.entries);
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTCall(args);
+    }
+}
+
 export class PuppetASTResolvedProperty
 {
     private _hasType: boolean;
@@ -1160,7 +1401,7 @@ export class PuppetASTResolvedProperty
 export class PuppetASTClass extends PuppetASTObject implements PuppetASTContainerContext
 {
     public readonly name: string;
-    public readonly params: any;
+    public readonly params: OrderedDictionary;
     public readonly body: PuppetASTObject;
     public readonly parent: PuppetASTPrimitive;
 
@@ -1171,12 +1412,12 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
     {
         super();
 
-        const metaData: any = args[0];
+        const metaData: OrderedDictionary = <OrderedDictionary>args[0];
 
-        this.name = metaData["name"].value;
-        this.body = metaData["body"];
-        this.params = metaData["params"] || {};
-        this.parent = metaData["parent"];
+        this.name = metaData.get("name").value;
+        this.body = metaData.get("body");
+        this.params = metaData.get("params") || new OrderedDictionary();
+        this.parent = metaData.get("parent");
         this._resolvedParent = null;
         this.resolvedProperties = new Dictionary();
     }
@@ -1228,12 +1469,12 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
 
         console.log("Resolving class " + this.name);
 
-        for (const paramName in this.params)
+        for (const paramName of this.params.keys)
         {
-            const param = this.params[paramName];
+            const param: OrderedDictionary = this.params.get(paramName);
 
-            let type = param.type;
-            const value = param.value;
+            let type = param.get("type");
+            const value = param.get("value");
 
             if (type instanceof PuppetASTObject)
             {
@@ -1314,17 +1555,17 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
 
 export class PuppetASTResource extends PuppetASTObject
 {
-    private readonly ops: any;
+    private readonly ops: OrderedDictionary;
     private readonly title: PuppetASTObject;
     private _resolvedTitle: string;
     private readonly _resolvedProperties: Dictionary<string, PuppetASTResolvedProperty>;
 
-    constructor(args: any)
+    constructor(args: OrderedDictionary)
     {
         super();
 
-        this.ops = args.ops;
-        this.title = args.title;
+        this.ops = args.get("ops");
+        this.title = args.get("title");
         this._resolvedProperties = new Dictionary();
     }
 
@@ -1362,11 +1603,6 @@ export class PuppetASTResource extends PuppetASTObject
             }
         }
     }
-
-    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
-    {
-        return new PuppetASTResource(args);
-    }
 }
 
 export class PuppetASTResourcesEntry extends PuppetASTObject
@@ -1380,10 +1616,10 @@ export class PuppetASTResourcesEntry extends PuppetASTObject
     {
         super();
 
-        const values: any = args[0];
+        const values: OrderedDictionary = <OrderedDictionary>args[0];
 
-        this.bodies = values.bodies;
-        this.type = values.type;
+        this.bodies = values.get("bodies");
+        this.type = values.get("type");
         this.entries = new Dictionary();
     }
 
@@ -1398,7 +1634,7 @@ export class PuppetASTResourcesEntry extends PuppetASTObject
 
         for (const body of this.bodies.entries)
         {
-            const resource = new PuppetASTResource(<any>(body));
+            const resource = new PuppetASTResource(<OrderedDictionary>(body));
             await resource.resolve(context, resolver);
             this.entries.put(resource.getTitle(), resource);
         }
@@ -1447,7 +1683,7 @@ export class PuppetASTResolvedDefinedType implements PuppetASTContainerContext
 export class PuppetASTDefinedType extends PuppetASTObject
 {
     public readonly name: string;
-    public readonly params: any;
+    public readonly params: OrderedDictionary;
     public readonly body: PuppetASTObject;
 
     public getName(): string
@@ -1459,11 +1695,11 @@ export class PuppetASTDefinedType extends PuppetASTObject
     {
         super();
 
-        const metaData: any = args[0];
+        const metaData: OrderedDictionary = <OrderedDictionary>args[0];
 
-        this.name = metaData["name"].value;
-        this.body = metaData["body"];
-        this.params = metaData["params"] || {};
+        this.name = metaData.get("name").value;
+        this.body = metaData.get("body");
+        this.params = metaData.get("params") || new OrderedDictionary();
     }
     
     public async resolveAsResource(title: string, properties: any, resolver: Resolver): Promise<PuppetASTResolvedDefinedType>
@@ -1492,12 +1728,12 @@ export class PuppetASTDefinedType extends PuppetASTObject
     {
         console.log("Resolving defined type " + this.name);
 
-        for (const paramName in this.params)
+        for (const paramName of this.params.keys)
         {
-            const param = this.params[paramName];
+            const param: OrderedDictionary = this.params.get(paramName);
 
-            let type = param.type;
-            const value = param.value;
+            let type = param.get("type");
+            const value = param.get("value");
 
             if (type instanceof PuppetASTObject)
             {
@@ -1731,6 +1967,67 @@ export class PuppetASTVariable extends PuppetASTObject
     }
 }
 
+export class OrderedDictionary extends PuppetASTObject
+{
+    private _value: any;
+    private _keys: string[];
+
+    constructor()
+    {
+        super();
+
+        this._value = {};
+        this._keys = [];
+    }
+
+    public get length(): number
+    {
+        return this._keys.length;
+    }
+
+    public has(key: string): boolean
+    {
+        return this._value.hasOwnProperty(key);
+    }
+
+    public get(key: string): any
+    {
+        return this._value[key];
+    }
+
+    public delete(key: string)
+    {
+        const i = this._keys.indexOf(key);
+        if (i < 0)
+            return;
+        this._keys.splice(i, 1);
+        delete this._value[key];
+    }
+
+    public put(key: string, value: any)
+    {
+        if (this._keys.indexOf(key) < 0)
+        {
+            this._keys.push(key);
+        }
+
+        this._value[key] = value;
+    }
+
+    public get keys(): string[]
+    {
+        return this._keys;
+    }
+    
+    *[Symbol.iterator]()
+    {
+        for (const key of this._keys)
+        {
+            yield this._value[key];
+        }
+    }
+}
+
 
 export class PuppetASTParser
 {
@@ -1766,11 +2063,16 @@ export class PuppetASTParser
             "==": PuppetASTCondition.Equal,
             "!=": PuppetASTCondition.NotEqual,
             "in": PuppetASTCondition.In,
+            "+": PuppetASTMath.Plus,
+            "-": PuppetASTMath.Minus,
+            "*": PuppetASTMath.Multiply,
+            "/": PuppetASTMath.Divide,
             "and": PuppetASTAndCondition.Create,
             "or": PuppetASTOrCondition.Create,
             "paren": PuppetASTParenthesis.Create,
             "if": PuppetASTIf.Create,
-            "call": PuppetASTIgnored.Create("call"),
+            "function": PuppetASTFunction.Create,
+            "call": PuppetASTCall.Create,
             "exported-query": PuppetASTIgnored.Create("exported-query"),
             "collect": PuppetASTIgnored.Create("collect"),
             "invoke": PuppetASTInvoke.Create,
@@ -1817,12 +2119,11 @@ export class PuppetASTParser
             {
                 const isHash = obj["#"];
 
-                const result: any = {};
+                const result = new OrderedDictionary();
                 for (let i = 0; i < isHash.length; i += 2)
                 {
-                    result[isHash[i]] = this.parse(isHash[i + 1]);
+                    result.put(isHash[i], this.parse(isHash[i + 1]));
                 }
-
                 return result;
             }
             else if (Array.isArray(obj))

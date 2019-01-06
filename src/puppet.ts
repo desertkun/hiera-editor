@@ -8,7 +8,7 @@ import {Dictionary} from "./dictionary";
 const slash = require('slash');
 const PromisePool = require('es6-promise-pool');
 
-import {PuppetASTParser, PuppetASTClass, PuppetASTDefinedType, PuppetASTResolvedDefinedType, Resolver} from "./puppet/ast";
+import {PuppetASTParser, PuppetASTClass, PuppetASTDefinedType, PuppetASTFunction, PuppetASTResolvedDefinedType, Resolver} from "./puppet/ast";
 import { throws } from "assert";
 
 export module puppet
@@ -280,6 +280,101 @@ export module puppet
         }
     }
 
+    class PuppetFunctionInfo
+    {
+        public readonly name: string;
+        private readonly info: any;
+        private readonly _tags: any;
+        private readonly _options: any;
+        private readonly _description: string;
+        private readonly _modules: PuppetModulesInfo;
+
+        constructor(name: string, info: any, modules: PuppetModulesInfo)
+        {
+            this.name = name;
+            this.info = info;
+            this._modules = modules;
+            this._options = {};
+            this._tags = {};
+
+            const docstring = info["docstring"];
+            if (docstring)
+            {
+                this._description = docstring["text"];
+
+                const tags = docstring["tags"];
+                if (tags)
+                {
+                    for (const tag of tags)
+                    {
+                        const tag_name = tag["tag_name"];
+                        const name = tag["name"];
+
+                        if (tag_name == "option" && name == "editor")
+                        {
+                            this._options[tag["opt_name"]] = tag["opt_text"];
+                        }
+
+                        const text = tag["text"];
+                        if (text)
+                        {
+                            if (this._tags[tag_name] == null)
+                                this._tags[tag_name] = {};
+
+                            this._tags[tag_name][name] = text;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                this._description = "";
+            }
+        }
+
+        public get modulesInfo(): PuppetModulesInfo
+        {
+            return this._modules;
+        }
+
+        public get source(): string
+        {
+            return this.info["source"];
+        }
+
+        public get description(): string
+        {
+            return this._description;
+        }
+
+        public get options(): any
+        {
+            return this._options;
+        }
+
+        public get tags(): any
+        {
+            return this._tags;
+        }
+
+        public get file(): string
+        {
+            return this.info["file"];
+        }
+
+        public dump()
+        {
+            return {
+                "name": this.name,
+                "file": this.info["file"],
+                "inherits": this.info["inherits"],
+                "description": this.description,
+                "options": this.options,
+                "tags": this.tags
+            }
+        }
+    }
+
     class CompiledPromisesCallback
     {
         public callback: any;
@@ -302,6 +397,7 @@ export module puppet
         private readonly _modulesPath: string;
         private readonly _classes: Dictionary<string, PuppetClassInfo>;
         private readonly _definedTypes: Dictionary<string, PuppetDefinedTypeInfo>;
+        private readonly _functions: Dictionary<string, PuppetFunctionInfo>;
 
         constructor(modulesPath: string, cachePath: string, data: any)
         {
@@ -309,6 +405,7 @@ export module puppet
             this._cachePath = cachePath;
             this._classes = new Dictionary();
             this._definedTypes = new Dictionary();
+            this._functions = new Dictionary();
 
             for (const puppetClass of data["puppet_classes"])
             {
@@ -321,11 +418,22 @@ export module puppet
                 const name: string = definedType["name"];
                 this._definedTypes.put(name, new PuppetDefinedTypeInfo(name, definedType, this));
             }
+
+            for (const function_ of data["puppet_functions"])
+            {
+                const name: string = function_["name"];
+                this._functions.put(name, new PuppetFunctionInfo(name, function_, this));
+            }
         }
 
         public getCompiledClassPath(fileName: string)
         {
             return path.join(this._cachePath, "obj", fileName + ".o");
+        }
+
+        public getCompiledFunctionPath(fileName: string)
+        {
+            return path.join(this._cachePath, "func", fileName + ".o");
         }
 
         public async searchClasses(search: string, results: Array<any>): Promise<void>
@@ -369,6 +477,7 @@ export module puppet
             const result: Array<any> = [];
             const classes = this.classes.getValues();
             const definedTypes = this.definedTypes.getValues();
+            const functions = this.functions.getValues();
 
             const _cachedStats: any = {};
             const _realStats: any = {};
@@ -389,6 +498,15 @@ export module puppet
 
                 _cachedStats[definedType.file] = async.fileStat(file);
                 _realStats[definedType.file] = async.fileStat(realFile);
+            }
+
+            for (let function_ of functions)
+            {
+                const file = this.getCompiledFunctionPath(function_.file);
+                const realFile = path.join(this._modulesPath, function_.file);
+
+                _cachedStats[function_.file] = async.fileStat(file);
+                _realStats[function_.file] = async.fileStat(realFile);
             }
 
             const cachedStats = await async.PromiseAllObject(_cachedStats);
@@ -490,6 +608,54 @@ export module puppet
                 }
             }
 
+            for (let function_ of functions)
+            {
+                const file = path.join(this._cachePath, "func", function_.file + ".o");
+                const realFile = path.join(this._modulesPath, function_.file);
+
+                if (cachedStats[function_.file])
+                {
+                    const cachedStat = cachedStats[function_.file];
+                    const cachedTime: Number = cachedStat.mtimeMs;
+
+                    const realStat = realStats[function_.file];
+                    const realTime: Number = realStat.mtimeMs;
+
+                    if (cachedTime >= realTime)
+                    {
+                        // compiled file is up-to-date
+                        continue;
+                    }
+                }
+
+                try
+                {
+                    async function compile(file: string, modulesPath: string, source: string)
+                    {
+                        console.log("Compiling function " + file + "...");
+
+                        try
+                        {
+                            await puppet.Ruby.CallInOut("puppet-parser.rb", [file], modulesPath, source);
+                            console.log("Compiling function " + file + " done!");
+                        }
+                        catch (e)
+                        {
+                            console.log("Failed to compile " + file + ": " + e);
+                        }
+
+                        cb.done += 1;
+
+                        if (cb.callback) cb.callback(cb.done);
+                    }
+
+                    result.push([compile, file, this._modulesPath, function_.source]);
+                }
+                catch (e) {
+                    console.log(e);
+                }
+            }
+
             return result;
         }
 
@@ -503,6 +669,11 @@ export module puppet
             return this._definedTypes;
         }
 
+        public get functions(): Dictionary<string, PuppetFunctionInfo>
+        {
+            return this._functions;
+        }
+
         public get modulesPath(): string
         {
             return this._modulesPath;
@@ -511,6 +682,11 @@ export module puppet
         public get cachePath(): string
         {
             return this._cachePath;
+        }
+
+        public findFunction(name: string): PuppetFunctionInfo
+        {
+            return this._functions.get(name);
         }
 
         public findClass(className: string): PuppetClassInfo
@@ -1013,6 +1189,19 @@ export module puppet
             return this._workspace.modulesInfo.findDefinedType(definedTypeName);
         }
 
+        public findFunctionInfo(className: string): PuppetFunctionInfo
+        {
+            if (this._modulesInfo)
+            {
+                const localFunctionInfo = this._modulesInfo.findFunction(className);
+
+                if (localFunctionInfo)
+                    return localFunctionInfo;
+            }
+
+            return this._workspace.modulesInfo.findFunction(className);
+        }
+
         public async create()
         {
             if (!await async.isDirectory(this.dataPath))
@@ -1484,6 +1673,7 @@ export module puppet
         private _facts: any;
 
         private readonly _compiledClasses: Dictionary<string, PuppetASTClass>;
+        private readonly _compiledFunctions: Dictionary<string, PuppetASTFunction>;
         private readonly _compiledResources: Dictionary<string, Dictionary<string, ResolvedResource>>;
 
         constructor(env: Environment, name: string, filePath: string, nodePath: string, parent: Folder)
@@ -1498,6 +1688,7 @@ export module puppet
 
             this._compiledClasses = new Dictionary();
             this._compiledResources = new Dictionary();
+            this._compiledFunctions = new Dictionary();
         }
 
         static NodePath(name: string): string
@@ -1604,6 +1795,11 @@ export module puppet
                         return zis.resolveClass(className, global);
                     }
 
+                    public resolveFunction(name: string): Promise<PuppetASTFunction>
+                    {
+                        return zis.resolveFunction(name, global);
+                    }
+
                     public async resolveGlobalVariable(name: string): Promise<string>
                     {
                         return global(name);
@@ -1618,6 +1814,45 @@ export module puppet
             }
 
             return clazz;
+        }
+
+        public async resolveFunction(name: string, global: GlobalVariableResolver): Promise<PuppetASTFunction>
+        {
+            name = Node.fixClassName(name);
+
+            if (this._compiledFunctions.has(name))
+            {
+                return this._compiledFunctions.get(name);
+            }
+
+            const zis = this;
+            console.log("Compiling function " + name + " (for environment " + this._name + ")");
+
+            const functionInfo = this.env.findFunctionInfo(name);
+
+            if (functionInfo == null)
+                throw new CompilationError("No such class info: " + name);
+
+            const compiledPath = functionInfo.modulesInfo.getCompiledFunctionPath(functionInfo.file);
+            let parsedJSON = null;
+
+            try
+            {
+                parsedJSON = await async.readJSON(compiledPath);
+            }
+            catch (e)
+            {
+                throw new CompilationError("Failed to parse function " + name);
+            }
+
+            const obj = PuppetASTParser.Parse(parsedJSON);
+
+            if (!(obj instanceof PuppetASTFunction))
+                throw "Not a function";
+
+            const function_: PuppetASTFunction = obj;
+            this._compiledFunctions.put(name, function_);
+            return function_;
         }
 
         public async resolveResource(definedTypeName: string, title: string, properties: any, global: GlobalVariableResolver): Promise<ResolvedResource>
@@ -1667,6 +1902,11 @@ export module puppet
                     public resolveClass(className: string): Promise<PuppetASTClass>
                     {
                         return zis.resolveClass(className, global);
+                    }
+
+                    public resolveFunction(name: string): Promise<PuppetASTFunction>
+                    {
+                        return zis.resolveFunction(name, global);
                     }
 
                     public async resolveGlobalVariable(name: string): Promise<string>
@@ -2304,9 +2544,9 @@ export module puppet
                 }
             }
             
-            for (const name in compiled.definedType.params)
+            for (const name of compiled.definedType.params.keys)
             {
-                const defaultParam = compiled.definedType.params[name];
+                const defaultParam = compiled.definedType.params.get(name);
                 const property = compiled.resource.resolvedProperties.get(name);
 
                 if (property == null || defaultParam == null)

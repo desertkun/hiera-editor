@@ -5,7 +5,7 @@ const rmdir = require('rimraf');
 import * as path from "path";
 import * as tmp from "tmp";
 import { puppet } from "../puppet";
-import {PuppetASTAccess, PuppetASTPrimitive, PuppetASTQualifiedName, PuppetASTType, PuppetASTTypeOf} from "../puppet/ast";
+import {PuppetASTAccess, PuppetASTPrimitive, PuppetASTQualifiedName, PuppetASTType, PuppetASTTypeOf, PuppetHintBodyCompilationError} from "../puppet/ast";
 
 const async = require("../async");
 const chai = require('chai');
@@ -49,7 +49,7 @@ async function testRealWorkspace(workspaceName: string, environmentName: string,
 }
 
 async function testSimpleWorkspace(files: any, nodeYAML: any,
-                             f: WorkspaceTestCallback = null, nodeYAMLCommentBefore?: string): Promise<puppet.Node>
+                             f: WorkspaceTestCallback = null, nodeYAMLCommentBefore?: string, functions?: any): Promise<puppet.Node>
 {
     const d = tmp.dirSync();
 
@@ -63,6 +63,16 @@ async function testSimpleWorkspace(files: any, nodeYAML: any,
         for (const fileName in files)
         {
             await async.write(path.join(_m, fileName), files[fileName]);
+        }
+
+        if (functions)
+        {
+            const _f = path.join(d.name, "modules", "test", "functions");
+            await async.makeDirectory(_f);
+            for (const fileName in functions)
+            {
+                await async.write(path.join(_f, fileName), functions[fileName]);
+            }
         }
 
         await async.makeDirectory(path.join(d.name, "environments"));
@@ -422,7 +432,46 @@ describe('Workspaces', () =>
             environment: puppet.Environment,
             node: puppet.Node) =>
         {
-            await expect(node.acquireClass("test")).to.be.rejectedWith("Welp");
+            const class_ = await node.acquireClass("test");
+
+            if (!class_.hasHints)
+            {
+                assert.fail("Expected to have a hint")
+            }
+
+            expect(class_.hints[0]).to.be.instanceOf(PuppetHintBodyCompilationError).
+                and.have.deep.property("message", "Failed to resolve class body: Welp");
+        });
+    });
+
+    it('functions', () =>
+    {
+        return testSimpleWorkspace({
+            "init.pp": `
+                class test ($v = test::test_summ(1), $v2 = test::test_summ(1, 2)) {}
+            `
+        }, {"classes": ["test"]}, async (
+            workspace: puppet.Workspace,
+            environment: puppet.Environment,
+            node: puppet.Node) =>
+        {
+            const class_ = await node.acquireClass("test");
+            
+            {
+                const test = class_.resolvedProperties.get("v");
+                expect(test.value).to.equal(11);
+            }
+
+            {
+                const test = class_.resolvedProperties.get("v2");
+                expect(test.value).to.equal(3);
+            }
+        }, null, {
+            "ff3.pp": `
+                function test::test_summ (Number $a, Number $b = 10) {
+                    return $a + $b
+                }
+            `
         });
     });
 
