@@ -25,6 +25,9 @@ To build the project youself you'll need install [Node](https://nodejs.org/en/do
 clone this repo, open it in the terminal, and just do `npm install`, followed by `npm start` to run it. 
 It also has debug configurations for Visual Studio Code.
 
+# License
+MIT
+
 ## Todo
 * Module management (installation, updating, removing)
 * Retreive facts from target machine for accurate compilation of default values
