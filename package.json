@@ -55,7 +55,8 @@
     "npm": "^5.10.0",
     "slash": "^2.0.0",
     "text-ellipsis": "^1.0.3",
-    "yaml": "^1.0.1"
+    "yaml": "^1.0.1",
+    "static-eval": ">=2.0.0"
   },
   "darwinDependencies": {
     "rubyjs-darwin": "latest"
