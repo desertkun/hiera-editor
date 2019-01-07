@@ -1831,7 +1831,9 @@ export module puppet
             const functionInfo = this.env.findFunctionInfo(name);
 
             if (functionInfo == null)
-                throw new CompilationError("No such class info: " + name);
+            {
+                return null;   
+            }
 
             const compiledPath = functionInfo.modulesInfo.getCompiledFunctionPath(functionInfo.file);
             let parsedJSON = null;
@@ -2437,12 +2439,14 @@ export module puppet
             const types: any = {};
             const errors: any = {};
             const hints: any = {};
+            const fields: string[] = [];
             const values: any = {};
             const classHints: any = compiled.hints;
 
-            for (const name of compiled.resolvedProperties.getKeys())
+            for (const name of compiled.resolvedFields.getKeys())
             {
                 const property = compiled.getResolvedProperty(name);
+                fields.push(name);
 
                 if (property.hasType)
                 {
@@ -2486,7 +2490,8 @@ export module puppet
                 "types": types,
                 "errors": errors,
                 "propertyHints": hints,
-                "hints": classHints
+                "hints": classHints,
+                "fields": fields
             }
         }
 
@@ -2501,6 +2506,7 @@ export module puppet
 
             const defaultValues: any = {};
             const types: any = {};
+            const fields: string[] = [];
             const errors: any = {};
             const hints: any = {};
             const values: any = {};
@@ -2518,9 +2524,9 @@ export module puppet
                 }
             }
 
-            for (const name of compiled.resource.resolvedProperties.getKeys())
+            for (const name of compiled.resource.resolvedFields.getKeys())
             {
-                const property = compiled.resource.resolvedProperties.get(name);
+                const property = compiled.resource.resolvedFields.get(name);
 
                 if (property.hasType)
                 {
@@ -2542,22 +2548,15 @@ export module puppet
                 {
                     hints[name] = property.hints;
                 }
-            }
-            
-            for (const name of compiled.definedType.params.keys)
-            {
-                const defaultParam = compiled.definedType.params.get(name);
-                const property = compiled.resource.resolvedProperties.get(name);
 
-                if (property == null || defaultParam == null)
-                    continue;
-
-                if (property.hasValue && defaultParam.hasOwnProperty("value"))
+                if (property.hasValue)
                 {
                     defaultValues[name] = property.value;
                 }
-            }
 
+                fields.push(name);
+            }
+            
             return {
                 "icon": classInfo.options.icon,
                 "values": values,
@@ -2566,7 +2565,7 @@ export module puppet
                 "types": types,
                 "errors": errors,
                 "propertyHints": hints,
-                "fields": Object.keys(compiled.definedType.params)
+                "fields": fields
             }
         }
     }

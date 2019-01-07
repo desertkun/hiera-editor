@@ -1,7 +1,6 @@
 
 import {Dictionary} from "../dictionary";
-import { throws } from "assert";
-import { TouchBarSlider } from "electron";
+import { GetBuiltinFunction } from "./builtin";
 
 export abstract class Resolver
 {
@@ -14,6 +13,7 @@ export interface PuppetASTContainerContext
 {
     setProperty(name: string, pp: PuppetASTResolvedProperty): void;
     getProperty(name: string): PuppetASTResolvedProperty;
+    setField(name: string, pp: PuppetASTResolvedProperty): void;
     getName(): string;
 }
 
@@ -118,7 +118,7 @@ export class PuppetASTObject
     }
 }
 
-class ResolveError extends Error
+export class ResolveError extends Error
 {
     public readonly obj: PuppetASTObject;
 
@@ -133,7 +133,7 @@ class ResolveError extends Error
 type PuppetASTInvokeFunctor = (invoke: PuppetASTInvoke, args: Array<any>,
                                context: PuppetASTContainerContext, resolver: Resolver) => Promise<any>;
 
-class PuppetASTReturn extends Error
+export class PuppetASTReturn extends Error
 {
     public value: any;
 
@@ -152,32 +152,7 @@ export class PuppetASTInvoke extends PuppetASTObject
 
     private static readonly InvokeFunctions: any =
     {
-        "fail": async function(invoke: PuppetASTInvoke, args: Array<any>,
-                               context: PuppetASTContainerContext, resolver: Resolver)
-        {
-            throw new ResolveError(invoke, args[0]);
-        },
-        "require": async function(invoke: PuppetASTInvoke, args: Array<any>,
-                                  context: PuppetASTContainerContext, resolver: Resolver)
-        {
-            await resolver.resolveClass(args[0]);
-        },
-        "contain": async function(invoke: PuppetASTInvoke, args: Array<any>,
-                                  context: PuppetASTContainerContext, resolver: Resolver)
-        {
-            await resolver.resolveClass(args[0]);
-        },
-        "include": async function(invoke: PuppetASTInvoke, args: Array<any>,
-                                  context: PuppetASTContainerContext, resolver: Resolver)
-        {
-            const className = args[0];
-            await resolver.resolveClass(className);
-        },
-        "return": async function(invoke: PuppetASTInvoke, args: Array<any>,
-                                  context: PuppetASTContainerContext, resolver: Resolver)
-        {
-            throw new PuppetASTReturn(args[0]);
-        }
+        
     };
 
     constructor(args: Array<PuppetASTObject>)
@@ -192,22 +167,21 @@ export class PuppetASTInvoke extends PuppetASTObject
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         const functorName: string = await this.functor.resolve(context, resolver);
-
-        if (!PuppetASTInvoke.InvokeFunctions.hasOwnProperty(functorName))
+        const builtin = GetBuiltinFunction(functorName);
+    
+        if (builtin == null)
         {
             console.log("Warning: Unknown function: " + functorName);
             return null;
         }
 
-        const f: PuppetASTInvokeFunctor = PuppetASTInvoke.InvokeFunctions[functorName];
-
-        const resolvedArgs = [];
+        const resolvedArgs: any = [];
         for (const arg of this.args.entries)
         {
             resolvedArgs.push(await arg.resolve(context, resolver))
         }
 
-        return await f(this, resolvedArgs, context, resolver);
+        return await builtin(this, context, resolver, resolvedArgs);
     }
 
     public static Create(args: Array<PuppetASTObject>)
@@ -288,6 +262,8 @@ export class PuppetASTAccess extends PuppetASTObject
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         this.accessOf = await this.what.access(this.values, context, resolver);
+        if (this.accessOf == null)
+            return null;
         return await this.accessOf.resolve(context, resolver);
     }
 
@@ -1217,6 +1193,11 @@ export class PuppetASTFunctionCall implements PuppetASTContainerContext
         return this.resolvedLocals.get(name);
     }
 
+    public setField(name: string, pp: PuppetASTResolvedProperty): void
+    {
+        // not applicable
+    }
+
     public getName(): string
     {
         return this.name;
@@ -1284,6 +1265,18 @@ export class PuppetASTCall extends PuppetASTObject
     {
         const functorName = await this.functor.resolve(context, resolver);
         const function_ = await resolver.resolveFunction(functorName);
+        if (function_ == null)
+        {
+            const builtin = GetBuiltinFunction(functorName);
+
+            if (builtin == null)
+            {
+                this.hint(new PuppetHintFunctionNotFound(functorName));
+                return null;
+            }
+
+            return await builtin(this, context, resolver, this.functorArgs.entries);
+        }
         return await function_.apply(context, resolver, this.functorArgs.entries);
     }
 
@@ -1406,7 +1399,8 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
     public readonly parent: PuppetASTPrimitive;
 
     private _resolvedParent: PuppetASTClass;
-    public readonly resolvedProperties: Dictionary<string, PuppetASTResolvedProperty>;
+    public readonly resolvedLocals: Dictionary<string, PuppetASTResolvedProperty>;
+    public readonly resolvedFields: Dictionary<string, PuppetASTResolvedProperty>;
 
     constructor(args: Array<PuppetASTObject>)
     {
@@ -1419,7 +1413,8 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
         this.params = metaData.get("params") || new OrderedDictionary();
         this.parent = metaData.get("parent");
         this._resolvedParent = null;
-        this.resolvedProperties = new Dictionary();
+        this.resolvedLocals = new Dictionary();
+        this.resolvedFields = new Dictionary();
     }
 
     public get resolvedParent(): PuppetASTClass
@@ -1429,8 +1424,8 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
 
     public getResolvedProperty(name: string): PuppetASTResolvedProperty
     {
-        if (this.resolvedProperties.has(name))
-            return this.resolvedProperties.get(name);
+        if (this.resolvedLocals.has(name))
+            return this.resolvedLocals.get(name);
 
         if (this._resolvedParent)
             return this._resolvedParent.getResolvedProperty(name);
@@ -1443,6 +1438,11 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
         return this.getResolvedProperty(name);
     }
 
+    public setField(name: string, pp: PuppetASTResolvedProperty): void
+    {
+        this.resolvedFields.put(name, pp);
+    }
+
     public getName(): string
     {
         return this.name;
@@ -1450,7 +1450,7 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
 
     public setResolvedProperty(name: string, pp: PuppetASTResolvedProperty)
     {
-        this.resolvedProperties.put(name, pp);
+        this.resolvedLocals.put(name, pp);
     }
     
     public setProperty(name: string, pp: PuppetASTResolvedProperty)
@@ -1489,39 +1489,43 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
                 }
             }
 
-            if (!(value instanceof PuppetASTObject))
-            {
-                continue;
-            }
-
-            let result: any;
-
-            try
-            {
-                result = await value.resolve(this, resolver);
-            }
-            catch (e)
-            {
-                console.log("Failed to resolve param " + paramName + " (" + value.constructor.name + "): " + e);
-                const pp = new PuppetASTResolvedProperty();
-                if (type != null)
-                    pp.type = type;
-                pp.error = e;
-                pp.addHints(value.hints);
-                this.resolvedProperties.put(paramName, pp);
-                continue;
-            }
-
             const pp = new PuppetASTResolvedProperty();
 
-            pp.value = result;
+            let result: any;
+            let hasValue: boolean = false;
 
+            if (value instanceof PuppetASTObject)
+            {
+                try
+                {
+                    result = await value.resolve(this, resolver);
+                    hasValue = true;
+                }
+                catch (e)
+                {
+                    console.log("Failed to resolve param " + paramName + " (" + value.constructor.name + "): " + e);
+                    const pp = new PuppetASTResolvedProperty();
+                    if (type != null)
+                        pp.type = type;
+                    pp.error = e;
+                    pp.addHints(value.hints);
+                    this.resolvedLocals.put(paramName, pp);
+                    this.resolvedFields.put(paramName, pp);
+                    continue;
+                }
+            }
+
+            if (hasValue)
+            {
+                pp.addHints(value.hints);
+                pp.value = result;
+            }
+            
             if (type != null)
                 pp.type = type;
 
-            pp.addHints(value.hints);
-
-            this.resolvedProperties.put(paramName, pp);
+            this.resolvedLocals.put(paramName, pp);
+            this.resolvedFields.put(paramName, pp);
         }
 
         if (this.body)
@@ -1648,7 +1652,8 @@ export class PuppetASTResourcesEntry extends PuppetASTObject
 
 export class PuppetASTResolvedDefinedType implements PuppetASTContainerContext
 {
-    private readonly _resolvedProperties: Dictionary<string, PuppetASTResolvedProperty>;
+    private readonly _resolvedFields: Dictionary<string, PuppetASTResolvedProperty>;
+    private readonly _resolvedLocals: Dictionary<string, PuppetASTResolvedProperty>;
     private _title: string;
     private _name: string;
 
@@ -1656,22 +1661,38 @@ export class PuppetASTResolvedDefinedType implements PuppetASTContainerContext
     {
         this._title = title;
         this._name = name;
-        this._resolvedProperties = new Dictionary();
+        this._resolvedLocals = new Dictionary();
+        this._resolvedFields = new Dictionary();
     }
 
     public setProperty(name: string, pp: PuppetASTResolvedProperty): void
     {
-        this._resolvedProperties.put(name, pp);
+        this._resolvedLocals.put(name, pp);
     }
 
     public getProperty(name: string): PuppetASTResolvedProperty
     {
-        return this._resolvedProperties.get(name);
+        return this._resolvedLocals.get(name);
     }
     
     public get resolvedProperties(): Dictionary<string, PuppetASTResolvedProperty>
     {
-        return this._resolvedProperties;
+        return this._resolvedLocals;
+    }
+
+    public setField(name: string, pp: PuppetASTResolvedProperty): void
+    {
+        this._resolvedFields.put(name, pp);
+    }
+
+    public getField(name: string): PuppetASTResolvedProperty
+    {
+        return this._resolvedFields.get(name);
+    }
+    
+    public get resolvedFields(): Dictionary<string, PuppetASTResolvedProperty>
+    {
+        return this._resolvedFields;
     }
 
     public getName(): string
@@ -1748,38 +1769,43 @@ export class PuppetASTDefinedType extends PuppetASTObject
                 }
             }
 
-            if (!(value instanceof PuppetASTObject))
-            {
-                continue;
-            }
-
-            let result: any;
-
-            try
-            {
-                result = await value.resolve(context, resolver);
-            }
-            catch (e)
-            {
-                console.log("Failed to resolve param " + paramName + " (" + value.constructor.name + "): " + e);
-                const pp = new PuppetASTResolvedProperty();
-                if (type != null)
-                    pp.type = type;
-                pp.error = e;
-                pp.addHints(value.hints);
-                context.setProperty(paramName, pp);
-                continue;
-            }
-
             const pp = new PuppetASTResolvedProperty();
 
-            pp.addHints(value.hints);
-            pp.value = result;
+            let result: any = null;
+            let hasValue: boolean = false;
+
+            if (value instanceof PuppetASTObject)
+            {
+                try
+                {
+                    result = await value.resolve(context, resolver);
+                    hasValue = true;
+                }
+                catch (e)
+                {
+                    console.log("Failed to resolve param " + paramName + " (" + value.constructor.name + "): " + e);
+                    const pp = new PuppetASTResolvedProperty();
+                    if (type != null)
+                        pp.type = type;
+                    pp.error = e;
+                    pp.addHints(value.hints);
+                    context.setProperty(paramName, pp);
+                    context.setField(paramName, pp);    
+                    continue;
+                }
+            }
+
+            if (hasValue)
+            {
+                pp.addHints(value.hints);
+                pp.value = result;
+            }
 
             if (type != null)
                 pp.type = type;
 
             context.setProperty(paramName, pp);
+            context.setField(paramName, pp);
         }
 
         if (this.body)
@@ -1854,6 +1880,17 @@ export class PuppetHintVariableNotFound extends PuppetHint
     }
 }
 
+export class PuppetHintFunctionNotFound extends PuppetHint
+{
+    public function_: string;
+
+    constructor(function_: string)
+    {
+        super("FunctionNotFound", "Function not found: " + function_);
+        this.function_ = function_;
+    }
+}
+
 export class PuppetHintBodyCompilationError extends PuppetHint
 {
     constructor(message: string)
@@ -1903,6 +1940,8 @@ export class PuppetASTVariable extends PuppetASTObject
     protected async _access(args: Array<PuppetASTObject>, context: PuppetASTContainerContext, resolver: Resolver): Promise<PuppetASTObject>
     {
         const resolved = await this.resolve(context, resolver);
+        if (resolved == null)
+            return null;
         const key = await args[0].resolve(context, resolver);
         const value = resolved[key];
         return new PuppetASTValue(value);

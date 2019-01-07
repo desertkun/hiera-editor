@@ -611,7 +611,7 @@ export class NodeClassTab extends WorkspaceTab
         if (this.info.classInfo == null)
             return [];
 
-        return this.info.classInfo.fields;
+        return this.info.fields;
     }
 
     public get defaults(): any

@@ -458,12 +458,12 @@ describe('Workspaces', () =>
             const class_ = await node.acquireClass("test");
             
             {
-                const test = class_.resolvedProperties.get("v");
+                const test = class_.resolvedFields.get("v");
                 expect(test.value).to.equal(11);
             }
 
             {
-                const test = class_.resolvedProperties.get("v2");
+                const test = class_.resolvedFields.get("v2");
                 expect(test.value).to.equal(3);
             }
         }, null, {
@@ -493,7 +493,7 @@ describe('Workspaces', () =>
             const class_ = await node.acquireClass("test");
             
             {
-                const test = class_.resolvedProperties.get("test");
+                const test = class_.resolvedFields.get("test");
                 expect(test.type).to.be.instanceOf(PuppetASTTypeOf);
             }
         });
@@ -518,7 +518,7 @@ describe('Workspaces', () =>
             const class_ = await node.acquireClass("test");
             
             {
-                const test = class_.resolvedProperties.get("test");
+                const test = class_.resolvedFields.get("test");
                 expect(test.value).to.equal(5);
             }
         });
@@ -544,17 +544,17 @@ describe('Workspaces', () =>
             const class_ = await node.acquireClass("test");
             
             {
-                const test = class_.resolvedProperties.get("testAV");
+                const test = class_.resolvedFields.get("testAV");
                 expect(test.value).to.equal("string");
             }
 
             {
-                const test = class_.resolvedProperties.get("testBV");
+                const test = class_.resolvedFields.get("testBV");
                 expect(test.value).to.equal(5);
             }
 
             {
-                const test = class_.resolvedProperties.get("testDirectV");
+                const test = class_.resolvedFields.get("testDirectV");
                 expect(test.value).to.equal(99);
             }
         }, 'testA = "string" \n testB = 5 \n testFactsDirect = 99');
@@ -578,7 +578,7 @@ describe('Workspaces', () =>
             const class_ = await node.acquireClass("test");
             
             {
-                const test = class_.resolvedProperties.get("test");
+                const test = class_.resolvedFields.get("test");
                 expect(test.value).to.equal(10);
             }
         }, 'a = {"b": 10}');
