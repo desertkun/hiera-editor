@@ -9,9 +9,9 @@
     "install:darwin": "./node_modules/rubyjs-darwin/bin/gem install bundler && BUNDLE_GEMFILE=./ruby/Gemfile ./node_modules/rubyjs-darwin/bin/bundle install",
     "install:win32": "cmd /C \"set BUNDLE_GEMFILE=ruby\\Gemfile && node_modules\\rubyjs-win32\\bin\\gem install bundler && node_modules\\rubyjs-win32\\bin\\bundle install\"",
     "test": "mocha --timeout 15000 dist/tests/**/*.js",
-    "package-mac": "npx electron-packager . --overwrite --platform=darwin --arch=x64 --icon=assets/icons/icon.icns --prune=true --out=release-builds",
-    "package-win": "npx electron-packager . hiera-editor --overwrite --asar=true --platform=win32 --arch=ia32 --icon=assets/icons/icon.ico --prune=true --out=release-builds --version-string.ProductName=\"Hiera Editor\"",
-    "package-linux": "npx electron-packager . hiera-editor --overwrite --asar=true --platform=linux --arch=x64 --icon=assets/icons/icon.png --prune=true --out=release-builds"
+    "package-mac": "npx electron-packager . --no-prune --overwrite --platform=darwin --arch=x64 --icon=assets/icons/icon.icns --out=release-builds",
+    "package-win": "npx electron-packager . hiera-editor --no-prune --overwrite --platform=win32 --arch=ia32 --icon=assets/icons/icon.ico --out=release-builds --version-string.ProductName=\"Hiera Editor\"",
+    "package-linux": "npx electron-packager . hiera-editor --no-prune --overwrite --platform=linux --arch=x64 --icon=assets/icons/icon.png --out=release-builds"
   },
   "repository": "https://github.com/desertkun/hiera-editor",
   "keywords": [
@@ -54,9 +54,9 @@
     "jquery": "^3.2.1",
     "npm": "^5.10.0",
     "slash": "^2.0.0",
+    "static-eval": ">=2.0.0",
     "text-ellipsis": "^1.0.3",
-    "yaml": "^1.0.1",
-    "static-eval": ">=2.0.0"
+    "yaml": "^1.0.1"
   },
   "darwinDependencies": {
     "rubyjs-darwin": "latest"
