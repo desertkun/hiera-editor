@@ -110,7 +110,7 @@ export class PuppetASTObject
 
     public get hasHints()
     {
-        return this._hints.length > 0;
+        return this._hints != null && this._hints.length > 0;
     }
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
@@ -1302,7 +1302,17 @@ export class PuppetASTCall extends PuppetASTObject
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         const functorName = await this.functor.resolve(context, resolver);
-        const function_ = await resolver.resolveFunction(functorName);
+        let function_ = null;
+
+        try
+        {
+            function_ = await resolver.resolveFunction(functorName);
+        }
+        catch (e)
+        {
+            this.hint(new PuppetHintFunctionNotFound(functorName));
+        }
+
         if (function_ == null)
         {
             const builtin = GetBuiltinFunction(functorName);
@@ -1504,6 +1514,10 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
             console.log("Resolving parent for class " + this.name);
             this.parentName = await this.parent.resolve(context, resolver);
             this._resolvedParent = await resolver.resolveClass(this.parentName);
+            if (this._resolvedParent && this._resolvedParent.hasHints)
+            {
+                this.carryHints(this._resolvedParent.hints);
+            }
         }
 
         console.log("Resolving class " + this.name);
