@@ -6,7 +6,8 @@ export abstract class Resolver
 {
     public async abstract resolveClass(className: string): Promise<PuppetASTClass>;
     public async abstract resolveFunction(name: string): Promise<PuppetASTFunction>;
-    public async abstract resolveGlobalVariable(name: string): Promise<string>;
+    public abstract getGlobalVariable(name: string): string;
+    public abstract hasGlobalVariable(name: string): boolean;
 }
 
 export interface PuppetASTContainerContext
@@ -1000,6 +1001,30 @@ export class PuppetASTTypeOf extends PuppetASTObject
     }
 }
 
+export class PuppetASTClassOf extends PuppetASTObject
+{
+    public readonly className: string;
+
+    constructor(className: string)
+    {
+        super();
+
+        this.className = className;
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        try
+        {
+            return await resolver.resolveClass(this.className) != null;
+        }
+        catch (e)
+        {
+            return false;
+        }
+    }
+}
+
 export class PuppetASTType extends PuppetASTObject
 {
     public readonly type: PuppetASTObject;
@@ -1018,7 +1043,20 @@ export class PuppetASTType extends PuppetASTObject
 
     protected async _access(args: Array<PuppetASTObject>, context: PuppetASTContainerContext, resolver: Resolver): Promise<PuppetASTObject>
     {
-        return new PuppetASTTypeOf(this, args);
+        const type = await this.type.resolve(context, resolver);
+
+        switch (type)
+        {
+            case "Class":
+            {
+                const className = await args[0].resolve(context, resolver);
+                return new PuppetASTClassOf(className);
+            }
+            default: 
+            {
+                return new PuppetASTTypeOf(this, args);
+            }
+        }
     }
 
     public toString(): string
@@ -1394,6 +1432,7 @@ export class PuppetASTResolvedProperty
 export class PuppetASTClass extends PuppetASTObject implements PuppetASTContainerContext
 {
     public readonly name: string;
+    public parentName: string;
     public readonly params: OrderedDictionary;
     public readonly body: PuppetASTObject;
     public readonly parent: PuppetASTPrimitive;
@@ -1463,8 +1502,8 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
         if (this.parent)
         {
             console.log("Resolving parent for class " + this.name);
-            const parentName = await this.parent.resolve(context, resolver);
-            this._resolvedParent = await resolver.resolveClass(parentName);
+            this.parentName = await this.parent.resolve(context, resolver);
+            this._resolvedParent = await resolver.resolveClass(this.parentName);
         }
 
         console.log("Resolving class " + this.name);
@@ -1474,7 +1513,6 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
             const param: OrderedDictionary = this.params.get(paramName);
 
             let type = param.get("type");
-            const value = param.get("value");
 
             if (type instanceof PuppetASTObject)
             {
@@ -1489,43 +1527,65 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
                 }
             }
 
-            const pp = new PuppetASTResolvedProperty();
+            const globalParamName = this.name + "::" + paramName;
 
-            let result: any;
-            let hasValue: boolean = false;
-
-            if (value instanceof PuppetASTObject)
+            if (resolver.hasGlobalVariable(globalParamName))
             {
-                try
+                const globalParamValue = resolver.getGlobalVariable(globalParamName);
+
+                const pp = new PuppetASTResolvedProperty();
+                pp.value = globalParamValue;
+                
+                if (type != null)
+                    pp.type = type;
+
+                this.resolvedLocals.put(paramName, pp);
+                this.resolvedFields.put(paramName, pp);
+            }
+            else
+            {
+                const value = param.get("value");
+
+                const pp = new PuppetASTResolvedProperty();
+
+                let result: any;
+                let hasValue: boolean = false;
+
+                if (value instanceof PuppetASTObject)
                 {
-                    result = await value.resolve(this, resolver);
-                    hasValue = true;
+                    try
+                    {
+                        result = await value.resolve(this, resolver);
+                        hasValue = true;
+                    }
+                    catch (e)
+                    {
+                        console.log("Failed to resolve param " + paramName + " (" + value.constructor.name + "): " + e);
+                        const pp = new PuppetASTResolvedProperty();
+                        if (type != null)
+                            pp.type = type;
+                        pp.error = e;
+                        pp.addHints(value.hints);
+                        this.resolvedLocals.put(paramName, pp);
+                        this.resolvedFields.put(paramName, pp);
+                        continue;
+                    }
                 }
-                catch (e)
+
+                if (hasValue)
                 {
-                    console.log("Failed to resolve param " + paramName + " (" + value.constructor.name + "): " + e);
-                    const pp = new PuppetASTResolvedProperty();
-                    if (type != null)
-                        pp.type = type;
-                    pp.error = e;
                     pp.addHints(value.hints);
-                    this.resolvedLocals.put(paramName, pp);
-                    this.resolvedFields.put(paramName, pp);
-                    continue;
+                    pp.value = result;
                 }
+                
+                if (type != null)
+                    pp.type = type;
+
+                this.resolvedLocals.put(paramName, pp);
+                this.resolvedFields.put(paramName, pp);
             }
 
-            if (hasValue)
-            {
-                pp.addHints(value.hints);
-                pp.value = result;
-            }
             
-            if (type != null)
-                pp.type = type;
-
-            this.resolvedLocals.put(paramName, pp);
-            this.resolvedFields.put(paramName, pp);
         }
 
         if (this.body)
@@ -1952,6 +2012,41 @@ export class PuppetASTVariable extends PuppetASTObject
         return this.root || this.className == "";
     }
 
+    public async defined(context: PuppetASTContainerContext, resolver: Resolver): Promise<boolean>
+    {
+        const isRoot = this.isRoot();
+
+        if (isRoot || context.getName() == this.className)
+        {
+            // we're asking the current context, no need to resolve
+            const property = context.getProperty(this.name);
+
+            if (property && property.hasValue)
+            {
+                return true;
+            }
+            else if (isRoot)
+            {
+                if (resolver.hasGlobalVariable(this.name))
+                {
+                    return true;
+                }
+            }
+        }
+        else
+        {
+            const class_:PuppetASTClass = await resolver.resolveClass(this.className);
+            const property = class_.getResolvedProperty(this.name);
+
+            if (property && property.hasValue)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         const isRoot = this.isRoot();
@@ -1970,10 +2065,9 @@ export class PuppetASTVariable extends PuppetASTObject
             {
                 // if we've been asking for a variable without classpath mentioned,
                 // try to find a global variable
-                const global = await resolver.resolveGlobalVariable(this.name);
-                if (global)
+                if (resolver.hasGlobalVariable(this.name))
                 {
-                    return global;
+                    return resolver.getGlobalVariable(this.name);
                 }
             }
         }

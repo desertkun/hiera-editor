@@ -410,6 +410,7 @@ export class NodeClassTab extends WorkspaceTab
             const documentation = $('<pre></pre>').html(description).css("display", "none").appendTo(pad);
 
             i.click(() => {
+                $(i).tooltip('hide');
                 $(i).remove();
                 $(documentation).show();
             });
@@ -474,7 +475,7 @@ export class NodeClassTab extends WorkspaceTab
         }
 
         // show the modified marker is the class if there is any value to it (including null)
-        if (this.hasDefaultValue(propertyName) && value != defaultValue)
+        if (this.hadDefinedPropertyOriginally(propertyName))
         {
             modified.show();
             $(label).addClass("text-primary");
@@ -500,21 +501,13 @@ export class NodeClassTab extends WorkspaceTab
             renderer.render(group, propertyId, defaultValue, value, async function(value: any)
         {
             await zis.setProperty(propertyName, value);
-
-            if (zis.hasDefaultValue(propertyName))
-            {
-                modified.show();
-                label.addClass("text-primary");
-                node.addClass("modified");
-            }
+            await zis.refresh();
         });
         
         modified.click(async () => {
+            modified.tooltip('hide');
             await zis.removeProperty(propertyName);
-            modified.hide();
-            label.removeClass("text-primary");
-            node.removeClass("modified");
-            renderedProperty.set(defaultValue);
+            await zis.refresh();
         }).tooltip();
         
         const error = this.getPropertyErrorInfo(propertyName);
@@ -649,14 +642,31 @@ export class NodeClassTab extends WorkspaceTab
         return this.defaults.hasOwnProperty(propertyName);
     }
 
+    protected isFieldRequired(propertyName: string): boolean
+    {
+        return this.info.requiredFields.indexOf(propertyName) >= 0;
+    }
+
     protected async setProperty(propertyName: string, value: any)
     {
         await ipc.setNodeClassProperty(this.nodePath, this.className, propertyName, value);
+        await ipc.invalidateNodeClass(this.nodePath, this.className);
+    }
+
+    protected async hasProperty(propertyName: string)
+    {
+        return await ipc.hasNodeClassProperty(this.nodePath, this.className, propertyName);
     }
 
     protected async removeProperty(propertyName: string)
     {
         await ipc.removeNodeClassProperty(this.nodePath, this.className, propertyName);
+        await ipc.invalidateNodeClass(this.nodePath, this.className);
+    }
+
+    protected hadDefinedPropertyOriginally(propertyName: string): boolean
+    {
+        return this.info.definedFields.indexOf(propertyName) >= 0;
     }
 
     public getIcon(): any
@@ -686,7 +696,7 @@ export class NodeClassTab extends WorkspaceTab
 
         for (const fieldName of classFields)
         {
-            if (this.hasDefaultValue(fieldName))
+            if (!this.isFieldRequired(fieldName))
                 continue;
 
             const inputGroup = $('<div class="node-class-property flex-item"></div>').appendTo(container);
@@ -704,7 +714,7 @@ export class NodeClassTab extends WorkspaceTab
 
         for (const fieldName of classFields)
         {
-            if (!this.hasDefaultValue(fieldName))
+            if (this.isFieldRequired(fieldName))
                 continue;
                 
             const inputGroup = $('<div class="node-class-property flex-item"></div>').appendTo(container);

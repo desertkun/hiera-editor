@@ -164,6 +164,25 @@ export class IpcServer implements IpcAPI
     
         return await node.setClassProperty(className, propertyName, value);
     }
+    
+    public async hasNodeClassProperty(nodePath: string, className: string, propertyName: string): Promise<boolean>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            return false;
+        }
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+        {
+            return false;
+        }
+    
+        return await node.hasClassProperty(className, propertyName);
+    }
 
     public async removeNodeClassProperty(
         nodePath: string, className: string, propertyName: string
@@ -544,6 +563,36 @@ export class IpcServer implements IpcAPI
             return;
             
         await node.invalidate();
+    }
+
+    public async invalidateNodeClass(nodePath: string, className: string): Promise<void>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return;
+            
+        await node.invalidateClass(className);
+    }
+
+    public async invalidateNodeResource(nodePath: string, definedTypeName: string, title: string): Promise<void>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+            return;
+    
+        const node = await workspace.findNode(nodePath);
+    
+        if (node == null)
+            return;
+            
+        await node.invalidateDefinedType(definedTypeName, title);
     }
     
     public async isNodeClassValid(nodePath: string, className: string): Promise<boolean>

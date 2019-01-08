@@ -8,9 +8,11 @@ export interface IpcAPI
     getEnvironmentTree(name: string): Promise<any>;
     findNode(localPath: string): Promise<any>;
     acquireNodeClass(nodePath: string, className: string): Promise<any>;
+    hasNodeClassProperty(nodePath: string, className: string, propertyName: string): Promise<boolean>;
     setNodeClassProperty(nodePath: string, className: string, propertyName: string, value: any): Promise<any>;
     removeNodeClassProperty(nodePath: string, className: string, propertyName: string): Promise<any>;
     removeNodeClassProperties(nodePath: string, className: string): Promise<any>;
+    invalidateNodeClass(nodePath: string, className: string): Promise<void>;
     getClassInfo(env: string): Promise<any>;
     refreshWorkspace(): Promise<any>;
     showOpenDirectoryDialog(defaultPath?: string): Promise<string>;
@@ -26,6 +28,7 @@ export interface IpcAPI
     removeResourceFromNode(nodePath: string, definedTypeName: string, title: string): Promise<void>;
     renameNodeResource(nodePath: string, definedTypeName: string, title: string, newTitle: string): Promise<boolean>;
     removeResourcesFromNode(nodePath: string, definedTypeName: string): Promise<string[]>;
+    invalidateNodeResource(nodePath: string, definedTypeName: string, title: string): Promise<void>;
     chooseDefinedType(nodePath: string): Promise<string>;
     createNewResourceToNode(nodePath: string, definedTypeName: string, title: string): Promise<any>;
     removeAllResourcesFromNode(nodePath: string): Promise<any[]>;

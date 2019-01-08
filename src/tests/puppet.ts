@@ -474,7 +474,7 @@ describe('Workspaces', () =>
             `
         });
     });
-
+    
     it('access[optional]', () =>
     {
         return testSimpleWorkspace({
@@ -523,6 +523,108 @@ describe('Workspaces', () =>
             }
         });
     });
+
+   it('access[class]', () =>
+   {
+       return testSimpleWorkspace({
+           "init.pp": `
+                class test (
+                    Optional[Boolean] $testA = defined(Class['test::check']),
+                    Optional[Boolean] $testB = defined(Class['test::false']),
+                ) {}
+           `,
+           "check.pp": `
+               class test::check () {
+                   
+               }
+           `
+       }, {"classes": ["test"]}, async (
+           workspace: puppet.Workspace,
+           environment: puppet.Environment,
+           node: puppet.Node) =>
+       {
+           const class_ = await node.acquireClass("test");
+           
+           {
+               const test = class_.resolvedFields.get("testA");
+               expect(test.value).to.be.equal(true);
+           }
+
+           {
+               const test = class_.resolvedFields.get("testB");
+               expect(test.value).to.be.equal(false);
+           }
+       });
+   });
+    
+   it('defined[variable]', () =>
+   {
+       return testSimpleWorkspace({
+           "init.pp": `
+                class test (
+                    Optional[Boolean] $testA = defined($test::check::testA),
+                    Optional[Boolean] $testB = defined($test::check::testB),
+                    Optional[Boolean] $testC = defined($test::check::testC),
+                ) {}
+           `,
+           "check.pp": `
+               class test::check (
+                   $testA = 10,
+                   $testB = undef
+               ) {
+                   
+               }
+           `
+       }, {"classes": ["test"]}, async (
+           workspace: puppet.Workspace,
+           environment: puppet.Environment,
+           node: puppet.Node) =>
+       {
+           const class_ = await node.acquireClass("test");
+           
+           {
+               const test = class_.resolvedFields.get("testA");
+               expect(test.value).to.be.equal(true);
+           }
+           {
+               const test = class_.resolvedFields.get("testB");
+               expect(test.value).to.be.equal(true);
+           }
+           {
+               const test = class_.resolvedFields.get("testC");
+               expect(test.value).to.be.equal(false);
+           }
+       });
+   });
+
+   it('class properties defined by user', () =>
+   {
+       return testSimpleWorkspace({
+           "init.pp": `
+                class test (
+                    Optional[Number] $testA = $test::check::checkA
+                ) {}
+           `,
+           "check.pp": `
+               class test::check (
+                   $checkA
+               ) {
+                   
+               }
+           `
+       }, {"classes": ["test"], "test::check::checkA": 15}, async (
+           workspace: puppet.Workspace,
+           environment: puppet.Environment,
+           node: puppet.Node) =>
+       {
+           const class_ = await node.acquireClass("test");
+           
+           {
+               const test = class_.resolvedFields.get("testA");
+               expect(test.value).to.be.equal(15);
+           }
+       });
+   });
 
     it('facts', () =>
     {

@@ -135,7 +135,7 @@ export module puppet
             return this.info["file"];
         }
 
-        public get fields(): Array<string>
+        public get defaults(): Array<string>
         {
             return Object.keys(this.info["defaults"] || {});
         }
@@ -170,7 +170,7 @@ export module puppet
             return {
                 "name": this.name,
                 "file": this.info["file"],
-                "fields": this.fields,
+                "defaults": this.defaults,
                 "inherits": this.info["inherits"],
                 "description": this.description,
                 "options": this.options,
@@ -241,7 +241,7 @@ export module puppet
             return this.info["source"];
         }
 
-        public get fields(): Array<string>
+        public get defaults(): Array<string>
         {
             return Object.keys(this.info["defaults"] || {});
         }
@@ -271,7 +271,7 @@ export module puppet
             return {
                 "name": this.name,
                 "file": this.info["file"],
-                "fields": this.fields,
+                "defaults": this.defaults,
                 "inherits": this.info["inherits"],
                 "description": this.description,
                 "options": this.options,
@@ -1098,7 +1098,11 @@ export module puppet
         }
     }
     
-    export type GlobalVariableResolver = (key: string) => string;
+    export interface GlobalVariableResolver
+    {
+        get (key: string): string;
+        has (key: string): boolean;
+    }
 
     export class ResolvedResource
     {
@@ -1727,6 +1731,31 @@ export module puppet
             this._compiledResources.clear();
         }
 
+        public async invalidateClass(className: string): Promise<void>
+        {
+            if (this._compiledClasses.has(className))
+            {
+                const compiled = this._compiledClasses.get(className);
+                this._compiledClasses.remove(className);
+
+                // invalidate also a direct parent, if any
+                if (compiled.parentName != null)
+                {
+                    await this.invalidateClass(compiled.parentName);
+                }
+            }
+        }
+
+        public async invalidateDefinedType(definedTypeName: string, title: string): Promise<void>
+        {
+            if (this._compiledResources.has(definedTypeName))
+            {
+                const titles = this._compiledResources.get(definedTypeName);
+
+                titles.remove(title);
+            }
+        }
+
         public async remove(): Promise<boolean>
         {
             if (this._parent == null)
@@ -1800,9 +1829,14 @@ export module puppet
                         return zis.resolveFunction(name, global);
                     }
 
-                    public async resolveGlobalVariable(name: string): Promise<string>
+                    public getGlobalVariable(name: string): string
                     {
-                        return global(name);
+                        return global.get(name);
+                    }
+
+                    public hasGlobalVariable(name: string): boolean
+                    {
+                        return global.has(name);
                     }
                 });
             }
@@ -1911,9 +1945,14 @@ export module puppet
                         return zis.resolveFunction(name, global);
                     }
 
-                    public async resolveGlobalVariable(name: string): Promise<string>
+                    public getGlobalVariable(name: string): string
                     {
-                        return global(name);
+                        return global.get(name);
+                    }
+
+                    public hasGlobalVariable(name: string): boolean
+                    {
+                        return global.has(name);
                     }
                 });
             }
@@ -2118,6 +2157,25 @@ export module puppet
             return this.configClasses.indexOf(className) >= 0
         }
         
+        public hasGlobal(key: string): boolean
+        {
+            if (key == "facts")
+            {
+                return this.configFacts != null;
+            }
+
+            if (this.configFacts != null && this.configFacts.hasOwnProperty(key))
+                return true;
+
+            if (this._env.global.has(key) || this._env.workspace.global.has(key))
+                return true;
+
+            if (this._config != null && this._config.hasOwnProperty(key))
+                return true;
+            
+            return false;
+        }
+
         public getGlobal(key: string): string
         {
             if (key == "facts")
@@ -2125,7 +2183,19 @@ export module puppet
                 return this.configFacts;
             }
 
-            return this.configFacts[key] || this._env.global.get(key) || this._env.workspace.global.get(key);
+            if (this.configFacts != null && this.configFacts.hasOwnProperty(key))
+                return this.configFacts[key];
+
+            if (this._env.global.has(key))
+                return this._env.global.get(key);
+
+            if (this._env.workspace.global.has(key))
+                return this._env.workspace.global.get(key);
+
+            if (this._config != null)
+                return this._config[key];
+            
+            return null;
         }
 
         public async removeClass(className: string): Promise<void>
@@ -2274,9 +2344,9 @@ export module puppet
             if (!this.hasClass(className))
                 throw Error("No such class: " + className);
 
-            return await this.resolveClass(className, (key: string) =>
-            {
-                return zis.getGlobal(key);
+            return await this.resolveClass(className, {
+                get: (key: string) => zis.getGlobal(key),
+                has: (key: string) => zis.hasGlobal(key)
             });
         }
         
@@ -2303,9 +2373,9 @@ export module puppet
 
             values["title"] = title;
             
-            return await this.resolveResource(definedTypeName, title, values, (key: string) =>
-            {
-                return zis.getGlobal(key);
+            return await this.resolveResource(definedTypeName, title, values, {
+                get: (key: string) => zis.getGlobal(key),
+                has: (key: string) => zis.hasGlobal(key)
             });
         }
 
@@ -2360,6 +2430,23 @@ export module puppet
             t[propertyName] = value;
 
             await this.save();
+        }
+
+        public async hasClassProperty(className: string, propertyName: string): Promise<boolean>
+        {
+            const classInfo = this._env.findClassInfo(className);
+
+            if (classInfo == null)
+                return false;
+
+            const compiled = await this.acquireClass(className);
+
+            if (!compiled)
+                return false;
+
+            const propertyPath = this.compilePropertyPath(className, propertyName);
+
+            return this.config != null && this.config.hasOwnProperty(propertyPath);
         }
 
         public async removeClassProperty(className: string, propertyName: string): Promise<any>
@@ -2417,7 +2504,7 @@ export module puppet
             if (!compiled)
                 return;
 
-            for (const propertyName of classInfo.fields)
+            for (const propertyName of compiled.resolvedFields.getKeys())
             {
                 const propertyPath = this.compilePropertyPath(className, propertyName);
                 delete this.config[propertyPath];
@@ -2440,6 +2527,8 @@ export module puppet
             const errors: any = {};
             const hints: any = {};
             const fields: string[] = [];
+            const definedFields: string[] = [];
+            const requiredFields: string[] = [];
             const values: any = {};
             const classHints: any = compiled.hints;
 
@@ -2447,6 +2536,11 @@ export module puppet
             {
                 const property = compiled.getResolvedProperty(name);
                 fields.push(name);
+
+                if (classInfo.defaults.indexOf(name) < 0)
+                {
+                    requiredFields.push(name);
+                }
 
                 if (property.hasType)
                 {
@@ -2475,10 +2569,12 @@ export module puppet
                 }
 
                 const propertyPath = this.compilePropertyPath(className, name);
-                const configValue = this.config[propertyPath];
-                if (configValue != null)
+
+                if (this.config.hasOwnProperty(propertyPath))
                 {
+                    const configValue = this.config[propertyPath];
                     values[name] = configValue;
+                    definedFields.push(name);
                 }
             }
 
@@ -2491,7 +2587,9 @@ export module puppet
                 "errors": errors,
                 "propertyHints": hints,
                 "hints": classHints,
-                "fields": fields
+                "definedFields": definedFields,
+                "fields": fields,
+                "requiredFields": requiredFields
             }
         }
 
@@ -2507,6 +2605,8 @@ export module puppet
             const defaultValues: any = {};
             const types: any = {};
             const fields: string[] = [];
+            const definedFields: string[] = [];
+            const requiredFields: string[] = [];
             const errors: any = {};
             const hints: any = {};
             const values: any = {};
@@ -2520,6 +2620,7 @@ export module puppet
                     for (const k in t)
                     {
                         values[k] = t[k];
+                        definedFields.push(k);
                     }
                 }
             }
@@ -2527,6 +2628,11 @@ export module puppet
             for (const name of compiled.resource.resolvedFields.getKeys())
             {
                 const property = compiled.resource.resolvedFields.get(name);
+
+                if (classInfo.defaults.indexOf(name) < 0)
+                {
+                    requiredFields.push(name);
+                }
 
                 if (property.hasType)
                 {
@@ -2565,7 +2671,9 @@ export module puppet
                 "types": types,
                 "errors": errors,
                 "propertyHints": hints,
-                "fields": fields
+                "definedFields": definedFields,
+                "fields": fields,
+                "requiredFields": requiredFields
             }
         }
     }
