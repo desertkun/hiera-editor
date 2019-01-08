@@ -25,6 +25,8 @@ To build the project youself you'll need install [Node](https://nodejs.org/en/do
 clone this repo, open it in the terminal, and just do `npm install`, followed by `npm start` to run it. 
 It also has debug configurations for Visual Studio Code.
 
+The project has a bunch of tests, to run those do `tsc` to compile the typescript and then do `npm test`.
+
 # License
 MIT
 
