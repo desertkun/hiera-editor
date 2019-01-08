@@ -20,6 +20,9 @@ A GUI tool to manage your Puppet/Hiera for you.
 ## Download
 You can download it from [Releases](https://github.com/desertkun/hiera-editor/releases) page.
 
+## Demo
+As a working example, you can clone [this repository](https://github.com/anthill-platform/puppet-anthill-dev), and open it within the editor.
+
 ## Building from source
 To build the project youself you'll need install [Node](https://nodejs.org/en/download/), 
 clone this repo, open it in the terminal, and just do `npm install`, followed by `npm start` to run it. 
@@ -27,7 +30,7 @@ It also has debug configurations for Visual Studio Code.
 
 The project has a bunch of tests, to run those do `tsc` to compile the typescript and then do `npm test`.
 
-# License
+## License
 MIT
 
 ## Todo
