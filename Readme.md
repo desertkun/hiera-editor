@@ -5,7 +5,7 @@ A GUI tool to manage your Puppet/Hiera for you.
 <img src="https://user-images.githubusercontent.com/1666014/50780430-90d38680-12ab-11e9-8f83-916055fa8e70.png" width="888">
 
 ## Features
-* Windows / MacOs
+* Cross platform
 * Parses modules to extract class information like field names, types and doc strings
 * Retrieves default values of class fields by doing best-effort compilation of Puppet AST on your machine
 * Automatic field validation (for example, if module fails when you pass a value that does not match a regular expression)
