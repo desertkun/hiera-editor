@@ -26,10 +26,15 @@ def dump_parse(source, filename, options, show_filename = true)
   return output
 end
 
-export_filename = ARGV[0]
-dirname = File.dirname(export_filename)
-unless File.directory?(dirname)
-  FileUtils.mkdir_p(dirname)
+files = JSON.parse(STDIN.read)
+
+files.each do |export_filename, source|
+  dirname = File.dirname(export_filename)
+
+  unless File.directory?(dirname)
+    FileUtils.mkdir_p(dirname)
+  end
+
+  File.open(export_filename, 'w') { |file| file.write(dump_parse(source, 'stdin', {}, false)) }
 end
 
-File.open(export_filename, 'w') { |file| file.write(dump_parse(STDIN.read, 'stdin', {}, false)) }
