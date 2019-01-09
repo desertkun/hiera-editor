@@ -7,6 +7,8 @@ import * as child_process from "child_process";
 
 import * as YAML from "yaml";
 
+const stream = require('stream');
+
 export function fileExists(path: string): Promise<boolean>
 {
     return new Promise<boolean>((resolve, reject) =>
@@ -251,13 +253,14 @@ export function listFiles(path: string): Promise<string[]>
     });
 }
 
-export function execFile(path: string, args: Array<string>, cwd: string): Promise<any>
+export function execFile(path: string, args: Array<string>, cwd: string, env?: any): Promise<any>
 {
     return new Promise<boolean>((resolve, reject) =>
     {
         const options: child_process.ExecFileOptions = {
             'cwd': cwd,
-            'maxBuffer': 1024000
+            'maxBuffer': 1024000,
+            'env': env
         };
 
         child_process.execFile(path, args, options, (error: Error, stdout: string, stderr: string) =>
@@ -271,6 +274,53 @@ export function execFile(path: string, args: Array<string>, cwd: string): Promis
                 resolve();
             }
         });
+    });
+}
+
+export type ExecFileLineCallback = (line: string) => void;
+
+export function execFileReadIn(command: string, cwd: string, env?: any, cb?: ExecFileLineCallback): Promise<any>
+{
+    return new Promise<boolean>((resolve, reject) =>
+    {
+        const options: child_process.ExecFileOptions = {
+            'cwd': cwd,
+            'maxBuffer': 1024000,
+            'env': env
+        };
+
+        const process = child_process.exec(command, options, (error: Error, stdout: string, stderr: string) =>
+        {
+            if (error != null)
+            {
+                reject(stdout);
+            }
+            else
+            {
+                resolve();
+            }
+        });
+
+        if (cb != null)
+        {
+            process.stdout.setEncoding('utf8');
+            process.stdout.on('data', function(data) 
+            {
+                var str = data.toString(), lines = str.split(/\r?\n/g);
+                
+                for (let i = lines.length - 1; i >= 0; i--)
+                {
+                    const line = lines[i];
+                    if (line != "")
+                    {
+                        cb(line);
+                        break;
+                    }
+                }
+                
+                return true;
+            });
+        }
     });
 }
 

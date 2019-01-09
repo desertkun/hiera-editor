@@ -43,7 +43,7 @@ export class IpcServer implements IpcAPI
         }
 
         const files = await listFiles(path);
-        
+
         if (files.length > 0)
         {
             throw new Error("Please choose an empty directory");
@@ -319,8 +319,8 @@ export class IpcServer implements IpcAPI
 
         await workspace.refresh((progress: number) => {
             workspace_window.browserWindow.webContents.send("refreshWorkspaceProgress", progress);
-        }, (text: string) => {
-            workspace_window.browserWindow.webContents.send("refreshWorkspaceCategory", text);
+        }, (text: string, showProgress: boolean) => {
+            workspace_window.browserWindow.webContents.send("refreshWorkspaceCategory", text, showProgress);
         });
     }
 

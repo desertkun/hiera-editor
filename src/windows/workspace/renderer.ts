@@ -850,9 +850,18 @@ export class WorkspaceRenderer
 
     private async initUI()
     {
-        electron.ipcRenderer.on('refreshWorkspaceCategory', function(event: any, text: number)
+        electron.ipcRenderer.on('refreshWorkspaceCategory', function(event: any, text: number, showProgress: boolean)
         {
             $('#loading-category').text(text);
+
+            if (showProgress)
+            {
+                $('#loading-progress-p').show();
+            }
+            else
+            {
+                $('#loading-progress-p').hide();
+            }
         });
 
         electron.ipcRenderer.on('refreshWorkspaceProgress', function(event: any, progress: number)
@@ -913,7 +922,7 @@ export class WorkspaceRenderer
             '<span class="text text-muted"><i class="fas fa-cog fa-4x fa-spin"></i></span></p>' +
             '<p class="text-center"><span class="text text-muted" id="loading-category">' +
             'Please wait while the workspace is updating cache</span></p>' +
-            '<p class="text-center"><div class="progress" style="width: 400px;">' +
+            '<p class="text-center"><div class="progress" id="loading-progress-p" style="width: 400px;">' +
             '<div class="progress-bar progress-bar-striped progress-bar-animated" ' +
             'id="loading-progress" role="progressbar" aria-valuenow="0" ' +
             'aria-valuemin="0" aria-valuemax="100" style="width:0">' +

@@ -40,6 +40,35 @@ export module puppet
             return null;
         }
 
+        public static async CallBin(command: string, args: string[], cwd: string, cb?: async.ExecFileLineCallback): Promise<boolean>
+        {
+            const argsTotal = [
+                Ruby.Path().rubyPath,
+                path.join(Ruby.Path().path, command)
+            ];
+
+            for (let arg of args)
+            {
+                argsTotal.push(arg);
+            }
+        
+            const env: any = {
+                "SSL_CERT_FILE": require('app-root-path').resolve("ruby", "cacert.pem"),
+                "PATH": process.env["PATH"] + path.delimiter + Ruby.Path().path
+            };
+        
+            try
+            {
+                await async.execFileReadIn("\"" + argsTotal.join("\" \"") + "\"", cwd, env, cb);
+                return true;
+            }
+            catch (e)
+            {
+                console.log("Failed to execute command " + command + ": " + e);
+                return false;
+            }
+        }
+
         public static async Call(script: string, args: Array<string>, cwd: string): Promise<boolean>
         {
             const rubyScript = require('app-root-path').resolve(path.join("ruby", script));
@@ -544,15 +573,22 @@ export module puppet
                 if (cachedStats[clazz.file])
                 {
                     const cachedStat = cachedStats[clazz.file];
-                    const cachedTime: Number = cachedStat.mtimeMs;
-
-                    const realStat = realStats[clazz.file];
-                    const realTime: Number = realStat.mtimeMs;
-
-                    if (cachedTime >= realTime)
+                    if (cachedStat != null)
                     {
-                        // compiled file is up-to-date
-                        continue;
+                        const cachedTime: Number = cachedStat.mtimeMs;
+    
+                        const realStat = realStats[clazz.file];
+                        
+                        if (realStat != null)
+                        {
+                            const realTime: Number = realStat.mtimeMs;
+    
+                            if (cachedTime >= realTime)
+                            {
+                                // compiled file is up-to-date
+                                continue;
+                            }
+                        }
                     }
                 }
 
@@ -566,15 +602,20 @@ export module puppet
                 if (cachedStats[definedType.file])
                 {
                     const cachedStat = cachedStats[definedType.file];
-                    const cachedTime: Number = cachedStat.mtimeMs;
-
-                    const realStat = realStats[definedType.file];
-                    const realTime: Number = realStat.mtimeMs;
-
-                    if (cachedTime >= realTime)
+                    if (cachedStat != null)
                     {
-                        // compiled file is up-to-date
-                        continue;
+                        const cachedTime: Number = cachedStat.mtimeMs;
+
+                        const realStat = realStats[definedType.file];
+                        if (realStat != null)
+                        {
+                            const realTime: Number = realStat.mtimeMs;
+                            if (cachedTime >= realTime)
+                            {
+                                // compiled file is up-to-date
+                                continue;
+                            }
+                        }
                     }
                 }
 
@@ -799,6 +840,31 @@ export module puppet
         {
             return this._name;
         }
+        
+        private async installModules(updateProgressCategory: any): Promise<void>
+        {
+            if (await async.isFile(path.join(this.path, "Puppetfile")))
+            {
+                if (updateProgressCategory) updateProgressCategory("Installing modules...", false);
+            
+                try
+                {
+                    await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], this._path, (line: string) => 
+                    {
+                        if (line.length > 80)
+                        {
+                            line = line.substr(0, 80) + " ...";
+                        }
+    
+                        if (updateProgressCategory) updateProgressCategory(line, false);
+                    });
+                }
+                catch (e)
+                {
+                    throw new WorkspaceError("Failed to install modules: " + e.toString());
+                }
+            }
+        }
 
         public async refresh(progressCallback: any = null, updateProgressCategory: any = null): Promise<any>
         {
@@ -815,9 +881,11 @@ export module puppet
                 }
             }
 
+            await this.installModules(updateProgressCategory);
+
             let upToDate: boolean = false;
 
-            if (updateProgressCategory) updateProgressCategory("Processing classes...");
+            if (updateProgressCategory) updateProgressCategory("Processing classes...", false);
 
             const bStat = await async.fileStat(this.cacheModulesFilePath);
             if (bStat)
@@ -835,7 +903,7 @@ export module puppet
 
             if (!upToDate)
             {
-                if (updateProgressCategory) updateProgressCategory("Extracting class info...");
+                if (updateProgressCategory) updateProgressCategory("Extracting class info...", false);
 
                 const a = JSON.stringify([
                     "*/manifests/**/*.pp", "*/functions/**/*.pp", "*/types/**/*.pp", "*/lib/**/*.rb"
@@ -877,18 +945,18 @@ export module puppet
                     };
                 }
 
-                if (updateProgressCategory) updateProgressCategory("Compiling classes...");
+                if (updateProgressCategory) updateProgressCategory("Compiling classes...", true);
 
                 await pool.start();
             }
 
             for (const env of await this.listEnvironments())
             {
-                if (updateProgressCategory) updateProgressCategory("Processing environment: " + env.name);
-                await env.refresh(progressCallback)
+                if (updateProgressCategory) updateProgressCategory("Processing environment: " + env.name, false);
+                await env.refresh(progressCallback, updateProgressCategory)
             }
 
-            if (updateProgressCategory) updateProgressCategory("Processing environments complete!");
+            if (updateProgressCategory) updateProgressCategory("Processing environments complete!", false);
         }
 
         private async loadModulesInfo(): Promise<PuppetModulesInfo>
@@ -1239,7 +1307,32 @@ export module puppet
             }
         }
 
-        public async refresh(progressCallback: any = null): Promise<any>
+        private async installModules(updateProgressCategory: any): Promise<void>
+        {
+            if (await async.isFile(path.join(this.path, "Puppetfile")))
+            {
+                if (updateProgressCategory) updateProgressCategory("Installing modules...", false);
+            
+                try
+                {
+                    await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], this._path, (line: string) => 
+                    {
+                        if (line.length > 80)
+                        {
+                            line = line.substr(0, 80) + " ...";
+                        }
+    
+                        if (updateProgressCategory) updateProgressCategory(line, false);
+                    });
+                }
+                catch (e)
+                {
+                    throw new WorkspaceError("Failed to install modules: " + e.toString());
+                }
+            }
+        }
+
+        public async refresh(progressCallback: any = null, updateProgressCategory: any = null): Promise<any>
         {
             if (!await async.isDirectory(this.cachePath))
             {
@@ -1248,6 +1341,8 @@ export module puppet
                     throw "Failed to create cache directory";
                 }
             }
+
+            await this.installModules(updateProgressCategory);
 
             if (await async.isDirectory(this.modulesPath))
             {
