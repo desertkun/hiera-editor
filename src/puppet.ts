@@ -32,6 +32,10 @@ export module puppet
             {
                 return require('rubyjs-darwin');
             }
+            else if (process.platform == "linux")
+            {
+                return require('rubyjs-linux');
+            }
             
             return null;
         }
