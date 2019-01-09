@@ -154,7 +154,7 @@ class NodeTreeItemRenderer
         for (const definedTypeName of nodeResourcesNames)
         {
             const resourceTypeInfo = this.classInfo.types[definedTypeName];
-            const iconData = resourceTypeInfo.options.icon;
+            const iconData = resourceTypeInfo != null && resourceTypeInfo.options != null ? resourceTypeInfo.options.icon : null;
 
             const resourceNode = node.addChild( 
                 (node) => 

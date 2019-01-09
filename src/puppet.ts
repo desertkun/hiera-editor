@@ -516,10 +516,30 @@ export module puppet
             const cachedStats = await async.PromiseAllObject(_cachedStats);
             const realStats = await async.PromiseAllObject(_realStats);
 
+            async function compileFiles(files: any, modulesPath: string)
+            {
+                console.log("Compiling " + Object.keys(files).join(", ") + "...");
+
+                try
+                {
+                    await puppet.Ruby.CallInOut("puppet-parser.rb", [], modulesPath, JSON.stringify(files));
+                    console.log("Compiling done!");
+                }
+                catch (e)
+                {
+                    console.log("Failed to compile: " + e);
+                }
+
+                cb.done += 1;
+
+                if (cb.callback) cb.callback(cb.done);
+            }
+
+            const compileFileList: Array<[string, string]> = [];
+
             for (let clazz of classes)
             {
                 const file = path.join(this._cachePath, "obj", clazz.file + ".o");
-                const realFile = path.join(this._modulesPath, clazz.file);
 
                 if (cachedStats[clazz.file])
                 {
@@ -536,38 +556,12 @@ export module puppet
                     }
                 }
 
-                try
-                {
-                    async function compile(file: string, modulesPath: string, source: string)
-                    {
-                        console.log("Compiling " + file + "...");
-
-                        try
-                        {
-                            await puppet.Ruby.CallInOut("puppet-parser.rb", [file], modulesPath, source);
-                            console.log("Compiling " + file + " done!");
-                        }
-                        catch (e)
-                        {
-                            console.log("Failed to compile " + file + ": " + e);
-                        }
-
-                        cb.done += 1;
-
-                        if (cb.callback) cb.callback(cb.done);
-                    }
-
-                    result.push([compile, file, this._modulesPath, clazz.source]);
-                }
-                catch (e) {
-                    console.log(e);
-                }
+                compileFileList.push([file, clazz.source]);
             }
 
             for (let definedType of definedTypes)
             {
                 const file = path.join(this._cachePath, "obj", definedType.file + ".o");
-                const realFile = path.join(this._modulesPath, definedType.file);
 
                 if (cachedStats[definedType.file])
                 {
@@ -584,38 +578,12 @@ export module puppet
                     }
                 }
 
-                try
-                {
-                    async function compile(file: string, modulesPath: string, source: string)
-                    {
-                        console.log("Compiling " + file + "...");
-
-                        try
-                        {
-                            await puppet.Ruby.CallInOut("puppet-parser.rb", [file], modulesPath, source);
-                            console.log("Compiling " + file + " done!");
-                        }
-                        catch (e)
-                        {
-                            console.log("Failed to compile " + file + ": " + e);
-                        }
-
-                        cb.done += 1;
-
-                        if (cb.callback) cb.callback(cb.done);
-                    }
-
-                    result.push([compile, file, this._modulesPath, definedType.source]);
-                }
-                catch (e) {
-                    console.log(e);
-                }
+                compileFileList.push([file, definedType.source]);
             }
 
             for (let function_ of functions)
             {
                 const file = path.join(this._cachePath, "func", function_.file + ".o");
-                const realFile = path.join(this._modulesPath, function_.file);
 
                 if (cachedStats[function_.file])
                 {
@@ -632,32 +600,28 @@ export module puppet
                     }
                 }
 
-                try
+                compileFileList.push([file, function_.source]);
+            }
+
+            while (true)
+            {
+                const files: any = {};
+                let foundOne: boolean = false;
+
+                for (let i = 0; i < 16; i++)
                 {
-                    async function compile(file: string, modulesPath: string, source: string)
-                    {
-                        console.log("Compiling function " + file + "...");
+                    if (compileFileList.length == 0)
+                        break;
 
-                        try
-                        {
-                            await puppet.Ruby.CallInOut("puppet-parser.rb", [file], modulesPath, source);
-                            console.log("Compiling function " + file + " done!");
-                        }
-                        catch (e)
-                        {
-                            console.log("Failed to compile " + file + ": " + e);
-                        }
-
-                        cb.done += 1;
-
-                        if (cb.callback) cb.callback(cb.done);
-                    }
-
-                    result.push([compile, file, this._modulesPath, function_.source]);
+                    const [file, source] = compileFileList.pop();
+                    files[file] = source;
+                    foundOne = true;
                 }
-                catch (e) {
-                    console.log(e);
-                }
+
+                if (!foundOne)
+                    break;
+
+                result.push([compileFiles, files, this._modulesPath]);
             }
 
             return result;
@@ -892,7 +856,9 @@ export module puppet
                 {
                     for (const p of modulesInfoPromises)
                     {
-                        yield p[0](p[1], p[2], p[3]);
+                        const f = p[0];
+                        p.splice(0, 1);
+                        yield f.apply(f, p);
                     }
                 }
 
@@ -921,6 +887,8 @@ export module puppet
                 if (updateProgressCategory) updateProgressCategory("Processing environment: " + env.name);
                 await env.refresh(progressCallback)
             }
+
+            if (updateProgressCategory) updateProgressCategory("Processing environments complete!");
         }
 
         private async loadModulesInfo(): Promise<PuppetModulesInfo>
@@ -1318,7 +1286,9 @@ export module puppet
                 {
                     for (const p of modulesInfoPromises)
                     {
-                        yield p[0](p[1], p[2], p[3]);
+                        const f = p[0];
+                        p.splice(0, 1);
+                        yield f.apply(f, p);
                     }
                 }
 
