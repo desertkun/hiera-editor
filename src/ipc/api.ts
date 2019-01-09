@@ -3,6 +3,7 @@ export interface IpcAPI
 {
     addProject(path: string): Promise<boolean>;
     openProject(path: string): Promise<void>;
+    createProject(): Promise<void>;
     getProjectList(): Promise<any>;
     getEnvironmentList(): Promise<string[]>;
     getEnvironmentTree(name: string): Promise<any>;
@@ -15,7 +16,7 @@ export interface IpcAPI
     invalidateNodeClass(nodePath: string, className: string): Promise<void>;
     getClassInfo(env: string): Promise<any>;
     refreshWorkspace(): Promise<any>;
-    showOpenDirectoryDialog(defaultPath?: string): Promise<string>;
+    showOpenDirectoryDialog(defaultPath?: string, mode?: Array<'openDirectory' | 'createDirectory' | 'promptToCreate'>): Promise<string>;
     getCurrentWorkspacePath(): Promise<string>;
     assignNewClassToNode(nodePath: string): Promise<string>;
     searchClasses(nodePath: string, search: string): Promise<any[]>;

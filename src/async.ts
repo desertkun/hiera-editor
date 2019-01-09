@@ -353,6 +353,24 @@ export function readJSON(filePath: string): Promise<any>
     });
 }
 
+export function writeFile(filePath: string, data: string): Promise<boolean>
+{
+    return new Promise<any>((resolve, reject) =>
+    {
+        fs.writeFile(filePath, data, "UTF-8", (error) => 
+        {
+            if (error) 
+            {
+                reject(error)
+            } 
+            else 
+            {
+                resolve(true);
+            }
+        })
+    });
+}
+
 export function writeJSON(filePath: string, data: any): Promise<any>
 {
     return new Promise<any>((resolve, reject) =>
@@ -401,7 +419,7 @@ export function write(filePath: string, data: any): Promise<any>
     });
 }
 
-export function writeYAML(filePath: string, data: any, commentBefore?: string): Promise<any>
+export function writeYAML(filePath: string, data: any, commentBefore?: string): Promise<boolean>
 {
     return new Promise<any>((resolve, reject) =>
     {
@@ -426,7 +444,7 @@ export function writeYAML(filePath: string, data: any, commentBefore?: string): 
             }
             else
             {
-                resolve();
+                resolve(true);
             }
         })
     });

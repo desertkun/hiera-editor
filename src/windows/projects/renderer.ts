@@ -43,6 +43,18 @@ class ProjectsRenderer
 
             zis.openProject(path);
         });
+        
+        $('#btn-new-project').click(async () => 
+        {
+            try
+            {
+                await ipc.createProject();
+            }
+            catch (e)
+            {
+                alert (e.message);
+            }
+        });
     }
 
     private openProject(path: string)

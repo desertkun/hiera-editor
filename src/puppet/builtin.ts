@@ -35,6 +35,11 @@ const BuiltInFunctions: any = {
         const def = await obj.resolve(context, resolver);
         return <boolean>(def);
     },
+    "template": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        // can't do much
+        return "";
+    },
     "require": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
     {
         await resolver.resolveClass(args[0]);

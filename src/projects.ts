@@ -1,5 +1,6 @@
 
 import { puppet } from "./puppet";
+import * as path from "path"
 import * as async from "./async"
 
 export class ProjectModel
@@ -140,6 +141,73 @@ export class ProjectsModel
         }
 
         return false;
+    }
+
+    public async createProject(projectPath: string, env: string)
+    {
+        if (this.hasProject(projectPath))
+            return false;
+            
+        if (!await async.isDirectory(projectPath))
+            return false;
+
+        if (!await async.writeFile(path.join(projectPath, "environment.conf"), "modulepath = modules"))
+            return false;
+
+        if (!await async.createDirectory(path.join(projectPath, "environments")))
+            return false;
+            
+        const envPath = path.join(projectPath, "environments", env);
+        if (!await async.createDirectory(envPath))
+            return false;
+
+        if (!await async.createDirectory(path.join(envPath, "data")))
+            return false;
+        
+        if (!await async.createDirectory(path.join(envPath, "manifests")))
+            return false;
+        
+        if (!await async.createDirectory(path.join(envPath, "modules")))
+            return false;
+    
+        if (!await async.writeFile(path.join(envPath, "environment.conf"), "modulepath = modules:../../modules"))
+            return false;
+
+        if (!await async.writeYAML(path.join(envPath, "hiera.yaml"), {
+            "version": 5,
+            "hierarchy": [
+                {
+                    "name": "Nodes",
+                    "path": "nodes/%{trusted.certname}.yaml"
+                },
+                {
+                    "name": "common",
+                    "path": "common.yaml"
+                }
+            ],
+            "defaults": {
+                "data_hash": "yaml_data"
+            }
+        })) {
+            return false;
+        }
+
+        if (!await async.writeFile(path.join(envPath, "manifests", "init.pp"), "include hieraresources"))
+            return false;
+
+        if (!await async.createDirectory(path.join(projectPath, "modules")))
+            return false;
+
+        const workspace = new puppet.Workspace(projectPath);
+
+        await workspace.load();
+
+        const newProject: ProjectModel = new ProjectModel(projectPath, workspace);
+        this._projects.push(newProject);
+
+        await this.save();
+
+        return true;
     }
 
     public async addProject(projectPath: string)

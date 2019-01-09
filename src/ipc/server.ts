@@ -4,7 +4,9 @@ import { projects_list, projects_window, workspace_window, setCurrentWorkspace, 
 import { AssignClassWindow } from "../windows/assign_class/window"
 import { CreateResourceWindow } from "../windows/create_resource/window"
 import { CreateEnvironmentWindow } from "../windows/create_environment/window"
+import { CreateProjectWindow } from "../windows/create_project/window"
 import { ProjectsModel, ProjectModel } from "../projects"
+import { isDirectory, listFiles } from "../async"
 import { puppet } from "../puppet"
 
 import register from "electron-ipc-tunnel/server";
@@ -28,6 +30,31 @@ export class IpcServer implements IpcAPI
         workspace_window.show(path);
         Menu.setApplicationMenu(workspace_menu);
         projects_window.close();
+    }
+
+    public async createProject(): Promise<void>
+    {
+        const window = new CreateProjectWindow();
+        const [path,env] = await window.show();
+
+        if (!await isDirectory(path))
+        {
+            throw new Error("Please choose an empty directory");
+        }
+
+        const files = await listFiles(path);
+        
+        if (files.length > 0)
+        {
+            throw new Error("Please choose an empty directory");
+        }
+
+        if (!await projects_list.createProject(path, env))
+        {
+            throw new Error("Failed to create a new project");
+        }
+
+        await this.openProject(path);
     }
 
     public async getProjectList(): Promise<any> 
@@ -297,13 +324,13 @@ export class IpcServer implements IpcAPI
         });
     }
 
-    public showOpenDirectoryDialog(defaultPath?: string): Promise<any> 
+    public showOpenDirectoryDialog(defaultPath?: string, mode: Array<'openDirectory' | 'createDirectory' | 'promptToCreate'> = ['openDirectory']): Promise<any> 
     {
         return new Promise<string>((resolve, reject) => 
         {
             const options: OpenDialogOptions = {
                 'defaultPath': defaultPath,
-                'properties': ['openDirectory']
+                'properties': mode
             };
         
             dialog.showOpenDialog(options, (filePaths: string[]) =>

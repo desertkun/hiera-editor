@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Create a Project</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src * 'self' data: https:;">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-reboot.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/font-awesome.min.css">
+    <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
+    <script type="text/javascript">
+      window.$ = window.jQuery = require('jquery');
+    </script>
+    <script src="../js/tether.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+  </head>
+  <body>
+    <div class="container-w-padding-x2 w-100 h-100">
+        <label for="project-directory" id="project-directory-label">New Project Directory</label>
+        <div class="input-group input-group-sm mb-3">
+            <input type="text" class="form-control form-control-sm" 
+                aria-label="Project Directory" aria-describedby="project-directory-label" id="project-directory">
+
+            <div class="input-group-append">
+                <button class="btn btn-outline-secondary" type="button" id="browse-project">
+                    <i class="fa fa-folder" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+        <label for="environment-name" id="environment-name-label">Environment Name</label>
+        <div class="input-group input-group-sm mb-3">
+            <input type="text" class="form-control form-control-sm" placeholder="Project Directory" 
+                aria-label="Environment Name" aria-describedby="envirnonemt-name-label" 
+                value="development" id="environment-name">
+        </div>
+        <br/>
+        <div class="w-100 d-flex justify-content-end bottom-buttons">
+            <input type="button" id="create" class="btn btn-space btn-primary" value="Create">
+            <input type="button" id="cancel" class="btn btn-space btn-danger" value="Cancel">
+        </div>
+    </div>
+
+    <script>
+      require('../dist/windows/create_project/renderer.js')
+    </script>
+  </body>
+</html>
