@@ -1150,7 +1150,7 @@ export class PuppetASTFunctionCall implements PuppetASTContainerContext
     {        
         this.name = name;
         this.body = body;
-        this.params = params;
+        this.params = params || new OrderedDictionary();
         this.args = args;
 
         this.resolvedLocals = new Dictionary();
@@ -1435,7 +1435,7 @@ export class PuppetASTResolvedProperty
 
     public get hasHints(): boolean
     {
-        return this._hints.length > 0;
+        return this._hints != null && this._hints.length > 0;
     }
 }
 
