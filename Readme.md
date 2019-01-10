@@ -25,7 +25,14 @@ As a working example, you can clone [this repository](https://github.com/anthill
 
 ## Building from source
 To build the project youself you'll need install [Node](https://nodejs.org/en/download/), 
-clone this repo, open it in the terminal, and just do `npm install`, followed by `npm start` to run it. 
+clone this repo, open it in the terminal, and just do
+
+```
+npm install
+tsc
+npm start
+```
+
 It also has debug configurations for Visual Studio Code.
 
 The project has a bunch of tests, to run those do `tsc` to compile the typescript and then do `npm test`.
