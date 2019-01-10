@@ -40,6 +40,9 @@ The project has a bunch of tests, to run those do `tsc` to compile the typescrip
 ## License
 MIT
 
+This project uses icons from Font Awesome (https://fontawesome.com/license) under the
+Creative Commons Attribution 4.0 International license.
+
 ## Todo
 * Module management (installation, updating, removing)
 * Retreive facts from target machine for accurate compilation of default values
