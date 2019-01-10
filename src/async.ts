@@ -308,13 +308,11 @@ export function execFileReadIn(command: string, cwd: string, env?: any, cb?: Exe
             {
                 var str = data.toString(), lines = str.split(/\r?\n/g);
                 
-                for (let i = lines.length - 1; i >= 0; i--)
+                for (const line of lines)
                 {
-                    const line = lines[i];
                     if (line != "")
                     {
                         cb(line);
-                        break;
                     }
                 }
                 

@@ -1,10 +1,11 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    anthill-librarian-puppet (3.0.0)
+      librarianp (>= 0.6.3)
+      puppet_forge (~> 2.1)
+      rsync
     certified (1.0.0)
-    facter (2.5.1)
-    facter (2.5.1-x64-mingw32)
-      ffi (~> 1.9.5)
     facter (2.5.1-x86-mingw32)
       ffi (~> 1.9.5)
     faraday (0.13.1)
@@ -12,7 +13,6 @@ GEM
     faraday_middleware (0.12.2)
       faraday (>= 0.7.4, < 1.0)
     fast_gettext (1.1.2)
-    ffi (1.9.25-x64-mingw32)
     ffi (1.9.25-x86-mingw32)
     gettext (3.2.9)
       locale (>= 2.0.5)
@@ -24,40 +24,12 @@ GEM
     hiera (3.5.0)
     hocon (1.2.5)
     httpclient (2.8.3)
-    librarian-puppet (3.0.0)
-      librarianp (>= 0.6.3)
-      puppet_forge (~> 2.1)
-      rsync
     librarianp (0.6.4)
       thor (~> 0.15)
     locale (2.1.2)
     minitar (0.6.1)
     multi_json (1.13.1)
     multipart-post (2.0.0)
-    puppet (6.1.0)
-      facter (> 2.0.1, < 4)
-      fast_gettext (~> 1.1.2)
-      hiera (>= 3.2.1, < 4)
-      httpclient (~> 2.8)
-      locale (~> 2.1)
-      multi_json (~> 1.10)
-      puppet-resource_api (~> 1.5)
-      semantic_puppet (~> 1.0)
-    puppet (6.1.0-x64-mingw32)
-      facter (> 2.0.1, < 4)
-      fast_gettext (~> 1.1.2)
-      ffi (~> 1.9.25)
-      hiera (>= 3.2.1, < 4)
-      httpclient (~> 2.8)
-      locale (~> 2.1)
-      minitar (~> 0.6.1)
-      multi_json (~> 1.10)
-      puppet-resource_api (~> 1.5)
-      semantic_puppet (~> 1.0)
-      win32-dir (= 0.4.9)
-      win32-process (= 0.7.5)
-      win32-security (= 0.2.5)
-      win32-service (= 0.8.8)
     puppet (6.1.0-x86-mingw32)
       facter (> 2.0.1, < 4)
       fast_gettext (~> 1.1.2)
@@ -101,13 +73,11 @@ GEM
     yard (0.9.16)
 
 PLATFORMS
-  ruby
-  x64-mingw32
   x86-mingw32
 
 DEPENDENCIES
+  anthill-librarian-puppet
   certified
-  librarian-puppet
   puppet
   puppet-strings
   rdoc

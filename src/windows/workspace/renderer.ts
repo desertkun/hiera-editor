@@ -920,7 +920,7 @@ export class WorkspaceRenderer
     {
         $('#workspace-contents').html('<div class="vertical-center h-100"><div><p class="text-center">' +
             '<span class="text text-muted"><i class="fas fa-cog fa-4x fa-spin"></i></span></p>' +
-            '<p class="text-center"><span class="text text-muted" id="loading-category">' +
+            '<p class="text-center"><span class="text text-muted" style="white-space: pre-line;" id="loading-category">' +
             'Please wait while the workspace is updating cache</span></p>' +
             '<p class="text-center"><div class="progress" id="loading-progress-p" style="width: 400px;">' +
             '<div class="progress-bar progress-bar-striped progress-bar-animated" ' +

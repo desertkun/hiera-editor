@@ -40,22 +40,20 @@ export module puppet
             return null;
         }
 
-        public static async CallBin(command: string, args: string[], cwd: string, cb?: async.ExecFileLineCallback): Promise<boolean>
+        public static async CallBin(script: string, args: string[], cwd: string, env: any, cb?: async.ExecFileLineCallback): Promise<boolean>
         {
             const argsTotal = [
                 Ruby.Path().rubyPath,
-                path.join(Ruby.Path().path, command)
+                path.join(Ruby.Path().path, script)
             ];
 
             for (let arg of args)
             {
                 argsTotal.push(arg);
             }
-        
-            const env: any = {
-                "SSL_CERT_FILE": require('app-root-path').resolve("ruby", "cacert.pem"),
-                "PATH": process.env["PATH"] + path.delimiter + Ruby.Path().path
-            };
+
+            env["SSL_CERT_FILE"] = require('app-root-path').resolve("ruby", "cacert.pem");
+            env["PATH"] = process.env["PATH"] + path.delimiter + Ruby.Path().path;
         
             try
             {
@@ -64,7 +62,7 @@ export module puppet
             }
             catch (e)
             {
-                console.log("Failed to execute command " + command + ": " + e);
+                console.log("Failed to execute command " + script + ": " + e);
                 return false;
             }
         }
@@ -849,14 +847,31 @@ export module puppet
             
                 try
                 {
-                    await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], this._path, (line: string) => 
+                    const lines: string[] = [];
+
+                    const env: any = {};
+
+                    if (process.platform == "win32")
+                    {
+                        env["LIBRARIAN_PUPPET_USE_SHORT_CACHE_PATH"] = "true";
+                        env["LIBRARIAN_PUPPET_TMP"] = "C:/";
+                    }
+
+                    await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], this._path, env, (line: string) => 
                     {
                         if (line.length > 80)
                         {
                             line = line.substr(0, 80) + " ...";
                         }
+
+                        lines.push(line);
+
+                        if (lines.length > 4)
+                        {
+                            lines.splice(0, 1);
+                        }
     
-                        if (updateProgressCategory) updateProgressCategory(line, false);
+                        if (updateProgressCategory) updateProgressCategory(lines.join("\n"), false);
                     });
                 }
                 catch (e)
@@ -1315,14 +1330,31 @@ export module puppet
             
                 try
                 {
-                    await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], this._path, (line: string) => 
+                    const lines: string[] = [];
+
+                    const env: any = {};
+
+                    if (process.platform == "win32")
+                    {
+                        env["LIBRARIAN_PUPPET_USE_SHORT_CACHE_PATH"] = "true";
+                        env["LIBRARIAN_PUPPET_TMP"] = "C:/";
+                    }
+
+                    await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], this._path, env, (line: string) => 
                     {
                         if (line.length > 80)
                         {
                             line = line.substr(0, 80) + " ...";
                         }
+
+                        lines.push(line);
+
+                        if (lines.length > 4)
+                        {
+                            lines.splice(0, 1);
+                        }
     
-                        if (updateProgressCategory) updateProgressCategory(line, false);
+                        if (updateProgressCategory) updateProgressCategory(lines.join("\n"), false);
                     });
                 }
                 catch (e)
