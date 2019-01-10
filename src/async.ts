@@ -293,7 +293,7 @@ export function execFileReadIn(command: string, cwd: string, env?: any, cb?: Exe
         {
             if (error != null)
             {
-                reject(stdout);
+                reject(stderr);
             }
             else
             {

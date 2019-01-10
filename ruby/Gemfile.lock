@@ -6,6 +6,7 @@ GEM
       puppet_forge (~> 2.1)
       rsync
     certified (1.0.0)
+    facter (2.5.1)
     facter (2.5.1-x86-mingw32)
       ffi (~> 1.9.5)
     faraday (0.13.1)
@@ -30,6 +31,15 @@ GEM
     minitar (0.6.1)
     multi_json (1.13.1)
     multipart-post (2.0.0)
+    puppet (6.1.0)
+      facter (> 2.0.1, < 4)
+      fast_gettext (~> 1.1.2)
+      hiera (>= 3.2.1, < 4)
+      httpclient (~> 2.8)
+      locale (~> 2.1)
+      multi_json (~> 1.10)
+      puppet-resource_api (~> 1.5)
+      semantic_puppet (~> 1.0)
     puppet (6.1.0-x86-mingw32)
       facter (> 2.0.1, < 4)
       fast_gettext (~> 1.1.2)
@@ -73,6 +83,7 @@ GEM
     yard (0.9.16)
 
 PLATFORMS
+  ruby
   x86-mingw32
 
 DEPENDENCIES

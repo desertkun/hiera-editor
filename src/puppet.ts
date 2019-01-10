@@ -40,7 +40,7 @@ export module puppet
             return null;
         }
 
-        public static async CallBin(script: string, args: string[], cwd: string, env: any, cb?: async.ExecFileLineCallback): Promise<boolean>
+        public static async CallBin(script: string, args: string[], cwd: string, env_: any, cb?: async.ExecFileLineCallback): Promise<boolean>
         {
             const argsTotal = [
                 Ruby.Path().rubyPath,
@@ -52,8 +52,11 @@ export module puppet
                 argsTotal.push(arg);
             }
 
-            env["SSL_CERT_FILE"] = require('app-root-path').resolve("ruby", "cacert.pem");
-            env["PATH"] = process.env["PATH"] + path.delimiter + Ruby.Path().path;
+            const env = Object.assign({}, process.env);
+            Object.assign(env, env_);
+
+            env["SSL_CERT_FILE"] = require('app-root-path').resolve("ruby/cacert.pem");
+            env["PATH"] = Ruby.Path().path + path.delimiter + process.env["PATH"];
         
             try
             {
@@ -856,6 +859,10 @@ export module puppet
                         env["LIBRARIAN_PUPPET_USE_SHORT_CACHE_PATH"] = "true";
                         env["LIBRARIAN_PUPPET_TMP"] = "C:/";
                     }
+                    else
+                    {
+                        env["LIBRARIAN_PUPPET_TMP"] = path.join(this._path, ".tmp");
+                    }
 
                     await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], this._path, env, (line: string) => 
                     {
@@ -1338,6 +1345,10 @@ export module puppet
                     {
                         env["LIBRARIAN_PUPPET_USE_SHORT_CACHE_PATH"] = "true";
                         env["LIBRARIAN_PUPPET_TMP"] = "C:/";
+                    }
+                    else
+                    {
+                        env["LIBRARIAN_PUPPET_TMP"] = path.join(this._path, ".tmp");
                     }
 
                     await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], this._path, env, (line: string) => 
