@@ -47,4 +47,5 @@ export interface IpcAPI
     getGlobalModules(): Promise<any>;
     getEnvironmentModules(env: string): Promise<any>;
     createEnvironment(): Promise<boolean>;
+    installModules(): Promise<void>;
 }

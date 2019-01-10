@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Please wait</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src * 'self' data: https:;">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-reboot.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/font-awesome.min.css">
+    <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
+    <script type="text/javascript">
+      window.$ = window.jQuery = require('jquery');
+    </script>
+    <script src="../js/tether.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+  </head>
+  <body>
+    <div class="container-w-padding-x2 w-100 h-100">
+        <div id="progress-root" style="display: flex; overflow: hidden; flex-direction: column;">
+            <p class="text-center" style="padding-top: 80px;">
+                <span class="text text-muted">
+                    <i class="fas fa-cog fa-4x fa-spin"></i>
+                </span>
+            </p>
+            <p class="text-center">
+                <span class="text text-muted" style="white-space: pre-line;" id="loading-progress"></span>
+            </p>
+        </div>
+        <div class="text-center w-100 d-flex justify-content-center">
+            <input type="button" id="close" style="display: none;" class="btn btn-danger" value="Close">
+        </div>
+    </div>
+    <script>
+      require('../dist/windows/progress/renderer.js')
+    </script>
+  </body>
+</html>

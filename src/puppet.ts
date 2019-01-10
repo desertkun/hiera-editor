@@ -777,53 +777,54 @@ export module puppet
             return this._modulesInfo;
         }
 
-        public static async InstallModules(path_: string, updateProgressCategory: any): Promise<void>
+        public static async InstallModules(path_: string, progressCallback: any): Promise<boolean>
         {
-            if (await async.isFile(path.join(path_, "Puppetfile")))
+            if (!await async.isFile(path.join(path_, "Puppetfile")))
+                return false;
+
+            progressCallback("Installing modules...", false);
+        
+            try
             {
-                if (updateProgressCategory) updateProgressCategory("Installing modules...", false);
-            
-                try
+                const lines: string[] = [];
+                const env: any = {};
+
+                if (process.platform == "win32")
                 {
-                    const lines: string[] = [];
-
-                    const env: any = {};
-
-                    if (process.platform == "win32")
-                    {
-                        env["LIBRARIAN_PUPPET_USE_SHORT_CACHE_PATH"] = "true";
-                        env["LIBRARIAN_PUPPET_TMP"] = "C:/";
-                    }
-                    else
-                    {
-                        env["LIBRARIAN_PUPPET_TMP"] = path.join(path_, ".tmp");
-                    }
-
-                    await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], path_, env, (line: string) => 
-                    {
-                        if (line.length > 80)
-                        {
-                            line = line.substr(0, 80) + " ...";
-                        }
-
-                        if (line.indexOf("No output") >= 0)
-                            return;
-
-                        lines.push(line);
-
-                        if (lines.length > 4)
-                        {
-                            lines.splice(0, 1);
-                        }
-    
-                        if (updateProgressCategory) updateProgressCategory(lines.join("\n"), false);
-                    });
+                    env["LIBRARIAN_PUPPET_USE_SHORT_CACHE_PATH"] = "true";
+                    env["LIBRARIAN_PUPPET_TMP"] = "C:/";
                 }
-                catch (e)
+                else
                 {
-                    throw new WorkspaceError("Failed to install modules", e.toString());
+                    env["LIBRARIAN_PUPPET_TMP"] = path.join(path_, ".tmp");
                 }
+
+                await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], path_, env, (line: string) => 
+                {
+                    if (line.length > 80)
+                    {
+                        line = line.substr(0, 80) + " ...";
+                    }
+
+                    if (line.indexOf("No output") >= 0)
+                        return;
+
+                    lines.push(line);
+
+                    if (lines.length > 4)
+                    {
+                        lines.splice(0, 1);
+                    }
+
+                    progressCallback(lines.join("\n"), false);
+                });
             }
+            catch (e)
+            {
+                throw new WorkspaceError("Failed to install modules", e.toString());
+            }
+
+            return true;
         }
 
         public async createEnvironment(name: string): Promise<boolean>
@@ -907,6 +908,18 @@ export module puppet
             return this._name;
         }
 
+        public async installModules(callback: any): Promise<boolean>
+        {
+            let hadModules: boolean = await Workspace.InstallModules(this._path, callback);
+
+            for (const env of await this.listEnvironments())
+            {
+                hadModules = hadModules || await env.installModules(callback)
+            }
+
+            return hadModules;
+        }
+
         public async refresh(progressCallback: any = null, updateProgressCategory: any = null): Promise<any>
         {
             if (!await async.isDirectory(this.path))
@@ -922,7 +935,11 @@ export module puppet
                 }
             }
 
-            await Workspace.InstallModules(this._path, updateProgressCategory);
+            if (await async.isFile(path.join(this._path, "Puppetfile")) &&
+                !await async.isDirectory(this.modulesPath))
+            {
+                await this.installModules(updateProgressCategory);   
+            }
 
             let upToDate: boolean = false;
 
@@ -1348,6 +1365,11 @@ export module puppet
             }
         }
 
+        public async installModules(callback: any): Promise<boolean>
+        {
+            return await Workspace.InstallModules(this._path, callback);
+        }
+
         public async refresh(progressCallback: any = null, updateProgressCategory: any = null): Promise<any>
         {
             if (!await async.isDirectory(this.cachePath))
@@ -1358,7 +1380,11 @@ export module puppet
                 }
             }
 
-            await Workspace.InstallModules(this._path, updateProgressCategory);
+            if (await async.isFile(path.join(this._path, "Puppetfile")) &&
+                !await async.isDirectory(this.modulesPath))
+            {
+                await this.installModules(updateProgressCategory);   
+            }
 
             if (await async.isDirectory(this.modulesPath))
             {

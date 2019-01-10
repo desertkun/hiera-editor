@@ -1149,6 +1149,14 @@ export class WorkspaceRenderer
                 }
             }));
 
+            contextMenu.append(new MenuItem({
+                label: 'Install/Update Puppetfile modules',
+                async click () 
+                { 
+                    await ipc.installModules();
+                }
+            }));
+
             contextMenu.popup({window: remote.getCurrentWindow()})
         });
 

@@ -5,6 +5,7 @@ import { AssignClassWindow } from "../windows/assign_class/window"
 import { CreateResourceWindow } from "../windows/create_resource/window"
 import { CreateEnvironmentWindow } from "../windows/create_environment/window"
 import { CreateProjectWindow } from "../windows/create_project/window"
+import { ProgressWindow } from "../windows/progress/window"
 import { ProjectsModel, ProjectModel } from "../projects"
 import { isDirectory, listFiles } from "../async"
 import { puppet } from "../puppet"
@@ -756,6 +757,44 @@ export class IpcServer implements IpcAPI
             return;
 
         return await workspace.createEnvironment(env);
+    }
+    
+    public async installModules(): Promise<void>
+    {
+        const workspace: puppet.Workspace = getCurrentWorkspace();
+        if (workspace == null)
+            return;
+            
+        const progress = new ProgressWindow();
+        await progress.show();
+
+        try
+        {
+            const hadAny = await workspace.installModules((text: string) => 
+            {
+                progress.notifyProgressUpdate(text);
+            });
+
+            if (hadAny)
+            {
+                progress.close();
+            }
+            else
+            {
+                throw new Error("Puppetfile wasn't found. Please place Puppetfile in the root of your project, or in the environment folder.");
+            }
+        }
+        catch (e)
+        {
+            if (e.hasOwnProperty("title"))
+            {
+                progress.notifyProgressError(e.title, e.message);
+            }
+            else
+            {
+                progress.notifyProgressError("Failed to process the workspace", e.message);
+            }
+        }
     }
 }
 
