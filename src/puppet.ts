@@ -22,7 +22,7 @@ export module puppet
 
     export class Ruby
     {
-        public static Path(): RubyPath
+        private static Path_(): RubyPath
         {
             if (process.platform == "win32")
             {
@@ -39,12 +39,25 @@ export module puppet
             
             return null;
         }
+        
+        public static Path(): RubyPath
+        {
+            const path_ = Ruby.Path_();
+
+            return {
+                path: path_.path.replace('app.asar', 'app.asar.unpacked'),
+                rubyPath: path_.rubyPath.replace('app.asar', 'app.asar.unpacked'),
+                gemPath: path_.gemPath.replace('app.asar', 'app.asar.unpacked'),
+            };
+        }
 
         public static async CallBin(script: string, args: string[], cwd: string, env_: any, cb?: async.ExecFileLineCallback): Promise<void>
         {
+            const ruby = Ruby.Path();
+
             const argsTotal = [
-                Ruby.Path().rubyPath,
-                path.join(Ruby.Path().path, script)
+                ruby.rubyPath,
+                path.join(ruby.path, script)
             ];
 
             for (let arg of args)
@@ -56,13 +69,14 @@ export module puppet
             Object.assign(env, env_);
 
             env["SSL_CERT_FILE"] = require('app-root-path').resolve("ruby/cacert.pem");
-            env["PATH"] = Ruby.Path().path + path.delimiter + process.env["PATH"];
+            env["PATH"] = ruby.path + path.delimiter + process.env["PATH"];
         
             await async.execFileReadIn("\"" + argsTotal.join("\" \"") + "\"", cwd, env, cb);
         }
 
         public static async Call(script: string, args: Array<string>, cwd: string): Promise<boolean>
         {
+            const ruby = Ruby.Path();
             const rubyScript = require('app-root-path').resolve(path.join("ruby", script));
 
             const argsTotal = [];
@@ -76,7 +90,7 @@ export module puppet
         
             try
             {
-                await async.execFile(Ruby.Path().rubyPath, argsTotal, cwd);
+                await async.execFile(ruby.rubyPath, argsTotal, cwd);
                 return true;
             }
             catch (e)
