@@ -104,8 +104,8 @@
     "yaml": "^1.0.1"
   },
   "optionalDependencies": {
-    "rubyjs-darwin": "latest",
-    "rubyjs-win32": "latest",
-    "rubyjs-linux": "latest"
+    "rubyjs-darwin": "2.3.3",
+    "rubyjs-win32": "2.3.5",
+    "rubyjs-linux": "2.3.6"
   }
 }
