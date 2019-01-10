@@ -40,7 +40,7 @@ export module puppet
             return null;
         }
 
-        public static async CallBin(script: string, args: string[], cwd: string, env_: any, cb?: async.ExecFileLineCallback): Promise<boolean>
+        public static async CallBin(script: string, args: string[], cwd: string, env_: any, cb?: async.ExecFileLineCallback): Promise<void>
         {
             const argsTotal = [
                 Ruby.Path().rubyPath,
@@ -58,16 +58,7 @@ export module puppet
             env["SSL_CERT_FILE"] = require('app-root-path').resolve("ruby/cacert.pem");
             env["PATH"] = Ruby.Path().path + path.delimiter + process.env["PATH"];
         
-            try
-            {
-                await async.execFileReadIn("\"" + argsTotal.join("\" \"") + "\"", cwd, env, cb);
-                return true;
-            }
-            catch (e)
-            {
-                console.log("Failed to execute command " + script + ": " + e);
-                return false;
-            }
+            await async.execFileReadIn("\"" + argsTotal.join("\" \"") + "\"", cwd, env, cb);
         }
 
         public static async Call(script: string, args: Array<string>, cwd: string): Promise<boolean>
@@ -421,7 +412,18 @@ export module puppet
     }
 
     export class PuppetError extends Error {}
-    export class WorkspaceError extends PuppetError {}
+
+    export class WorkspaceError extends PuppetError 
+    {
+        public title: string;
+
+        constructor (title: string, message: string)
+        {
+            super(message);
+            this.title = title;
+        }
+    }
+
     export class NoSuchEnvironmentError extends PuppetError {}
     export class CompilationError extends PuppetError {}
 
@@ -761,6 +763,55 @@ export module puppet
             return this._modulesInfo;
         }
 
+        public static async InstallModules(path_: string, updateProgressCategory: any): Promise<void>
+        {
+            if (await async.isFile(path.join(path_, "Puppetfile")))
+            {
+                if (updateProgressCategory) updateProgressCategory("Installing modules...", false);
+            
+                try
+                {
+                    const lines: string[] = [];
+
+                    const env: any = {};
+
+                    if (process.platform == "win32")
+                    {
+                        env["LIBRARIAN_PUPPET_USE_SHORT_CACHE_PATH"] = "true";
+                        env["LIBRARIAN_PUPPET_TMP"] = "C:/";
+                    }
+                    else
+                    {
+                        env["LIBRARIAN_PUPPET_TMP"] = path.join(path_, ".tmp");
+                    }
+
+                    await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], path_, env, (line: string) => 
+                    {
+                        if (line.length > 80)
+                        {
+                            line = line.substr(0, 80) + " ...";
+                        }
+
+                        if (line.indexOf("No output") >= 0)
+                            return;
+
+                        lines.push(line);
+
+                        if (lines.length > 4)
+                        {
+                            lines.splice(0, 1);
+                        }
+    
+                        if (updateProgressCategory) updateProgressCategory(lines.join("\n"), false);
+                    });
+                }
+                catch (e)
+                {
+                    throw new WorkspaceError("Failed to install modules", e.toString());
+                }
+            }
+        }
+
         public async createEnvironment(name: string): Promise<boolean>
         {
             if (await this.getEnvironment(name) != null)
@@ -841,69 +892,23 @@ export module puppet
         {
             return this._name;
         }
-        
-        private async installModules(updateProgressCategory: any): Promise<void>
-        {
-            if (await async.isFile(path.join(this.path, "Puppetfile")))
-            {
-                if (updateProgressCategory) updateProgressCategory("Installing modules...", false);
-            
-                try
-                {
-                    const lines: string[] = [];
-
-                    const env: any = {};
-
-                    if (process.platform == "win32")
-                    {
-                        env["LIBRARIAN_PUPPET_USE_SHORT_CACHE_PATH"] = "true";
-                        env["LIBRARIAN_PUPPET_TMP"] = "C:/";
-                    }
-                    else
-                    {
-                        env["LIBRARIAN_PUPPET_TMP"] = path.join(this._path, ".tmp");
-                    }
-
-                    await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], this._path, env, (line: string) => 
-                    {
-                        if (line.length > 80)
-                        {
-                            line = line.substr(0, 80) + " ...";
-                        }
-
-                        lines.push(line);
-
-                        if (lines.length > 4)
-                        {
-                            lines.splice(0, 1);
-                        }
-    
-                        if (updateProgressCategory) updateProgressCategory(lines.join("\n"), false);
-                    });
-                }
-                catch (e)
-                {
-                    throw new WorkspaceError("Failed to install modules: " + e.toString());
-                }
-            }
-        }
 
         public async refresh(progressCallback: any = null, updateProgressCategory: any = null): Promise<any>
         {
             if (!await async.isDirectory(this.path))
             {
-                throw new WorkspaceError("Workspace path does not exist");
+                throw new WorkspaceError("Workspace path does not exist", this.path);
             }
 
             if (!await async.isDirectory(this.cachePath))
             {
                 if (!await async.makeDirectory(this.cachePath))
                 {
-                    throw new WorkspaceError("Failed to create cache directory");
+                    throw new WorkspaceError("Failed to create cache directory", this.cachePath);
                 }
             }
 
-            await this.installModules(updateProgressCategory);
+            await Workspace.InstallModules(this._path, updateProgressCategory);
 
             let upToDate: boolean = false;
 
@@ -1329,52 +1334,6 @@ export module puppet
             }
         }
 
-        private async installModules(updateProgressCategory: any): Promise<void>
-        {
-            if (await async.isFile(path.join(this.path, "Puppetfile")))
-            {
-                if (updateProgressCategory) updateProgressCategory("Installing modules...", false);
-            
-                try
-                {
-                    const lines: string[] = [];
-
-                    const env: any = {};
-
-                    if (process.platform == "win32")
-                    {
-                        env["LIBRARIAN_PUPPET_USE_SHORT_CACHE_PATH"] = "true";
-                        env["LIBRARIAN_PUPPET_TMP"] = "C:/";
-                    }
-                    else
-                    {
-                        env["LIBRARIAN_PUPPET_TMP"] = path.join(this._path, ".tmp");
-                    }
-
-                    await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], this._path, env, (line: string) => 
-                    {
-                        if (line.length > 80)
-                        {
-                            line = line.substr(0, 80) + " ...";
-                        }
-
-                        lines.push(line);
-
-                        if (lines.length > 4)
-                        {
-                            lines.splice(0, 1);
-                        }
-    
-                        if (updateProgressCategory) updateProgressCategory(lines.join("\n"), false);
-                    });
-                }
-                catch (e)
-                {
-                    throw new WorkspaceError("Failed to install modules: " + e.toString());
-                }
-            }
-        }
-
         public async refresh(progressCallback: any = null, updateProgressCategory: any = null): Promise<any>
         {
             if (!await async.isDirectory(this.cachePath))
@@ -1385,7 +1344,7 @@ export module puppet
                 }
             }
 
-            await this.installModules(updateProgressCategory);
+            await Workspace.InstallModules(this._path, updateProgressCategory);
 
             if (await async.isDirectory(this.modulesPath))
             {

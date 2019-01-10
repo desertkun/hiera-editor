@@ -841,7 +841,24 @@ export class WorkspaceRenderer
         }
 
         await this.initUI();
-        await ipc.refreshWorkspace();
+        
+        try
+        {
+            await ipc.refreshWorkspace();
+        }
+        catch (e)
+        {
+            if (e.hasOwnProperty("title"))
+            {
+                WorkspaceRenderer.OpenError(e.title, e.message);
+            }
+            else
+            {
+                WorkspaceRenderer.OpenError("Failed to process the workspace", e.message);
+            }
+            return;
+        }
+
         await this.initWorkspace();
         await this.initModules();
 
@@ -914,6 +931,19 @@ export class WorkspaceRenderer
         const environment = new EnvironmentTreeItemRenderer(this, name, this.workspaceTree.root);
         this.environments.put(name, environment);
         return environment;
+    }
+
+    private static OpenError(title: string, text: string)
+    {
+        $('#workspace-contents').html('<div class="vertical-center h-100"><div><p class="text-center">' +
+            '<span class="text text-danger"><i class="fas fa-2x fa-exclamation-triangle"></i></span></p>' +
+            '<p class="text-center text-danger">' +
+            '<span class="text text-muted" style="white-space: pre-line;" id="loading-error-title"></span></p>' +
+            '<p class="text-center" style="max-height: 250px; overflow-y: scroll;">' +
+            '<span class="text text-muted" style="white-space: pre-line;" id="loading-error-contents"></span></p></div></div>');
+
+        $('#loading-error-title').text(title);
+        $('#loading-error-contents').text(text);
     }
 
     private static OpenLoading()
