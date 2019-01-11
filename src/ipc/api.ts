@@ -48,4 +48,6 @@ export interface IpcAPI
     getEnvironmentModules(env: string): Promise<any>;
     createEnvironment(): Promise<boolean>;
     installModules(): Promise<void>;
+    publishCSR(server: string, certname: string): Promise<string>;
+    downloadSignedCertificate(): Promise<void>;
 }

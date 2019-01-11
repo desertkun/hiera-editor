@@ -1,0 +1,20 @@
+
+.step-iteration {
+    margin: auto;
+    width: 100%;
+    height: 4px;
+    background-color: #eae8e8;
+    border-radius: 4px;
+}
+
+.step-iteration-success {
+    background-color: #28a745!important;
+}
+
+.step-iteration-progress {
+    background-color: #ffc107!important;
+}
+
+.step-iteration-fail {
+    background-color: #dc3545!important;
+}

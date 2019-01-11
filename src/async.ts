@@ -279,9 +279,9 @@ export function execFile(path: string, args: Array<string>, cwd: string, env?: a
 
 export type ExecFileLineCallback = (line: string) => void;
 
-export function execFileReadIn(command: string, cwd: string, env?: any, cb?: ExecFileLineCallback): Promise<any>
+export function execFileReadIn(command: string, cwd: string, env?: any, cb?: ExecFileLineCallback): Promise<string>
 {
-    return new Promise<boolean>((resolve, reject) =>
+    return new Promise<string>((resolve, reject) =>
     {
         const options: child_process.ExecFileOptions = {
             'cwd': cwd,
@@ -297,7 +297,7 @@ export function execFileReadIn(command: string, cwd: string, env?: any, cb?: Exe
             }
             else
             {
-                resolve();
+                resolve(stdout);
             }
         });
 
@@ -396,6 +396,24 @@ export function readJSON(filePath: string): Promise<any>
                 {
                     reject(e);
                 }
+            }
+        })
+    });
+}
+
+export function readFile(filePath: string): Promise<string>
+{
+    return new Promise<string>((resolve, reject) =>
+    {
+        fs.readFile(filePath, "UTF-8", (error, data) => 
+        {
+            if (error) 
+            {
+                reject(error)
+            } 
+            else 
+            {
+                resolve(data);
             }
         })
     });

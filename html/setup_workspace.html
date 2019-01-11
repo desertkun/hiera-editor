@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Workspace Setup</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src * 'self' data: https:;">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-reboot.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/font-awesome.min.css">
+    <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
+    <link rel="stylesheet" href="../css/setup_workspace.css">
+    <script type="text/javascript">
+      window.$ = window.jQuery = require('jquery');
+    </script>
+    <script src="../js/tether.min.js"></script>
+    <script src="../js/popper.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+  </head>
+  <body>
+      <div class="w-100 h-100">
+        <div class="container-w-padding-x2 d-flex flex-column h-100">
+            <div class="p-2">
+                <h4 id="setup-step-title"></h4>
+                <div class="d-flex flex-row">
+                    <div class="p-2 text-muted" id="setup-step-1"><i class="fas fa-circle"></i></div>
+                    <div class="step-iteration" id="setup-step-2-line"></div>
+                    <div class="p-2 text-muted" id="setup-step-2"><i class="fas fa-circle"></i></div>
+                    <div class="step-iteration" id="setup-step-3-line"></div>
+                    <div class="p-2 text-muted" id="setup-step-3"><i class="fas fa-circle"></i></div>
+                    <div class="step-iteration" id="setup-step-4-line"></div>
+                    <div class="p-2 text-muted" id="setup-step-4"><i class="fas fa-circle"></i></div>
+                    <div class="step-iteration" id="setup-step-5-line"></div>
+                    <div class="p-2 text-muted" id="setup-step-5"><i class="fas fa-circle"></i></div>
+                </div>
+            </div>
+            <div class="p-2" style="flex-grow: 1;">
+                <div id="setup-step-1-content" style="display: none;">
+                    <div class="alert alert-light" role="alert">
+                        <div class="d-flex flex-row">
+                            <div class="p-2"><i class="fas fa-3x fa-wrench"></i></div>
+                            <div class="p-2">
+                                In order to Hiera Editor to work it needs to be able to download some information from Puppet Server.
+                            </div>
+                        </div>
+                    </div>
+                    <label for="puppet-server" id="puppet-server-label">Puppet Server Hostname</label>
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" 
+                            aria-label="Puppet Server Hostname" placeholder="Something like puppet.yourdomain.com" 
+                            aria-describedby="puppet-server-label" id="puppet-server" autofocus>
+                    </div>
+                    <label for="puppet-certname" id="puppet-certname-label">Hiera Editor Certificate Name 
+                    </label>
+                    <div class="text-muted float-right" data-toggle="tooltip" 
+                        title="Hiera Editor will perform a Certificate Requiest to Puppet Server to be able to get node information" 
+                        data-placement="left"><i class="fas fa-question"></i></div>
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" 
+                            aria-label="Hiera Editor Certificate Name" 
+                            aria-describedby="puppet-certname-label" id="puppet-certname" 
+                            value="hiera-editor-tool" autofocus>
+                    </div>
+                </div>
+                <div id="setup-step-2-content" style="display: none;">
+                    <div class="text-center">
+                        <br/><br/><br/><br/>
+                        <i class="fas text-muted fa-cog fa-4x fa-spin"></i>
+                        <br/><br/>
+                        Please wait while the certificate is being requested
+                    </div>
+                </div>
+                <div id="setup-step-3-content" style="display: none;">
+                    <div>
+                        Please sign the certificate request on the Puppet Server.<br>
+                        You can do it with something like this (using ssh):<br>
+                        <code id="crs-sign-example"></code>
+                        <br><br>
+                        <div id="crs-fingerprint" style="display: none;">
+                            Please make sure the fingerprint matches:
+                            <br>
+                            <code id="crs-fingerprint-value"></code>
+                            <br><br>
+                            You can do that by running:
+                            <br>
+                            <code id="crs-fingerprint-check"></code>
+                            <br><br>
+                        </div>
+                        Once ready, hit next.
+                    </div>
+                </div>
+                <div id="setup-step-4-content" style="display: none;">
+                    <div class="text-center">
+                        <br/><br/><br/><br/>
+                        <i class="fas text-muted fa-cog fa-4x fa-spin"></i>
+                        <br/><br/>
+                        Please wait while the signed certificate is being downloaded
+                    </div>
+                </div>
+                <div id="setup-step-5-content" style="display: none;">
+                    <div>
+                        Allow Hiera Editor to retrieve facts from another nodes.<br>
+                        To do so, you would need to edit file <span class="badge badge-secondary">auth.conf</span> on the Puppet Server:<br>
+                        <code>
+                            nano /etc/puppetlabs/puppetserver/conf.d/auth.conf
+                        </code>
+                        <br><br>
+                        Scroll down (with arrow keys) until you see a block like this<br>
+                        <code style="line-height: 0;font-size: 14px;">
+                            # Allow nodes to retrieve only their own node definition<br>
+                            match-request: {<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;path: "^/puppet/v3/node/([^/]+)$"<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;type: regex<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;method: get<br>
+                            }<br>
+                            <span class="badge badge-danger">allow: ["$1", <span id="auth-conf-example"></span>]</span><br>
+                            sort-order: 500<br>
+                            name: "puppetlabs node"<br>
+                        </code>
+                        <br>
+                        Update that block as shown in the red line above (<span class="badge badge-secondary">allow: [...]</span>).
+                    </div>
+                </div>
+                <div id="setup-error" style="display: none;">
+                    <div id="setup-error-text" style="overflow-y: auto; white-space: pre-line;">
+                    </div>
+                </div>
+            </div>
+            <div class="p-2">
+                <button class="btn btn-success btn-space float-right" id="btn-configuration-complete" style="display: none;">Complete</button>
+                <button class="btn btn-primary btn-space float-right" id="btn-configuration-next">Next</button>
+                <button class="btn btn-primary btn-space float-right" id="btn-configuration-retry" style="display: none;">Retry</button>
+                <button class="btn btn-danger btn-space float-right" id="btn-configuration-close" style="display: none;">Close</button>
+            </div>
+        </div>
+      </div>
+    
+    <script>
+      require('../dist/windows/setup_workspace/renderer.js')
+    </script>
+  </body>
+</html>

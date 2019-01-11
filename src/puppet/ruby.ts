@@ -41,7 +41,30 @@ export class Ruby
         };
     }
 
-    public static async CallBin(script: string, args: string[], cwd: string, env_: any, cb?: async.ExecFileLineCallback): Promise<void>
+    public static async CallBin(script: string, args: string[], cwd: string, env_: any, cb?: async.ExecFileLineCallback): Promise<string>
+    {
+        const ruby = Ruby.Path();
+
+        const argsTotal = [
+            path.join(ruby.path, script)
+        ];
+
+        for (let arg of args)
+        {
+            argsTotal.push(arg);
+        }
+
+        const env = Object.assign({}, process.env);
+        Object.assign(env, env_);
+
+        env["SSL_CERT_FILE"] = require('app-root-path').resolve("ruby/cacert.pem");
+        env["PATH"] = ruby.path + path.delimiter + process.env["PATH"];
+    
+        console.log("calling " + argsTotal.join(" "));
+        return await async.execFileReadIn(argsTotal.join(" "), cwd, env, cb);
+    }
+
+    public static async CallRubyBin(script: string, args: string[], cwd: string, env_: any, cb?: async.ExecFileLineCallback): Promise<void>
     {
         const ruby = Ruby.Path();
 
@@ -61,7 +84,8 @@ export class Ruby
         env["SSL_CERT_FILE"] = require('app-root-path').resolve("ruby/cacert.pem");
         env["PATH"] = ruby.path + path.delimiter + process.env["PATH"];
     
-        await async.execFileReadIn("\"" + argsTotal.join("\" \"") + "\"", cwd, env, cb);
+        console.log("calling " + argsTotal.join(" "));
+        await async.execFileReadIn(argsTotal.join(" "), cwd, env, cb);
     }
 
     public static async Call(script: string, args: Array<string>, cwd: string): Promise<boolean>

@@ -6,15 +6,15 @@ import { CreateResourceWindow } from "../windows/create_resource/window"
 import { CreateEnvironmentWindow } from "../windows/create_environment/window"
 import { CreateProjectWindow } from "../windows/create_project/window"
 import { ProgressWindow } from "../windows/progress/window"
-import { ProjectsModel, ProjectModel } from "../projects"
+import { ProjectModel } from "../projects"
 import { isDirectory, listFiles } from "../async"
-
 import { Workspace } from "../puppet/workspace";
 import { Environment } from "../puppet/environment";
-import { Node } from "../puppet/files";
-
 import register from "electron-ipc-tunnel/server";
 import { IpcAPI } from "./api"
+import { WorkspaceSettings } from "../puppet/workspace_settings";
+import { Ruby } from "../puppet/ruby";
+import { WorkspaceError } from "../puppet/util";
 
 export class IpcServer implements IpcAPI
 {
@@ -798,6 +798,30 @@ export class IpcServer implements IpcAPI
                 progress.notifyProgressError("Failed to process the workspace", e.message);
             }
         }
+    }
+    
+    public async publishCSR(server: string, certname: string): Promise<string>
+    {
+        const workspace: Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            throw new WorkspaceError("Failed to publich CRS", "No workspace");
+        }
+            
+        return await workspace.publishCSR(server, certname);
+    }
+    
+    public async downloadSignedCertificate(): Promise<void>
+    {
+        const workspace: Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            throw new WorkspaceError("Failed to publich CRS", "No workspace");
+        }
+            
+        await workspace.downloadSignedCertificate();
     }
 }
 

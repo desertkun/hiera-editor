@@ -3,6 +3,9 @@ import * as path from "path";
 import * as async from "../async";
 import * as os from "os";
 
+import { SetupWorkspaceWindow } from "../windows/setup_workspace/window"
+
+import { WorkspaceSettings } from "./workspace_settings"
 import { PuppetModulesInfo } from "./modules_info"
 import { Dictionary } from "../dictionary";
 import { Environment } from "./environment"
@@ -11,9 +14,11 @@ import { WorkspaceError, CompiledPromisesCallback } from "./util"
 import { Folder, Node } from "./files"
 
 const PromisePool = require('es6-promise-pool');
+const slash = require('slash');
 
 export class Workspace
 {
+    private _workspaceSettings: WorkspaceSettings;
     private readonly _path: string;
     private _name: string;
     private _environments: Dictionary<string, Environment>;
@@ -42,7 +47,22 @@ export class Workspace
 
     public get settingsPath(): string
     {
-        return path.join(this._cachePath, ".settings");
+        return path.join(this._cachePath, "puppet.conf");
+    }
+
+    public async getSettings(): Promise<WorkspaceSettings>
+    {
+        if (this._workspaceSettings == null)
+        {
+            this._workspaceSettings = new WorkspaceSettings(this.settingsPath, this._path);
+
+            if (!await this._workspaceSettings.read())
+            {
+                this._workspaceSettings.reset();
+            }
+        }
+        
+        return this._workspaceSettings;
     }
 
     public get path():string 
@@ -77,7 +97,7 @@ export class Workspace
                 env["LIBRARIAN_PUPPET_TMP"] = path.join(path_, ".tmp");
             }
 
-            await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], path_, env, (line: string) => 
+            await Ruby.CallRubyBin("librarian-puppet", ["install", "--verbose"], path_, env, (line: string) => 
             {
                 if (line.length > 80)
                 {
@@ -103,6 +123,67 @@ export class Workspace
         }
 
         return true;
+    }
+    
+    public async downloadSignedCertificate(): Promise<void>
+    {
+        const paths = WorkspaceSettings.GetPaths();
+
+        try
+        {
+            await Ruby.CallBin("puppet", [
+                "ssl", "download_cert", 
+                "--config '" + slash(this.settingsPath) + "'",
+                "--confdir '" + paths.confdir + "'",
+                "--vardir '" + paths.vardir + "'",
+                "--rundir '" + paths.rundir + "'",
+                "--logdir '" + paths.logdir + "'",
+                "--verbose"
+            ], this.path, {});
+        }   
+        catch (e)
+        {
+            throw new WorkspaceError("Failed to download signed certificate", e.toString());
+        }
+
+    }
+
+    public async publishCSR(server: string, certname: string): Promise<string>
+    {
+        const settings = await this.getSettings();
+
+        settings.server = server;
+        settings.certname = certname;
+
+        settings.write();
+
+        const paths = WorkspaceSettings.GetPaths();
+        let output;
+
+        try
+        {
+            output = await Ruby.CallBin("puppet", [
+                "ssl", "submit_request", 
+                "--config '" + slash(this.settingsPath) + "'",
+                "--confdir '" + paths.confdir + "'",
+                "--vardir '" + paths.vardir + "'",
+                "--rundir '" + paths.rundir + "'",
+                "--logdir '" + paths.logdir + "'",
+                "--verbose"
+            ], this.path, {});
+        }   
+        catch (e)
+        {
+            throw new WorkspaceError("Failed to publish CSR", e.toString());
+        }
+
+        const m = output.match(/Certificate Request fingerprint \(.+\): ([A-F0-9:]+)/);
+        if (m)
+        {
+            return m[1];
+        }
+
+        return null;
     }
 
     public async createEnvironment(name: string): Promise<boolean>
@@ -198,6 +279,13 @@ export class Workspace
         return hadModules;
     }
 
+    private async setupWorkspace(settings: WorkspaceSettings)
+    {
+        const setupWindow = new SetupWorkspaceWindow(settings);
+        await setupWindow.show();
+        await settings.write();
+    }
+
     public async init(progressCallback: any = null, updateProgressCategory: any = null): Promise<any>
     {
         if (!await async.isDirectory(this.path))
@@ -210,6 +298,19 @@ export class Workspace
             if (!await async.makeDirectory(this.cachePath))
             {
                 throw new WorkspaceError("Failed to create cache directory", this.cachePath);
+            }
+        }
+
+        const settings = await this.getSettings();
+
+        if (!await settings.isValid())
+        {
+            if (updateProgressCategory) updateProgressCategory("Setting up workspace...", false);
+            await this.setupWorkspace(settings);
+            
+            if (!await settings.isValid())
+            {
+                throw new WorkspaceError("Workspace setup complete, BUT", "There seem to be no downloaded certificates found.");
             }
         }
 
