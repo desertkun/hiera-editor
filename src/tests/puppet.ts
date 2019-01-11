@@ -4,8 +4,13 @@ const rmdir = require('rimraf');
 
 import * as path from "path";
 import * as tmp from "tmp";
-import { puppet } from "../puppet";
-import {PuppetASTAccess, PuppetASTPrimitive, PuppetASTQualifiedName, PuppetASTType, PuppetASTTypeOf, PuppetHintBodyCompilationError} from "../puppet/ast";
+
+import { Workspace } from "../puppet/workspace";
+import { Environment } from "../puppet/environment";
+import { Node } from "../puppet/files";
+import { PuppetASTAccess, PuppetASTPrimitive, PuppetASTQualifiedName, 
+    PuppetASTType, PuppetASTTypeOf, PuppetHintBodyCompilationError } from "../puppet/ast";
+import { WorkspaceError, CompilationError } from "../puppet/util"
 
 const async = require("../async");
 const chai = require('chai');
@@ -20,21 +25,21 @@ function getWorkspacePath(name: string)
     return path.join(__dirname, "../../tests/workspaces/" + name);
 }
 
-type WorkspaceTestCallback = (workspace: puppet.Workspace,
-                              environment: puppet.Environment,
-                              node: puppet.Node) => Promise<any>;
+type WorkspaceTestCallback = (workspace: Workspace,
+                              environment: Environment,
+                              node: Node) => Promise<any>;
 
 async function testRealWorkspace(workspaceName: string, environmentName: string, nodeName: string,
-                             f: WorkspaceTestCallback = null): Promise<puppet.Node>
+                             f: WorkspaceTestCallback = null): Promise<Node>
 {
     const d = tmp.dirSync();
 
     try
     {
-        const workspace = new puppet.Workspace(getWorkspacePath(workspaceName), d.name);
-        await workspace.refresh();
+        const workspace = new Workspace(getWorkspacePath(workspaceName), d.name);
+        await workspace.init();
         const environment = await workspace.getEnvironment(environmentName);
-        await environment.refresh();
+        await environment.init();
         const node = await environment.root.getNode(nodeName);
         if (f)
         {
@@ -49,7 +54,7 @@ async function testRealWorkspace(workspaceName: string, environmentName: string,
 }
 
 async function testSimpleWorkspace(files: any, nodeYAML: any,
-                             f: WorkspaceTestCallback = null, nodeYAMLCommentBefore?: string, functions?: any): Promise<puppet.Node>
+                             f: WorkspaceTestCallback = null, nodeYAMLCommentBefore?: string, functions?: any): Promise<Node>
 {
     const d = tmp.dirSync();
 
@@ -88,10 +93,10 @@ async function testSimpleWorkspace(files: any, nodeYAML: any,
 
     try
     {
-        const workspace = new puppet.Workspace(d.name);
-        await workspace.refresh();
+        const workspace = new Workspace(d.name);
+        await workspace.init();
         const environment = await workspace.getEnvironment("dev");
-        await environment.refresh();
+        await environment.init();
         const node = await environment.root.getNode("test");
         if (f)
         {
@@ -109,15 +114,15 @@ describe('Workspaces', () =>
 {
     it('missing directory', () =>
     {
-        return expect(testRealWorkspace("missing...", "dev", "test")).to.be.rejectedWith(puppet.WorkspaceError);
+        return expect(testRealWorkspace("missing...", "dev", "test")).to.be.rejectedWith(WorkspaceError);
     });
 
     it('minimal workspace', () =>
     {
         return testRealWorkspace("minimal", "dev", "test", async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
             expect(class_.name).to.equal("test");
@@ -131,11 +136,11 @@ describe('Workspaces', () =>
                 $%@%+@*$ _&(FHW_ +{@#}UH
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
-            await expect(node.acquireClass("test")).to.be.rejectedWith(puppet.CompilationError);
+            await expect(node.acquireClass("test")).to.be.rejectedWith(CompilationError);
         });
     });
 
@@ -150,9 +155,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
             expect(class_.getResolvedProperty("test_string").value).to.equal("testing");
@@ -179,9 +184,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
             const a = class_.getResolvedProperty("test_string");
@@ -207,9 +212,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
             expect(class_.getResolvedProperty("v").value).to.equal("Hello, World!");
@@ -225,9 +230,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
             expect(class_.getResolvedProperty("v").value).to.equal("Hello, myhost!");
@@ -243,9 +248,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             await node.acquireClass("test");
         });
@@ -263,9 +268,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             await node.acquireClass("test");
         });
@@ -282,9 +287,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             await node.acquireClass("test");
         });
@@ -303,9 +308,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             await node.acquireClass("test");
         });
@@ -321,9 +326,9 @@ describe('Workspaces', () =>
                 ) {}
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
 
@@ -363,9 +368,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
 
@@ -404,9 +409,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
 
@@ -428,9 +433,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
 
@@ -451,9 +456,9 @@ describe('Workspaces', () =>
                 class test ($v = test::test_summ(1), $v2 = test::test_summ(1, 2)) {}
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
             
@@ -486,9 +491,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
             
@@ -511,9 +516,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
             
@@ -539,9 +544,9 @@ describe('Workspaces', () =>
                }
            `
        }, {"classes": ["test"]}, async (
-           workspace: puppet.Workspace,
-           environment: puppet.Environment,
-           node: puppet.Node) =>
+           workspace: Workspace,
+           environment: Environment,
+           node: Node) =>
        {
            const class_ = await node.acquireClass("test");
            
@@ -576,9 +581,9 @@ describe('Workspaces', () =>
                }
            `
        }, {"classes": ["test"]}, async (
-           workspace: puppet.Workspace,
-           environment: puppet.Environment,
-           node: puppet.Node) =>
+           workspace: Workspace,
+           environment: Environment,
+           node: Node) =>
        {
            const class_ = await node.acquireClass("test");
            
@@ -613,9 +618,9 @@ describe('Workspaces', () =>
                }
            `
        }, {"classes": ["test"], "test::check::checkA": 15}, async (
-           workspace: puppet.Workspace,
-           environment: puppet.Environment,
-           node: puppet.Node) =>
+           workspace: Workspace,
+           environment: Environment,
+           node: Node) =>
        {
            const class_ = await node.acquireClass("test");
            
@@ -639,9 +644,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
             
@@ -673,9 +678,9 @@ describe('Workspaces', () =>
                 }
             `
         }, {"classes": ["test"]}, async (
-            workspace: puppet.Workspace,
-            environment: puppet.Environment,
-            node: puppet.Node) =>
+            workspace: Workspace,
+            environment: Environment,
+            node: Node) =>
         {
             const class_ = await node.acquireClass("test");
             

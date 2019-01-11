@@ -8,7 +8,10 @@ import { CreateProjectWindow } from "../windows/create_project/window"
 import { ProgressWindow } from "../windows/progress/window"
 import { ProjectsModel, ProjectModel } from "../projects"
 import { isDirectory, listFiles } from "../async"
-import { puppet } from "../puppet"
+
+import { Workspace } from "../puppet/workspace";
+import { Environment } from "../puppet/environment";
+import { Node } from "../puppet/files";
 
 import register from "electron-ipc-tunnel/server";
 import { IpcAPI } from "./api"
@@ -79,7 +82,7 @@ export class IpcServer implements IpcAPI
 
     public async getEnvironmentList(): Promise<string[]> 
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
@@ -98,14 +101,14 @@ export class IpcServer implements IpcAPI
 
     public async getEnvironmentTree(name: string): Promise<any> 
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
             return null;
         }
 
-        const environment: puppet.Environment = await workspace.getEnvironment(name);
+        const environment: Environment = await workspace.getEnvironment(name);
 
         if (environment == null)
         {
@@ -117,7 +120,7 @@ export class IpcServer implements IpcAPI
 
     public async findNode(localPath: string): Promise<any> 
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
@@ -136,7 +139,7 @@ export class IpcServer implements IpcAPI
 
     public async acquireNodeClass(nodePath: string, className: string): Promise<any> 
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
@@ -155,7 +158,7 @@ export class IpcServer implements IpcAPI
     
     public async acquireNodeResource(nodePath: string, definedTypeName: string, title: string): Promise<any>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
@@ -176,7 +179,7 @@ export class IpcServer implements IpcAPI
         nodePath: string, className: string, propertyName: string, value: any
     ): Promise<any> 
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
@@ -195,7 +198,7 @@ export class IpcServer implements IpcAPI
     
     public async hasNodeClassProperty(nodePath: string, className: string, propertyName: string): Promise<boolean>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
@@ -216,7 +219,7 @@ export class IpcServer implements IpcAPI
         nodePath: string, className: string, propertyName: string
     ): Promise<any> 
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
@@ -235,7 +238,7 @@ export class IpcServer implements IpcAPI
 
     public async setNodeResourceProperty(nodePath: string, definedTypeName: string, title: string, propertyName: string, value: any): Promise<any>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
@@ -254,7 +257,7 @@ export class IpcServer implements IpcAPI
 
     public async removeNodeResourceProperty(nodePath: string, definedTypeName: string, title: string, propertyName: string): Promise<any>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
@@ -273,7 +276,7 @@ export class IpcServer implements IpcAPI
 
     public async removeNodeClassProperties(nodePath: string, className: string): Promise<any>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
@@ -292,7 +295,7 @@ export class IpcServer implements IpcAPI
 
     public async getClassInfo(env: string): Promise<any> 
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
@@ -309,16 +312,16 @@ export class IpcServer implements IpcAPI
         return environment.getClassInfo();
     }
 
-    public async refreshWorkspace(): Promise<any> 
+    public async initWorkspace(): Promise<any> 
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
         {
             return null;
         }
 
-        await workspace.refresh((progress: number) => {
+        await workspace.init((progress: number) => {
             workspace_window.browserWindow.webContents.send("refreshWorkspaceProgress", progress);
         }, (text: string, showProgress: boolean) => {
             workspace_window.browserWindow.webContents.send("refreshWorkspaceCategory", text, showProgress);
@@ -350,7 +353,7 @@ export class IpcServer implements IpcAPI
 
     public async getCurrentWorkspacePath(): Promise<string> 
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return null;
@@ -360,7 +363,7 @@ export class IpcServer implements IpcAPI
     
     public async assignNewClassToNode(nodePath: string): Promise<string>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return null;
@@ -383,7 +386,7 @@ export class IpcServer implements IpcAPI
 
     public async chooseDefinedType(nodePath: string): Promise<string>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return null;
@@ -400,7 +403,7 @@ export class IpcServer implements IpcAPI
 
     public async createNewResourceToNode(nodePath: string, definedTypeName: string, title: string): Promise<boolean>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return false;
@@ -415,7 +418,7 @@ export class IpcServer implements IpcAPI
     
     public async removeClassFromNode(nodePath: string, className: string): Promise<void>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -430,7 +433,7 @@ export class IpcServer implements IpcAPI
     
     public async removeResourceFromNode(nodePath: string, definedTypeName: string, title: string): Promise<void>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -445,7 +448,7 @@ export class IpcServer implements IpcAPI
 
     public async removeResourcesFromNode(nodePath: string, definedTypeName: string): Promise<string[]>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -460,7 +463,7 @@ export class IpcServer implements IpcAPI
     
     public async removeAllResourcesFromNode(nodePath: string): Promise<any[]>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -475,7 +478,7 @@ export class IpcServer implements IpcAPI
 
     public async renameNodeResource(nodePath: string, definedTypeName: string, title: string, newTitle: string): Promise<boolean>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -490,7 +493,7 @@ export class IpcServer implements IpcAPI
 
     public async removeClassesFromNode(nodePath: string): Promise<Array<string>>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -505,7 +508,7 @@ export class IpcServer implements IpcAPI
 
     public async searchClasses(nodePath: string, search: string): Promise<any[]>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return [];
@@ -520,7 +523,7 @@ export class IpcServer implements IpcAPI
 
     public async searchDefinedTypes(nodePath: string, search: string): Promise<any[]>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return [];
@@ -535,7 +538,7 @@ export class IpcServer implements IpcAPI
     
     public async acquireNodeFacts(nodePath: string): Promise<any>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return null;
@@ -550,7 +553,7 @@ export class IpcServer implements IpcAPI
 
     public async setNodeFact(nodePath: string, fact: string, value: string): Promise<void>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -565,7 +568,7 @@ export class IpcServer implements IpcAPI
 
     public async updateNodeFacts(nodePath: string, facts: any): Promise<void>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -580,7 +583,7 @@ export class IpcServer implements IpcAPI
 
     public async invalidateNode(nodePath: string): Promise<void>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -595,7 +598,7 @@ export class IpcServer implements IpcAPI
 
     public async invalidateNodeClass(nodePath: string, className: string): Promise<void>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -610,7 +613,7 @@ export class IpcServer implements IpcAPI
 
     public async invalidateNodeResource(nodePath: string, definedTypeName: string, title: string): Promise<void>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -625,7 +628,7 @@ export class IpcServer implements IpcAPI
     
     public async isNodeClassValid(nodePath: string, className: string): Promise<boolean>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -641,7 +644,7 @@ export class IpcServer implements IpcAPI
     public async isNodeDefinedTypeValid(nodePath: string, definedTypeName: string, title: string): Promise<boolean>
     {
         
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -656,7 +659,7 @@ export class IpcServer implements IpcAPI
     
     public async createFolder(path: string, name: string): Promise<boolean>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -671,7 +674,7 @@ export class IpcServer implements IpcAPI
 
     public async createNode(path: string, name: string): Promise<boolean>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -686,7 +689,7 @@ export class IpcServer implements IpcAPI
 
     public async removeFolder(path: string): Promise<boolean>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -701,7 +704,7 @@ export class IpcServer implements IpcAPI
 
     public async removeNode(path: string): Promise<boolean>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
@@ -716,7 +719,7 @@ export class IpcServer implements IpcAPI
     
     public async removeEnvironment(name: string): Promise<boolean>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return false;
@@ -726,7 +729,7 @@ export class IpcServer implements IpcAPI
 
     public async getGlobalModules(): Promise<any>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return false;
@@ -736,7 +739,7 @@ export class IpcServer implements IpcAPI
 
     public async getEnvironmentModules(env: string): Promise<any>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return false;
@@ -752,7 +755,7 @@ export class IpcServer implements IpcAPI
         if (env == null)
             return;
 
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
         if (workspace == null)
             return;
 
@@ -761,7 +764,7 @@ export class IpcServer implements IpcAPI
     
     public async installModules(): Promise<void>
     {
-        const workspace: puppet.Workspace = getCurrentWorkspace();
+        const workspace: Workspace = getCurrentWorkspace();
         if (workspace == null)
             return;
             

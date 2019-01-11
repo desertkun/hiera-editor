@@ -2,8 +2,8 @@
 import { ProjectsModel } from "./projects"
 import { ProjectsWindow } from "./windows/projects/window"
 import { WorkspaceWindow } from "./windows/workspace/window"
-import { puppet } from "./puppet"
 import { Menu } from "electron";
+import { Workspace } from "./puppet/workspace"
 
 export const projects_list: ProjectsModel = new ProjectsModel();
 export const projects_window: ProjectsWindow = new ProjectsWindow();
@@ -12,7 +12,7 @@ export const workspace_window: WorkspaceWindow = new WorkspaceWindow();
 export let workspace_menu: Menu;
 export let projects_menu: Menu;
 
-let current_workspace: puppet.Workspace;
+let current_workspace: Workspace;
 
 function initMenu()
 {
@@ -69,12 +69,12 @@ export function init()
     projects_list.load();
 }
 
-export function getCurrentWorkspace(): puppet.Workspace
+export function getCurrentWorkspace(): Workspace
 {
     return current_workspace;
 }
 
-export function setCurrentWorkspace(workspace: puppet.Workspace)
+export function setCurrentWorkspace(workspace: Workspace)
 {
     current_workspace = workspace;
 }

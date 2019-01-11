@@ -15,7 +15,7 @@ export interface IpcAPI
     removeNodeClassProperties(nodePath: string, className: string): Promise<any>;
     invalidateNodeClass(nodePath: string, className: string): Promise<void>;
     getClassInfo(env: string): Promise<any>;
-    refreshWorkspace(): Promise<any>;
+    initWorkspace(): Promise<any>;
     showOpenDirectoryDialog(defaultPath?: string, mode?: Array<'openDirectory' | 'createDirectory' | 'promptToCreate'>): Promise<string>;
     getCurrentWorkspacePath(): Promise<string>;
     assignNewClassToNode(nodePath: string): Promise<string>;

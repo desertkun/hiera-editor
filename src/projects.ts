@@ -1,14 +1,14 @@
 
-import { puppet } from "./puppet";
 import * as path from "path"
 import * as async from "./async"
+import { Workspace } from "./puppet/workspace"
 
 export class ProjectModel
 {
     private _path: string;
-    private _workspace: puppet.Workspace;
+    private _workspace: Workspace;
 
-    constructor(path?: string, workspace?: puppet.Workspace)
+    constructor(path?: string, workspace?: Workspace)
     {
         this._path = path;
         this._workspace = workspace;
@@ -19,7 +19,7 @@ export class ProjectModel
         return this._path;
     }
 
-    public get workspace():puppet.Workspace 
+    public get workspace(): Workspace 
     {
         return this._workspace;
     }
@@ -43,7 +43,7 @@ export class ProjectModel
             throw new Error("No such workspace: " + this._path);
         }
         
-        this._workspace = new puppet.Workspace(this._path);
+        this._workspace = new Workspace(this._path);
         return await this._workspace.load();
     }
 
@@ -198,7 +198,7 @@ export class ProjectsModel
         if (!await async.createDirectory(path.join(projectPath, "modules")))
             return false;
 
-        const workspace = new puppet.Workspace(projectPath);
+        const workspace = new Workspace(projectPath);
 
         await workspace.load();
 
@@ -215,7 +215,7 @@ export class ProjectsModel
         if (this.hasProject(projectPath))
             return false;
 
-        const workspace = new puppet.Workspace(projectPath);
+        const workspace = new Workspace(projectPath);
 
         await workspace.load();
 

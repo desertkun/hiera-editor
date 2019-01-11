@@ -22,7 +22,6 @@ import {NodeResourceTab} from "./tabs/resource";
 import {FactsTab} from "./tabs/facts";
 import { ipcRenderer } from 'electron';
 
-import {puppet} from "../../puppet";
 import {TreeView, TreeViewNode} from "./treeview";
 
 const dialogs = Dialogs();
@@ -844,7 +843,7 @@ export class WorkspaceRenderer
         
         try
         {
-            await ipc.refreshWorkspace();
+            await ipc.initWorkspace();
         }
         catch (e)
         {
