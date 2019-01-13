@@ -80,7 +80,7 @@ export class WorkspaceSettings
         return this.load(data);
     }
 
-    public async isValid(): Promise<boolean>
+    public async isValid(checkCertificates: boolean): Promise<boolean>
     {
         if (this.certname == null || this.certname == "")
             return false;
@@ -88,16 +88,19 @@ export class WorkspaceSettings
         if (this.server == null || this.server == "")
             return false;
 
-        const {ssldir} = WorkspaceSettings.GetPaths();
-
-        if (!await async.isFile(path.join(ssldir, "certs", "ca.pem")))
-            return false;
-
-        if (!await async.isFile(path.join(ssldir, "certs", this.certname + ".pem")))
-            return false;
-
-        if (!await async.isFile(path.join(ssldir, "private_keys", this.certname + ".pem")))
-            return false;
+        if (checkCertificates)
+        {
+            const {ssldir} = WorkspaceSettings.GetPaths();
+    
+            if (!await async.isFile(path.join(ssldir, "certs", "ca.pem")))
+                return false;
+    
+            if (!await async.isFile(path.join(ssldir, "certs", this.certname + ".pem")))
+                return false;
+    
+            if (!await async.isFile(path.join(ssldir, "private_keys", this.certname + ".pem")))
+                return false;
+        }
 
         return true;
     }

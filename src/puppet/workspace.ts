@@ -23,16 +23,18 @@ export class Workspace
     private _name: string;
     private _environments: Dictionary<string, Environment>;
     private _modulesInfo: PuppetModulesInfo;
+    private readonly checkCertificates: boolean;
 
     private readonly _cachePath: string;
     private readonly _global: Dictionary<string, string>;
 
-    constructor(workspacePath: string, cachePath: string = null)
+    constructor(workspacePath: string, cachePath: string = null, checkCertificates: boolean = true)
     {
         this._environments = new Dictionary();
         this._path = workspacePath;
         this._cachePath = cachePath || path.join(this._path, ".pe-cache");
         this._global = new Dictionary();
+        this.checkCertificates = checkCertificates;
     }
 
     public get global()
@@ -303,12 +305,12 @@ export class Workspace
 
         const settings = await this.getSettings();
 
-        if (!await settings.isValid())
+        if (!await settings.isValid(this.checkCertificates))
         {
             if (updateProgressCategory) updateProgressCategory("Setting up workspace...", false);
             await this.setupWorkspace(settings);
             
-            if (!await settings.isValid())
+            if (!await settings.isValid(this.checkCertificates))
             {
                 throw new WorkspaceError("Workspace setup complete, BUT", "There seem to be no downloaded certificates found.");
             }
@@ -434,7 +436,7 @@ export class Workspace
             return null;
         }
 
-        return this.acquireEnvironment(name, environmentPath, this.cachePath);
+        return this.acquireEnvironment(name, environmentPath, path.join(this.cachePath, "env-" + name));
     }
 
     private acquireEnvironment(name: string,  environmentPath: string, cachePath: string): Environment
@@ -468,7 +470,7 @@ export class Workspace
             if (!await async.isDirectory(envPath))
                 continue;
 
-            const env: Environment = this.acquireEnvironment(envName, envPath, this.cachePath);
+            const env: Environment = this.acquireEnvironment(envName, envPath, path.join(this.cachePath, "env-" + envName));
             result.push(env);
         }
 
