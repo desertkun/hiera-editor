@@ -14,7 +14,7 @@ const path = require('path');
 const nativeImage = electron.nativeImage;
 const storage = require('electron-json-storage');
 
-import {NodeTab} from "./tabs/node"
+import {FileTab} from "./tabs/file"
 import {WorkspaceTab, WorkspaceTabConstructor} from "./tabs/tab";
 import {DefaultTab} from "./tabs/default";
 import {NodeClassTab} from "./tabs/class";
@@ -72,7 +72,7 @@ class NodeTreeItemRenderer
 
     public async init()
     {
-        this.info = await ipc.findNode(this.localPath);
+        this.info = await ipc.findFile(this.localPath);
         this.classInfo = await renderer.getClassInfo(this.info.env);
         this.render();
     }
@@ -779,7 +779,7 @@ export class WorkspaceRenderer
 
         this.tabClasses = new Dictionary();
         
-        this.tabClasses.put("node", NodeTab);
+        this.tabClasses.put("node", FileTab);
         this.tabClasses.put("default", DefaultTab);
         this.tabClasses.put("class", NodeClassTab);
         this.tabClasses.put("resource", NodeResourceTab);

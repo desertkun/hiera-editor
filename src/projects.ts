@@ -186,7 +186,8 @@ export class ProjectsModel
                 }
             ],
             "defaults": {
-                "data_hash": "yaml_data"
+                "data_hash": "yaml_data",
+                "datadir": "data"
             }
         })) {
             return false;

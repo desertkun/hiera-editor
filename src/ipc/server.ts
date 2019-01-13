@@ -118,7 +118,7 @@ export class IpcServer implements IpcAPI
         return await environment.root.tree();
     }
 
-    public async findNode(localPath: string): Promise<any> 
+    public async findFile(localPath: string): Promise<any> 
     {
         const workspace: Workspace = getCurrentWorkspace();
 
@@ -127,7 +127,7 @@ export class IpcServer implements IpcAPI
             return null;
         }
 
-        const node = await workspace.findNode(localPath);
+        const node = await workspace.findFile(localPath);
 
         if (node == null)
         {
@@ -146,14 +146,14 @@ export class IpcServer implements IpcAPI
             return null;
         }
 
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
 
         if (node == null)
         {
             return null;
         }
 
-        return await node.dumpClass(className);
+        return {};//await node.dumpClass(className);
     }
     
     public async acquireNodeResource(nodePath: string, definedTypeName: string, title: string): Promise<any>
@@ -165,14 +165,14 @@ export class IpcServer implements IpcAPI
             return null;
         }
 
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
 
         if (node == null)
         {
             return null;
         }
 
-        return await node.dumpResource(definedTypeName, title);
+        return {};//await node.dumpResource(definedTypeName, title);
     }
 
     public async setNodeClassProperty(
@@ -186,14 +186,14 @@ export class IpcServer implements IpcAPI
             return null;
         }
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
         {
             return null;
         }
     
-        return await node.setClassProperty(className, propertyName, value);
+        //return await node.setClassProperty(className, propertyName, value);
     }
     
     public async hasNodeClassProperty(nodePath: string, className: string, propertyName: string): Promise<boolean>
@@ -205,14 +205,14 @@ export class IpcServer implements IpcAPI
             return false;
         }
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
         {
             return false;
         }
     
-        return await node.hasClassProperty(className, propertyName);
+        return false; //await node.hasClassProperty(className, propertyName);
     }
 
     public async removeNodeClassProperty(
@@ -226,17 +226,18 @@ export class IpcServer implements IpcAPI
             return null;
         }
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
         {
             return null;
         }
     
-        return await node.removeClassProperty(className, propertyName);
+        return; //await node.removeClassProperty(className, propertyName);
     }
 
-    public async setNodeResourceProperty(nodePath: string, definedTypeName: string, title: string, propertyName: string, value: any): Promise<any>
+    public async setNodeResourceProperty(nodePath: string, definedTypeName: string, 
+        title: string, propertyName: string, value: any): Promise<any>
     {
         const workspace: Workspace = getCurrentWorkspace();
 
@@ -245,14 +246,14 @@ export class IpcServer implements IpcAPI
             return null;
         }
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
         {
             return null;
         }
     
-        return await node.setResourceProperty(definedTypeName, title, propertyName, value);
+        //return await node.setResourceProperty(definedTypeName, title, propertyName, value);
     }
 
     public async removeNodeResourceProperty(nodePath: string, definedTypeName: string, title: string, propertyName: string): Promise<any>
@@ -264,14 +265,14 @@ export class IpcServer implements IpcAPI
             return null;
         }
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
         {
             return null;
         }
     
-        return await node.removeResourceProperty(definedTypeName, title, propertyName);
+        //return await node.removeResourceProperty(definedTypeName, title, propertyName);
     }
 
     public async removeNodeClassProperties(nodePath: string, className: string): Promise<any>
@@ -283,14 +284,14 @@ export class IpcServer implements IpcAPI
             return null;
         }
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
         {
             return null;
         }
     
-        return await node.removeClassProperties(className);
+        //return await node.removeClassProperties(className);
     }
 
     public async getClassInfo(env: string): Promise<any> 
@@ -368,7 +369,7 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return null;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return null;
@@ -379,7 +380,7 @@ export class IpcServer implements IpcAPI
         if (!className)
             return null;
 
-        await node.assignClass(className);
+        //await node.assignClass(className);
 
         return className;
     }
@@ -391,7 +392,7 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return null;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return null;
@@ -408,12 +409,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return false;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return false;
     
-        return await node.createResource(definedTypeName, title);
+        return false;//await node.createResource(definedTypeName, title);
     }
     
     public async removeClassFromNode(nodePath: string, className: string): Promise<void>
@@ -423,12 +424,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
 
-        await node.removeClass(className);
+        //await node.removeClass(className);
     }
     
     public async removeResourceFromNode(nodePath: string, definedTypeName: string, title: string): Promise<void>
@@ -438,12 +439,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
 
-        await node.removeResource(definedTypeName, title);
+        //await node.removeResource(definedTypeName, title);
     }
 
     public async removeResourcesFromNode(nodePath: string, definedTypeName: string): Promise<string[]>
@@ -453,12 +454,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
 
-        return await node.removeResources(definedTypeName);
+        //return await node.removeResources(definedTypeName);
     }
     
     public async removeAllResourcesFromNode(nodePath: string): Promise<any[]>
@@ -468,12 +469,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
 
-        return await node.removeAllResources();
+        //return await node.removeAllResources();
     }
 
     public async renameNodeResource(nodePath: string, definedTypeName: string, title: string, newTitle: string): Promise<boolean>
@@ -483,12 +484,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
 
-        return await node.renameResource(definedTypeName, title, newTitle);
+        //return await node.renameResource(definedTypeName, title, newTitle);
     }
 
     public async removeClassesFromNode(nodePath: string): Promise<Array<string>>
@@ -498,12 +499,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
 
-        return await node.removeAllClasses();
+        //return await node.removeAllClasses();
     }
 
     public async searchClasses(nodePath: string, search: string): Promise<any[]>
@@ -513,7 +514,7 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return [];
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return [];
@@ -528,7 +529,7 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return [];
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return [];
@@ -543,12 +544,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return null;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return null;
 
-        return await node.acquireFacts();
+        //return await node.acquireFacts();
     }
 
     public async setNodeFact(nodePath: string, fact: string, value: string): Promise<void>
@@ -558,12 +559,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
             
-        await node.setFact(fact, value);
+        //await node.setFact(fact, value);
     }
 
     public async updateNodeFacts(nodePath: string, facts: any): Promise<void>
@@ -573,12 +574,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
             
-        await node.updateFacts(facts);
+        //await node.updateFacts(facts);
     }
 
     public async invalidateNode(nodePath: string): Promise<void>
@@ -588,12 +589,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
             
-        await node.invalidate();
+        //await node.invalidate();
     }
 
     public async invalidateNodeClass(nodePath: string, className: string): Promise<void>
@@ -603,12 +604,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
             
-        await node.invalidateClass(className);
+        //await node.invalidateClass(className);
     }
 
     public async invalidateNodeResource(nodePath: string, definedTypeName: string, title: string): Promise<void>
@@ -618,12 +619,12 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
             
-        await node.invalidateDefinedType(definedTypeName, title);
+        //await node.invalidateDefinedType(definedTypeName, title);
     }
     
     public async isNodeClassValid(nodePath: string, className: string): Promise<boolean>
@@ -633,28 +634,27 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
             
-        return await node.isClassValid(className);
+        //return await node.isClassValid(className);
     }
 
     public async isNodeDefinedTypeValid(nodePath: string, definedTypeName: string, title: string): Promise<boolean>
     {
-        
         const workspace: Workspace = getCurrentWorkspace();
 
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(nodePath);
+        const node = await workspace.findFile(nodePath);
     
         if (node == null)
             return;
             
-        return await node.isDefinedTypeValid(definedTypeName, title);
+        //return await node.isDefinedTypeValid(definedTypeName, title);
     }
     
     public async createFolder(path: string, name: string): Promise<boolean>
@@ -684,7 +684,7 @@ export class IpcServer implements IpcAPI
         if (directory == null)
             return;
 
-        return await directory.createNode(name) != null;
+        return await directory.createFile(name) != null;
     }
 
     public async removeFolder(path: string): Promise<boolean>
@@ -709,7 +709,7 @@ export class IpcServer implements IpcAPI
         if (workspace == null)
             return;
     
-        const node = await workspace.findNode(path);
+        const node = await workspace.findFile(path);
     
         if (node == null)
             return;

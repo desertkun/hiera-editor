@@ -8,9 +8,10 @@ import * as async from "../async"
 
 import { Workspace } from "../puppet/workspace";
 import { Environment } from "../puppet/environment";
-import { Node } from "../puppet/files";
+import { File } from "../puppet/files";
+import { NodeContext } from "../puppet/node";
 import { PuppetASTAccess, PuppetASTPrimitive, PuppetASTQualifiedName, 
-    PuppetASTType, PuppetASTTypeOf, PuppetHintBodyCompilationError } from "../puppet/ast";
+    PuppetASTType, PuppetASTTypeOf, PuppetHintBodyCompilationError, PuppetASTClass } from "../puppet/ast";
 import { WorkspaceError, CompilationError } from "../puppet/util"
 
 const ini = require('ini');
@@ -28,10 +29,10 @@ function getWorkspacePath(name: string)
 
 type WorkspaceTestCallback = (workspace: Workspace,
                               environment: Environment,
-                              node: Node) => Promise<any>;
+                              node: NodeContext) => Promise<any>;
 
 async function testRealWorkspace(workspaceName: string, environmentName: string, nodeName: string,
-                             f: WorkspaceTestCallback = null): Promise<Node>
+                             f: WorkspaceTestCallback = null): Promise<NodeContext>
 {
     const d = tmp.dirSync();
 
@@ -51,7 +52,7 @@ async function testRealWorkspace(workspaceName: string, environmentName: string,
         await workspace.init();
         const environment = await workspace.getEnvironment(environmentName);
         await environment.init();
-        const node = await environment.root.getNode(nodeName);
+        const node = await environment.enterNodeContext(nodeName);
         if (f)
         {
             return await f(workspace, environment, node);
@@ -67,14 +68,15 @@ async function testRealWorkspace(workspaceName: string, environmentName: string,
 interface WorkspaceTest 
 {
     files: any;
-    nodeYAML?: any;
+    certname?: string;
+    hiera?: any;
     f?: WorkspaceTestCallback;
-    nodeYAMLCommentBefore?: string;
+    facts?: any;
     functions?: any;
     manifests?: any;
 }
 
-async function testSimpleWorkspace(test: WorkspaceTest): Promise<Node>
+async function testSimpleWorkspace(test: WorkspaceTest): Promise<NodeContext>
 {
     const d = tmp.dirSync();
 
@@ -119,7 +121,7 @@ async function testSimpleWorkspace(test: WorkspaceTest): Promise<Node>
         {
             const _f = path.join(d.name, "environments", "dev", "manifests");
             await async.makeDirectory(_f);
-            for (const fileName in test.functions)
+            for (const fileName in test.manifests)
             {
                 await async.write(path.join(_f, fileName), test.manifests[fileName]);
             }
@@ -127,9 +129,16 @@ async function testSimpleWorkspace(test: WorkspaceTest): Promise<Node>
 
         const _d = path.join(d.name, "environments", "dev", "data");
         await async.makeDirectory(_d);
-        if (test.nodeYAML)
+
+        if (test.hiera)
         {
-            await async.writeYAML(path.join(_d, "test.yaml"), test.nodeYAML, test.nodeYAMLCommentBefore);
+            for (const fileName in test.hiera)
+            {
+                const data = test.hiera[fileName];
+                const _f = path.join(_d, fileName);
+                await async.makeDirectory(path.dirname(_f));
+                await async.writeYAML(_f, data);
+            }
         }
     }
     catch (e)
@@ -143,7 +152,7 @@ async function testSimpleWorkspace(test: WorkspaceTest): Promise<Node>
         await workspace.init();
         const environment = await workspace.getEnvironment("dev");
         await environment.init();
-        const node = await environment.root.getNode("test");
+        const node = await environment.enterNodeContext(test.certname || "node.puppet", test.facts);
         if (test.f)
         {
             return await test.f(workspace, environment, node);
@@ -168,13 +177,13 @@ describe('Workspaces', () =>
         return testRealWorkspace("minimal", "dev", "test", async (
             workspace: Workspace,
             environment: Environment,
-            node: Node) =>
+            node: NodeContext) =>
         {
             const class_ = await node.acquireClass("test");
             expect(class_.name).to.equal("test");
         });
     });
-    
+
     it('compilation error', () =>
     {
         return testSimpleWorkspace({
@@ -183,13 +192,17 @@ describe('Workspaces', () =>
                     $%@%+@*$ _&(FHW_ +{@#}UH
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
-                await expect(node.acquireClass("test")).to.be.rejectedWith(CompilationError);
+                await expect(node.isClassResolved("test")).to.be.equal(false);
             }
         });
     });
@@ -206,11 +219,15 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
                 expect(class_.getResolvedProperty("test_string").value).to.equal("testing");
@@ -239,11 +256,15 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
                 const a = class_.getResolvedProperty("test_string");
@@ -271,11 +292,15 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
                 expect(class_.getResolvedProperty("v").value).to.equal("Hello, World!");
@@ -289,20 +314,28 @@ describe('Workspaces', () =>
             files: {
                 "init.pp": `
                     class test {
-                      $v = "Hello, $\{::hostname\}!"
+                      $v = ">>>$\{::test\}"
+                      $v2 = "Hello, $\{::hostname\}!"
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
+            facts: {
+                "test": "<<<"
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
-                expect(class_.getResolvedProperty("v").value).to.equal("Hello, myhost!");
-            }, 
-            nodeYAMLCommentBefore: "hostname = \"myhost\""
+                expect(class_.getResolvedProperty("v2").value).to.equal("Hello, node!");
+                expect(class_.getResolvedProperty("v").value).to.equal(">>><<<");
+            }
         });
     });
 
@@ -316,11 +349,15 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 await node.acquireClass("test");
             }
@@ -340,11 +377,15 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 await node.acquireClass("test");
             }
@@ -363,11 +404,15 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 await node.acquireClass("test");
             }
@@ -388,11 +433,15 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 await node.acquireClass("test");
             }
@@ -410,11 +459,15 @@ describe('Workspaces', () =>
                     ) {}
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
     
@@ -456,11 +509,15 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
     
@@ -501,11 +558,15 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
     
@@ -529,11 +590,15 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
     
@@ -556,11 +621,15 @@ describe('Workspaces', () =>
                     class test ($v = test::test_summ(1), $v2 = test::test_summ(1, 2)) {}
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
                 
@@ -596,11 +665,15 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
                 
@@ -625,11 +698,15 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
                 
@@ -657,11 +734,15 @@ describe('Workspaces', () =>
                 }
             `
         }, 
-        nodeYAML: {"classes": ["test"]}, 
+        manifests: {
+            "site.pp": `
+                include test
+            `  
+        },
         f: async (
             workspace: Workspace,
             environment: Environment,
-            node: Node) =>
+            node: NodeContext) =>
         {
             const class_ = await node.acquireClass("test");
             
@@ -698,11 +779,15 @@ describe('Workspaces', () =>
                 }
             `
         }, 
-        nodeYAML: {"classes": ["test"]}, 
+        manifests: {
+            "site.pp": `
+                include test
+            `  
+        },
         f: async (
             workspace: Workspace,
             environment: Environment,
-            node: Node) =>
+            node: NodeContext) =>
         {
             const class_ = await node.acquireClass("test");
             
@@ -722,34 +807,61 @@ describe('Workspaces', () =>
        });
    });
 
-   it('class properties defined by user', () =>
+   it('class properties defined by hiera', () =>
    {
        return testSimpleWorkspace({
            files: {
             "init.pp": `
                  class test (
-                     Optional[Number] $testA = $test::check::checkA
+                     Optional[Number] $testA = $test::check::checkA,
+                     Optional[Number] $testCommonA = $test::check::commonA,
+                     Optional[Number] $testCommonB = $test::check::commonB
                  ) {}
             `,
             "check.pp": `
                 class test::check (
-                    $checkA
+                    $checkA,
+                    $commonA,
+                    $commonB
                 ) {
                     
                 }
             `
         },
-        nodeYAML: {"classes": ["test"], "test::check::checkA": 15}, 
+        certname: "hiera.test.com",
+        hiera: {
+            "nodes/hiera.test.com.yaml": {
+                "test::check::checkA": 15,
+                "test::check::commonB": 20
+            },
+            "common.yaml": {
+                "test::check::commonA": 10,
+                "test::check::commonB": 10
+            },
+        },
+        manifests: {
+            "site.pp": `
+                include test
+            `  
+        },
         f: async (
             workspace: Workspace,
             environment: Environment,
-            node: Node) =>
+            node: NodeContext) =>
         {
             const class_ = await node.acquireClass("test");
             
             {
                 const test = class_.resolvedFields.get("testA");
                 expect(test.value).to.be.equal(15);
+            }
+            {
+                const test = class_.resolvedFields.get("testCommonA");
+                expect(test.value).to.be.equal(10);
+            }
+            {
+                const test = class_.resolvedFields.get("testCommonB");
+                expect(test.value).to.be.equal(20);
             }
         }
        });
@@ -769,11 +881,20 @@ describe('Workspaces', () =>
                     }
                 `
             }, 
-            nodeYAML: {"classes": ["test"]}, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
+            facts: {
+                "testA": "string",
+                "testB": 5,
+                "testFactsDirect": 99
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
                 
@@ -791,8 +912,7 @@ describe('Workspaces', () =>
                     const test = class_.resolvedFields.get("testDirectV");
                     expect(test.value).to.equal(99);
                 }
-            }, 
-            nodeYAMLCommentBefore: 'testA = "string" \n testB = 5 \n testFactsDirect = 99'
+            }
         });
     });
 
@@ -807,12 +927,21 @@ describe('Workspaces', () =>
                         
                     }
                 `
-            }, 
-            nodeYAML: {"classes": ["test"]}, 
+            },
+            facts: {
+                "a": {
+                    "b": 10
+                }
+            },
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
             f: async (
                 workspace: Workspace,
                 environment: Environment,
-                node: Node) =>
+                node: NodeContext) =>
             {
                 const class_ = await node.acquireClass("test");
                 
@@ -820,8 +949,86 @@ describe('Workspaces', () =>
                     const test = class_.resolvedFields.get("test");
                     expect(test.value).to.equal(10);
                 }
+            }
+        });
+    });
+
+    it('manifest locals passing', () =>
+    {
+        // variables should be passed from one manifest to another within manifests folder
+
+        return testSimpleWorkspace({
+            files: {
+                "a.pp": `
+                    class a () {}
+                `,
+                "b.pp": `
+                    class b () {}
+                `,
+                "c.pp": `
+                    class c () {}
+                `
             }, 
-            nodeYAMLCommentBefore: 'a = {"b": 10}'
+            certname: "testnode.domain.com",
+            manifests: {
+                "testB.pp":  `
+                    $testValue1 = 5
+                `,
+                "testA.pp":  `
+                    $testValue2 = 10
+                `,
+                "testC.pp":  `
+                    $testValue = $testValue1 + $testValue2
+                `
+            },
+            f: async (
+                workspace: Workspace,
+                environment: Environment,
+                node: NodeContext) =>
+            {
+                const value = node.ast.resolvedLocals.get("testValue");
+                expect(value.value).to.be.equal(15)
+            }
+        });
+    });
+
+    it('node', () =>
+    {
+        return testSimpleWorkspace({
+            files: {
+                "a.pp": `
+                    class a () {}
+                `,
+                "b.pp": `
+                    class b () {}
+                `,
+                "c.pp": `
+                    class c () {}
+                `
+            }, 
+            certname: "testnode.domain.com",
+            manifests: {
+                "site.pp":  `
+                    node "testnode.domain.com" {
+                        include a
+                    }
+                    node "othernode.domain.com" {
+                        include b
+                    }
+                    node default {
+                        include c
+                    }
+                `
+            },
+            f: async (
+                workspace: Workspace,
+                environment: Environment,
+                node: NodeContext) =>
+            {
+                expect(node.isClassResolved("a")).to.be.equal(true)
+                expect(node.isClassResolved("b")).to.be.equal(false)
+                expect(node.isClassResolved("c")).to.be.equal(true)
+            }
         });
     });
 

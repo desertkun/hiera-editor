@@ -41,14 +41,14 @@ class ClassGroupRenderer
     private readonly name: string;
     private child: Dictionary<string, ClassGroupRenderer>;
 
-    private tab: NodeTab;
+    private tab: FileTab;
     private parent: ClassGroupRenderer;
     private classes: Array<ClassRenderer>;
 
     private n_classes: any;
     private n_node: any;
 
-    constructor(name: string, tab: NodeTab, parent: ClassGroupRenderer = null)
+    constructor(name: string, tab: FileTab, parent: ClassGroupRenderer = null)
     {
         this.name = name;
         this.child = new Dictionary();
@@ -158,7 +158,7 @@ class ClassGroupRenderer
     }
 }
 
-export class NodeTab extends WorkspaceTab
+export class FileTab extends WorkspaceTab
 {
     private info: any;
     private _classInfo: any;
@@ -189,7 +189,7 @@ export class NodeTab extends WorkspaceTab
 
     public async init(): Promise<any>
     {
-        this.info = await ipc.findNode(this.nodePath);
+        this.info = await ipc.findFile(this.nodePath);
         this._classInfo = await ipc.getClassInfo(this.info.env);
 
         for (const className of this.info.classes)

@@ -11,7 +11,7 @@ import { Dictionary } from "../dictionary";
 import { Environment } from "./environment"
 import { Ruby } from "./ruby"
 import { WorkspaceError, CompiledPromisesCallback } from "./util"
-import { Folder, Node } from "./files"
+import { Folder, File } from "./files"
 
 const PromisePool = require('es6-promise-pool');
 const slash = require('slash');
@@ -239,7 +239,7 @@ export class Workspace
         return await env.root.findFolder(entries);
     }
 
-    public async findNode(path: string): Promise<Node>
+    public async findFile(path: string): Promise<File>
     {
         const entries = path.split("/");
 
@@ -251,7 +251,7 @@ export class Workspace
         if (env == null)
             return null;
         entries.splice(0, 1);
-        return await env.root.findNode(entries);
+        return await env.root.findFile(entries);
     }
 
     public get modulesPath(): string

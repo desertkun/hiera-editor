@@ -1,20 +1,22 @@
 
 import {Dictionary} from "../dictionary";
 import { GetBuiltinFunction } from "./builtin";
+import { resolve } from "dns";
+import { isString } from "util";
 
-export abstract class Resolver
+export interface Resolver
 {
-    public async abstract resolveClass(className: string): Promise<PuppetASTClass>;
-    public async abstract resolveFunction(name: string): Promise<PuppetASTFunction>;
-    public abstract getGlobalVariable(name: string): string;
-    public abstract hasGlobalVariable(name: string): boolean;
+    resolveClass(className: string): Promise<PuppetASTClass>;
+    resolveFunction(name: string): Promise<PuppetASTFunction>;
+    getGlobalVariable(name: string): string;
+    hasGlobalVariable(name: string): boolean;
+    getNodeName(): String;
 }
 
 export interface PuppetASTContainerContext
 {
-    setProperty(name: string, pp: PuppetASTResolvedProperty): void;
+    setProperty(kind: string, name: string, pp: PuppetASTResolvedProperty): void;
     getProperty(name: string): PuppetASTResolvedProperty;
-    setField(name: string, pp: PuppetASTResolvedProperty): void;
     getName(): string;
 }
 
@@ -143,6 +145,40 @@ export class PuppetASTReturn extends Error
         super();
 
         this.value = value;
+    }
+}
+
+export class PuppetASTEnvironment implements PuppetASTContainerContext
+{
+    public readonly name: string;
+    public readonly resolvedLocals: Dictionary<string, PuppetASTResolvedProperty>;
+
+    constructor (name: string)
+    {
+        this.name = name;
+        this.resolvedLocals = new Dictionary();
+    }
+
+    public setProperty(kind: string, name: string, pp: PuppetASTResolvedProperty): void
+    {
+        switch (kind)
+        {
+            case "local":
+            {
+                this.resolvedLocals.put(name, pp);
+                break;
+            }
+        }
+    }
+
+    public getProperty(name: string): PuppetASTResolvedProperty
+    {
+        return this.resolvedLocals.get(name);
+    }
+
+    public getName(): string
+    {
+        return this.name;
     }
 }
 
@@ -1124,11 +1160,73 @@ export class PuppetASTConcat extends PuppetASTObject
     }
 }
 
-export class PuppetASTBlock extends PuppetASTObject
+export class PuppetASTNode extends PuppetASTObject
 {
+    public matches: PuppetASTList;
+    public body: PuppetASTObject;
+
     constructor(args: Array<PuppetASTObject>)
     {
         super();
+
+        const arg = <OrderedDictionary>args[0];
+
+        this.matches = arg.get("matches");
+        this.body = arg.get("body");
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        let doMatches = false;
+        const nodeName = resolver.getNodeName();
+
+        for (const entry of this.matches.entries)
+        {
+            if (entry instanceof PuppetASTDefault)
+            {
+                doMatches = true;
+                break;
+            }
+            
+            const matches = await entry.resolve(context, resolver);
+
+            if (nodeName == matches)
+            {
+                doMatches = true;
+                break;
+            }
+        }
+
+        if (doMatches)
+        {
+            await this.body.resolve(context, resolver);
+        }
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTNode(args);
+    }
+}
+
+
+export class PuppetASTBlock extends PuppetASTObject
+{
+    public entries: Array<PuppetASTObject>;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        this.entries = args;
+    }
+    
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        for (const entry of this.entries)
+        {
+            await entry.resolve(context, resolver);
+        }
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject
@@ -1179,7 +1277,7 @@ export class PuppetASTFunctionCall implements PuppetASTContainerContext
 
             pp.value = await arg.resolve(this, resolver);
 
-            this.setProperty(name, pp)
+            this.setProperty("local", name, pp)
         }
 
         for (let i = passedArgs; i < haveArgs; i++)
@@ -1199,7 +1297,7 @@ export class PuppetASTFunctionCall implements PuppetASTContainerContext
 
             pp.value = await value.resolve(this, resolver);
 
-            this.setProperty(name, pp)
+            this.setProperty("local", name, pp)
         }
 
         try
@@ -1221,19 +1319,22 @@ export class PuppetASTFunctionCall implements PuppetASTContainerContext
         return null;
     }
 
-    public setProperty(name: string, pp: PuppetASTResolvedProperty): void
+    public setProperty(kind: string, name: string, pp: PuppetASTResolvedProperty): void
     {
-        this.resolvedLocals.put(name, pp);
+        switch (kind)
+        {
+            case "local":
+            {
+                this.resolvedLocals.put(name, pp);
+
+                break;
+            }
+        }
     }
 
     public getProperty(name: string): PuppetASTResolvedProperty
     {
         return this.resolvedLocals.get(name);
-    }
-
-    public setField(name: string, pp: PuppetASTResolvedProperty): void
-    {
-        // not applicable
     }
 
     public getName(): string
@@ -1487,11 +1588,6 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
         return this.getResolvedProperty(name);
     }
 
-    public setField(name: string, pp: PuppetASTResolvedProperty): void
-    {
-        this.resolvedFields.put(name, pp);
-    }
-
     public getName(): string
     {
         return this.name;
@@ -1502,9 +1598,21 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
         this.resolvedLocals.put(name, pp);
     }
     
-    public setProperty(name: string, pp: PuppetASTResolvedProperty)
+    public setProperty(kind: string, name: string, pp: PuppetASTResolvedProperty)
     {
-        this.setResolvedProperty(name, pp);
+        switch (kind)
+        {
+            case "local":
+            {
+                this.setResolvedProperty(name, pp);
+                break;
+            }
+            case "field":
+            {
+                this.resolvedFields.put(name, pp);
+                break;
+            }
+        }
     }
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
@@ -1739,9 +1847,21 @@ export class PuppetASTResolvedDefinedType implements PuppetASTContainerContext
         this._resolvedFields = new Dictionary();
     }
 
-    public setProperty(name: string, pp: PuppetASTResolvedProperty): void
+    public setProperty(kind: string, name: string, pp: PuppetASTResolvedProperty): void
     {
-        this._resolvedLocals.put(name, pp);
+        switch (kind)
+        {
+            case "local":
+            {
+                this._resolvedLocals.put(name, pp);
+                break;
+            }
+            case "field":
+            {
+                this._resolvedFields.put(name, pp);
+                break;
+            }
+        }
     }
 
     public getProperty(name: string): PuppetASTResolvedProperty
@@ -1752,11 +1872,6 @@ export class PuppetASTResolvedDefinedType implements PuppetASTContainerContext
     public get resolvedProperties(): Dictionary<string, PuppetASTResolvedProperty>
     {
         return this._resolvedLocals;
-    }
-
-    public setField(name: string, pp: PuppetASTResolvedProperty): void
-    {
-        this._resolvedFields.put(name, pp);
     }
 
     public getField(name: string): PuppetASTResolvedProperty
@@ -1863,8 +1978,8 @@ export class PuppetASTDefinedType extends PuppetASTObject
                         pp.type = type;
                     pp.error = e;
                     pp.addHints(value.hints);
-                    context.setProperty(paramName, pp);
-                    context.setField(paramName, pp);    
+                    context.setProperty("local", paramName, pp);
+                    context.setProperty("field", paramName, pp);    
                     continue;
                 }
             }
@@ -1878,8 +1993,8 @@ export class PuppetASTDefinedType extends PuppetASTObject
             if (type != null)
                 pp.type = type;
 
-            context.setProperty(paramName, pp);
-            context.setField(paramName, pp);
+            context.setProperty("local", paramName, pp);
+            context.setProperty("field", paramName, pp);
         }
 
         if (this.body)
@@ -1933,7 +2048,7 @@ export class PuppetASTSetInstruction extends PuppetASTObject
 
         pp.addHints(this.provider.hints);
         
-        context.setProperty(paramName, pp);
+        context.setProperty("local", paramName, pp);
         return pp;
     }
 
@@ -1997,11 +2112,18 @@ export class PuppetASTVariable extends PuppetASTObject
     public readonly className: string;
     public readonly root: boolean;
 
-    constructor(args: Array<PuppetASTObject>)
+    constructor(args: Array<PuppetASTObject> | string)
     {
         super();
 
-        this.fullName = (<PuppetASTPrimitive>args[0]).value;
+        if (isString(args))
+        {
+            this.fullName = args;
+        }
+        else
+        {
+            this.fullName = (<PuppetASTPrimitive>args[0]).value;
+        }
 
         const split = this.fullName.split("::");
         // cases like "$::operatingsystem"
@@ -2227,7 +2349,8 @@ export class PuppetASTParser
             "regexp": PuppetASTRegularExpression.Create,
             "=~": PuppetASTRegularExpressionCheck.Create,
             "hash": PuppetASTHash.Create,
-            "nop": PuppetASTNOP.Create
+            "nop": PuppetASTNOP.Create,
+            "node": PuppetASTNode.Create
         };
     }
 

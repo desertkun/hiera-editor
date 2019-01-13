@@ -7,7 +7,7 @@ export interface IpcAPI
     getProjectList(): Promise<any>;
     getEnvironmentList(): Promise<string[]>;
     getEnvironmentTree(name: string): Promise<any>;
-    findNode(localPath: string): Promise<any>;
+    findFile(localPath: string): Promise<any>;
     acquireNodeClass(nodePath: string, className: string): Promise<any>;
     hasNodeClassProperty(nodePath: string, className: string, propertyName: string): Promise<boolean>;
     setNodeClassProperty(nodePath: string, className: string, propertyName: string, value: any): Promise<any>;
