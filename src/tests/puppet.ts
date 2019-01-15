@@ -1027,10 +1027,49 @@ describe('Workspaces', () =>
             {
                 expect(node.isClassResolved("a")).to.be.equal(true)
                 expect(node.isClassResolved("b")).to.be.equal(false)
-                expect(node.isClassResolved("c")).to.be.equal(true)
+                expect(node.isClassResolved("c")).to.be.equal(false)
             }
         });
     });
 
+    it('node default', () =>
+    {
+        return testSimpleWorkspace({
+            files: {
+                "a.pp": `
+                    class a () {}
+                `,
+                "b.pp": `
+                    class b () {}
+                `,
+                "c.pp": `
+                    class c () {}
+                `
+            }, 
+            certname: "testnode.domain.com",
+            manifests: {
+                "site.pp":  `
+                    node "testnode2.domain.com" {
+                        include a
+                    }
+                    node "othernode2.domain.com" {
+                        include b
+                    }
+                    node default {
+                        include c
+                    }
+                `
+            },
+            f: async (
+                workspace: Workspace,
+                environment: Environment,
+                node: NodeContext) =>
+            {
+                expect(node.isClassResolved("a")).to.be.equal(false)
+                expect(node.isClassResolved("b")).to.be.equal(false)
+                expect(node.isClassResolved("c")).to.be.equal(true)
+            }
+        });
+    });
 });
 

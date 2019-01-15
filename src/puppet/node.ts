@@ -388,7 +388,9 @@ export class NodeContext
     
             const obj = PuppetASTParser.Parse(parsedJSON);
     
-            await obj.resolve(this.ast, new NodeContextResolver(this, global))
+            const resolver = new NodeContextResolver(this, global);
+            await obj.resolve(this.ast, resolver);
+            await this.ast.resolve(this.ast, resolver);
 
         }
     }

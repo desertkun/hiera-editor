@@ -8,8 +8,6 @@ import { PuppetASTVariable } from "./ast"
 import { Environment } from "./environment"
 import { File, Folder } from "./files"
 
-const stringReplaceAsync = require('string-replace-async');
-
 export class CompiledHierarchyEntry
 {
     public entry: HierarchyEntry;

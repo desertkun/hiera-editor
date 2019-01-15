@@ -148,15 +148,24 @@ export class PuppetASTReturn extends Error
     }
 }
 
-export class PuppetASTEnvironment implements PuppetASTContainerContext
+export class PuppetASTEnvironment extends PuppetASTObject implements PuppetASTContainerContext
 {
     public readonly name: string;
     public readonly resolvedLocals: Dictionary<string, PuppetASTResolvedProperty>;
+    public readonly nodeDefinitions: Array<PuppetASTNode>;
 
     constructor (name: string)
     {
+        super();
+        
         this.name = name;
         this.resolvedLocals = new Dictionary();
+        this.nodeDefinitions = [];
+    }
+
+    public addNodeDefinition(node: PuppetASTNode)
+    {
+        this.nodeDefinitions.push(node);
     }
 
     public setProperty(kind: string, name: string, pp: PuppetASTResolvedProperty): void
@@ -179,6 +188,71 @@ export class PuppetASTEnvironment implements PuppetASTContainerContext
     public getName(): string
     {
         return this.name;
+    }
+
+    protected async tryNode(nodeName: string, context: PuppetASTContainerContext, resolver: Resolver): Promise<boolean>
+    {
+        for (const def of this.nodeDefinitions)
+        {
+            for (const entry of def.matches.entries)
+            {
+                if (entry instanceof PuppetASTRegularExpression)
+                {
+                    const matcher = await entry.matcher(context, resolver);
+
+                    if (matcher.test(nodeName))
+                    {
+                        await def.body.resolve(context, resolver);
+                        return true;
+                    }
+                }
+                else if (entry instanceof PuppetASTPrimitive)
+                {
+                    const matches = await entry.resolve(context, resolver);
+                    if (matches == nodeName)
+                    {
+                        await def.body.resolve(context, resolver);
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        const nodeName = resolver.getNodeName();
+        const split = nodeName.split(".");
+
+        while (true)
+        {
+            if (await this.tryNode(split.join("."), context, resolver))
+            {
+                return;
+            }
+
+            split.pop();
+            
+            if (split.length == 0)
+                break;
+        }
+
+        // try default
+        
+        for (const def of this.nodeDefinitions)
+        {
+            for (const entry of def.matches.entries)
+            {
+                if (entry instanceof PuppetASTDefault)
+                {
+                    await def.body.resolve(context, resolver);
+                    return;
+                }
+            }
+        }
+
     }
 }
 
@@ -918,6 +992,11 @@ export class PuppetASTRegularExpression extends PuppetASTObject
         return "" + this.value;
     }
 
+    public async matcher(context: PuppetASTContainerContext, resolver: Resolver): Promise<RegExp>
+    {
+        return new RegExp(await this.resolve(context, resolver));
+    }
+
     public async matches(context: PuppetASTContainerContext, resolver: Resolver, object: PuppetASTObject): Promise<boolean>
     {
         const re = new RegExp(await this.resolve(context, resolver));
@@ -1177,29 +1256,9 @@ export class PuppetASTNode extends PuppetASTObject
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
-        let doMatches = false;
-        const nodeName = resolver.getNodeName();
-
-        for (const entry of this.matches.entries)
+        if (context instanceof PuppetASTEnvironment)
         {
-            if (entry instanceof PuppetASTDefault)
-            {
-                doMatches = true;
-                break;
-            }
-            
-            const matches = await entry.resolve(context, resolver);
-
-            if (nodeName == matches)
-            {
-                doMatches = true;
-                break;
-            }
-        }
-
-        if (doMatches)
-        {
-            await this.body.resolve(context, resolver);
+            context.addNodeDefinition(this);
         }
     }
 
