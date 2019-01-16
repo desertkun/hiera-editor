@@ -84,9 +84,9 @@ export async function walk(start: string, callback: any)
     }
 }
 
-export async function mostRecentFileTime(start: string): Promise<Number>
+export async function mostRecentFileTime(start: string): Promise<number>
 {
-    let lastModifiedTime: Number = 0;
+    let lastModifiedTime: number = 0;
 
     const stat = await fileStat(start);
 
@@ -96,7 +96,7 @@ export async function mostRecentFileTime(start: string): Promise<Number>
     }
 
     const files = await readDir(start);
-    const directories: Array<Promise<Number>> = [];
+    const directories: Array<Promise<number>> = [];
 
     for (const fileName of files)
     {
@@ -116,7 +116,7 @@ export async function mostRecentFileTime(start: string): Promise<Number>
         }
     }
 
-    const resolved: Array<Number> = await Promise.all(directories);
+    const resolved: Array<number> = await Promise.all(directories);
     for (const en of resolved)
     {
         if (en > lastModifiedTime)

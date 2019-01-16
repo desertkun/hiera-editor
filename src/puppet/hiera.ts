@@ -78,6 +78,20 @@ export class HierarchyEntry
         this.options = options;
         this.datadir = datadir;
     }
+
+    public getTokens(): Array<string>
+    {
+        const tokens: string[] = [];
+        const regexp = new RegExp(/\%\{\:{0,2}([^\}]+)\}/g);
+
+        let match;
+        while ((match = regexp.exec(this.path)) != null) 
+        {
+            tokens.push(match[1]);
+        }
+
+        return tokens;
+    }
 }
 
 export class Hierarchy
@@ -95,6 +109,11 @@ export class Hierarchy
             new HierarchyEntry("nodes/%{::trusted.certname}"), 
             new HierarchyEntry("common")
         ];
+    }
+
+    public get entries(): Array<HierarchyEntry>
+    {
+        return this._hierarchy;
     }
 
     public async compile(context: NodeContext, env: Environment): Promise<CompiledHierarchy>

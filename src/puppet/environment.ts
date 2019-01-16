@@ -9,10 +9,13 @@ import { PuppetModulesInfo } from "./modules_info"
 import { PuppetClassInfo, PuppetDefinedTypeInfo, PuppetFunctionInfo } from "./class_info"
 import { Ruby } from "./ruby"
 import { PuppetASTParser, PuppetASTClass, PuppetASTEnvironment, Resolver, PuppetASTFunction, ResolveError } from "./ast"
-import { CompiledPromisesCallback, GlobalVariableResolver, CompilationError } from "./util"
+import { CompiledPromisesCallback, GlobalVariableResolver, CompilationError, WorkspaceError } from "./util"
 import { Hierarchy } from "./hiera"
 import { NodeContext } from "./node"
 import { Folder } from "./files";
+import { PuppetHTTP } from "./http"
+import { isArray } from "util";
+import { WorkspaceSettings } from "./workspace_settings";
 
 const PromisePool = require('es6-promise-pool');
 
@@ -26,6 +29,8 @@ export class Environment
     private readonly _hierarchy: Hierarchy;
     private readonly _global: Dictionary<string, string>;
     private readonly _nodes: Dictionary<string, NodeContext>;
+    private readonly _warnings: Error[];
+    private readonly _nodeFacts: any;
     private _modulesInfo: PuppetModulesInfo;
 
     constructor(workspace: Workspace, name: string, _path: string, cachePath: string)
@@ -33,12 +38,14 @@ export class Environment
         this._name = name;
         this._workspace = workspace;
         this._path = _path;
+        this._warnings = [];
         this._hierarchy = new Hierarchy(path.join(_path, "hiera.yaml"));
         this._root = new Folder(this, "data", this.dataPath, name, null);
         this._cachePath = cachePath;
         this._global = new Dictionary();
         this._global.put("environment", name);
         this._nodes = new Dictionary();
+        this._nodeFacts = {};
     }
 
     public get global()
@@ -49,6 +56,31 @@ export class Environment
     public get root(): Folder
     {
         return this._root;
+    }
+
+    public get warnings(): Error[]
+    {
+        return this._warnings;
+    }
+
+    public addWarning(warning: Error)
+    {
+        this._warnings.push(warning);
+    }
+
+    public get certNodeFactsPath(): string
+    {
+        return path.join(this._cachePath, "facts")
+    }
+
+    public getNodeFactsPath(certName: string): string
+    {
+        return path.join(this._cachePath, "facts", certName + ".json")
+    }
+
+    public get certListCachePath(): string
+    {
+        return path.join(this._cachePath, "certnames.json")
     }
 
     public get hierarchy(): Hierarchy
@@ -354,6 +386,25 @@ export class Environment
 
     }
 
+    private async updateCertList(updateProgressCategory: any, settings: WorkspaceSettings): Promise<string[]>
+    {
+        if (updateProgressCategory) updateProgressCategory("[" + this.name + "] Updating certificate list...", false);
+
+        let certList: string[];
+
+        try
+        {
+            certList = await PuppetHTTP.GetCertList(this.name, settings);
+        }
+        catch (e)
+        {
+            throw new WorkspaceError("Failed to obtain certificate list", e.toString());
+        }
+
+        await async.writeJSON(this.certListCachePath, certList);
+        return certList;
+    }
+
     public async init(progressCallback: any = null, updateProgressCategory: any = null): Promise<any>
     {
         if (!await async.isDirectory(this.cachePath))
@@ -379,6 +430,103 @@ export class Environment
 
         await this.compileModules(progressCallback, updateProgressCategory);
         await this.compileManifests(progressCallback, updateProgressCategory);
+
+        const settings = await this.workspace.getSettings();
+
+        let nodeList: string[];
+
+        if (await async.isFile(this.certListCachePath))
+        {
+            try
+            {
+                nodeList = await this.updateCertList(updateProgressCategory, settings);
+            }
+            catch (e)
+            {
+                this.addWarning(e);
+                nodeList = await async.readJSON(this.certListCachePath);
+
+                if (!isArray(nodeList))
+                {
+                    nodeList = [];
+                    await async.writeJSON(this.certListCachePath, nodeList);
+                    throw e;
+                }
+            }
+        }
+        else
+        {
+            nodeList = await this.updateCertList(updateProgressCategory, settings);
+        }
+
+        if (!await async.isDirectory(this.certNodeFactsPath))
+            await async.makeDirectory(this.certNodeFactsPath);
+
+        const count = {
+            c: 0,
+            total: nodeList.length
+        };
+
+        const queries = [];
+
+        for (const certName of nodeList)
+        {
+            queries.push(this.fetchNodeFacts(certName, count, progressCallback, settings));
+        }
+
+        if (queries.length > 0)
+        {
+            if (updateProgressCategory) updateProgressCategory("[" + this.name + "] Fetching node facts...", true);
+    
+            await Promise.all(queries);
+        }
+
+    }
+
+    private async fetchNodeFacts(certname: string, count: any, progressCallback: any, settings: WorkspaceSettings)
+    {
+        const p = this.getNodeFactsPath(certname);
+
+        let facts;
+
+        try
+        {
+            facts = await PuppetHTTP.GetNodeFacts(this.name, certname, settings);
+            await async.writeJSON(p, facts);
+        }
+        catch (e)
+        {
+            this.addWarning(new WorkspaceError("Failed to fetch facts for node '" + certname + '"', e.toString()));
+            
+            if (await async.isFile(p))
+            {
+                try
+                {
+                    facts = await async.readJSON(p);
+                }
+                catch (e)
+                {
+                    try
+                    {
+                        await async.remove(p);
+                    }
+                    catch (e)
+                    {
+                        //
+                    }
+
+                    this.addWarning(new WorkspaceError("Failed to fetch back up facts for node '" + certname + '"', e.toString()));
+                }
+            }
+        }
+
+        this._nodeFacts[certname] = facts;
+        
+        if (progressCallback)
+        {
+            count.c++;
+            progressCallback(count.c / count.total);
+        }
     }
 
     public async loadModulesInfo(): Promise<PuppetModulesInfo>

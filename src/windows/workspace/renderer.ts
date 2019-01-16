@@ -442,143 +442,10 @@ class NodeTreeItemRenderer
     }
 }
 
-class FolderTreeItemRenderer
-{
-    private renderer: WorkspaceRenderer;
-    private nodes: Dictionary<string, NodeTreeItemRenderer>;
-    private folders: Dictionary<string, FolderTreeItemRenderer>;
-    private name: string;
-    private root: boolean;
-    private localPath: string;
-
-    private readonly n_parent: TreeViewNode;
-    private n_nodes: TreeViewNode;
-
-    constructor(renderer: WorkspaceRenderer, name: string, parentNode: TreeViewNode, localPath: string, root: boolean)
-    {
-        this.renderer = renderer;
-        this.name = name;
-        this.nodes = new Dictionary();
-        this.folders = new Dictionary();
-        this.root = root;
-        this.localPath = localPath;
-
-        this.n_parent = parentNode;
-
-        this.render();
-    }
-
-    private render()
-    {
-        if (this.root)
-        {
-            this.n_nodes = this.n_parent;
-        }
-        else
-        {
-            const zis = this;
-
-            this.n_nodes = this.n_parent.addChild( 
-                (node) => 
-            {
-                node.title = zis.name;
-                node.icon = $('<i class="fa fa-folder"></i>');
-            }, "folder-" + zis.localPath, renderer.openNodes);
-
-            this.n_nodes.contextMenu([
-                {
-                    label: "New Node",
-                    click: async () => 
-                    {
-                        const nodeName = await prompt("Enter a title for new node", "");
-    
-                        if (nodeName == null || nodeName.length == 0)
-                            return;
-                        
-                        if (!await ipc.createNode(zis.localPath, nodeName))
-                        {
-                            alert("Failed to create a node");
-                            return;
-                        }
-
-                        await renderer.refresh();
-                    }
-                },
-                {
-                    label: "New Folder",
-                    click: async () => 
-                    {
-                        const folderName = await prompt("Enter a title for new folder", "");
-    
-                        if (folderName == null || folderName.length == 0)
-                            return;
-                        
-                        if (!await ipc.createFolder(zis.localPath, folderName))
-                        {
-                            alert("Failed to create a folder");
-                            return;
-                        }
-
-                        await renderer.refresh();
-                    }
-                },
-                {
-                    type: "separator"
-                },
-                {
-                    label: "Delete",
-                    click: async () => 
-                    {
-                        if (!await confirm("Are you sure you would like to delete this folder?"))
-                            return;
-                        
-                        if (!await ipc.removeFolder(zis.localPath))
-                        {
-                            return;
-                        }
-
-                        await renderer.refresh();
-                    }
-                }
-            ])
-        }
-    }
-
-    public addNode(name: string, path: string, localPath: string): NodeTreeItemRenderer
-    {
-        const node = new NodeTreeItemRenderer(this.renderer, name, path, localPath, this.n_nodes);
-        this.nodes.put(name, node);
-        return node;
-    }
-
-    public addFolder(name: string): FolderTreeItemRenderer
-    {
-        const folder = new FolderTreeItemRenderer(this.renderer, name, this.n_nodes, this.localPath + "/" + name, false);
-        this.folders.put(name, folder);
-        return folder;
-    }
-
-    public async populate(tree: any)
-    {
-        for (const folderEntry of tree.folders)
-        {
-            const name: string = folderEntry.name;
-            const folder: FolderTreeItemRenderer = this.addFolder(name);
-            await folder.populate(folderEntry);
-        }
-
-        for (const nodeEntry of tree.nodes)
-        {
-            const node = this.addNode(nodeEntry.name, nodeEntry.path, nodeEntry.localPath);
-            await node.init();
-        }
-    }
-}
 
 class EnvironmentTreeItemRenderer
 {
     private renderer: WorkspaceRenderer;
-    private root: FolderTreeItemRenderer;
     private name: string;
 
     private n_environment: TreeViewNode;
@@ -592,7 +459,6 @@ class EnvironmentTreeItemRenderer
         this.n_treeView = treeView;
 
         this.render();
-        this.root = new FolderTreeItemRenderer(renderer, "root", this.n_environment, name, true);
     }
 
     private render()
@@ -629,24 +495,6 @@ class EnvironmentTreeItemRenderer
                 }
             },
             {
-                label: "New Folder",
-                click: async () => 
-                {
-                    const folderName = await prompt("Enter a title for new folder", "");
-
-                    if (folderName == null || folderName.length == 0)
-                        return;
-                    
-                    if (!await ipc.createFolder(zis.name, folderName))
-                    {
-                        alert("Failed to create a folder");
-                        return;
-                    }
-
-                    await renderer.refresh();
-                }
-            },
-            {
                 type: "separator"
             },
             {
@@ -670,7 +518,7 @@ class EnvironmentTreeItemRenderer
     public async init()
     {
         const tree = await ipc.getEnvironmentTree(this.name);
-        await this.root.populate(tree);
+        //await this.root.populate(tree);
     }
 }
 
