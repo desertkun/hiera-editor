@@ -1,5 +1,6 @@
 
 import {PuppetASTObject, PuppetASTContainerContext, Resolver, ResolveError, PuppetASTReturn, PuppetASTAccess, PuppetASTClass, PuppetASTVariable} from "./ast";
+import { isArray } from "util";
 
 type BuiltinFunctionCallback = (caller: PuppetASTObject, 
     context: PuppetASTContainerContext, resolver: Resolver, args: any[]) => Promise<any>;
@@ -42,16 +43,32 @@ const BuiltInFunctions: any = {
     },
     "require": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
     {
-        await resolver.resolveClass(args[0]);
+        await resolver.resolveClass(args[0], true);
     },
     "contain": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
     {
-        await resolver.resolveClass(args[0]);
+        await resolver.resolveClass(args[0], true);
     },
     "include": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
     {
         const className = args[0];
-        await resolver.resolveClass(className);
+        await resolver.resolveClass(className, true);
+    },
+    "hiera_include": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        const key = args[0];
+        const classes = resolver.getGlobalVariable(key);
+        if (isArray(classes))
+        {
+            for (const className of classes)
+            {
+                await resolver.resolveClass(className, true);
+            }
+        }
+    },
+    "hiera_resources": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        // todo
     },
     "return": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
     {

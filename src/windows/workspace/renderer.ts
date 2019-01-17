@@ -19,7 +19,6 @@ import {WorkspaceTab, WorkspaceTabConstructor} from "./tabs/tab";
 import {DefaultTab} from "./tabs/default";
 import {NodeClassTab} from "./tabs/class";
 import {NodeResourceTab} from "./tabs/resource";
-import {FactsTab} from "./tabs/facts";
 import { ipcRenderer } from 'electron';
 
 import {TreeView, TreeViewNode} from "./treeview";
@@ -48,32 +47,24 @@ function prompt(title: string, value: string): Promise<string>
     });
 }
 
-class NodeTreeItemRenderer
+class NodeItemRenderer
 {
-    private renderer: WorkspaceRenderer;
-    private name: string;
-    private path: string;
-    private localPath: string;
+    private certname: string;
+    private env: EnvironmentTreeItemRenderer;
     private info: any;
-    private classInfo: any;
-
-    private readonly n_parent: TreeViewNode;
     private n_node: TreeViewNode;
+    private n_parent: TreeViewNode;
 
-    constructor(renderer: WorkspaceRenderer, 
-        name: string, path: string, localPath: string, parentNode: TreeViewNode)
+    constructor(n_parent: TreeViewNode, env: EnvironmentTreeItemRenderer, certname: string, info: any)
     {
-        this.renderer = renderer;
-        this.name = name;
-        this.path = path;
-        this.localPath = localPath;
-        this.n_parent = parentNode;
+        this.certname = certname;
+        this.env = env;
+        this.info = info;
+        this.n_parent = n_parent;
     }
 
     public async init()
     {
-        this.info = await ipc.findFile(this.localPath);
-        this.classInfo = await renderer.getClassInfo(this.info.env);
         this.render();
     }
 
@@ -82,12 +73,12 @@ class NodeTreeItemRenderer
         const zis = this;
         let hadAny: boolean = false;
 
-        const nodeClassNames = this.info.classes;
+        const nodeClassNames = Object.keys(this.info.classes);
         nodeClassNames.sort();
 
         for (const className of nodeClassNames)
         {
-            const classInfo = this.classInfo.classes[className];
+            const classInfo = this.info.classes[className];
             const iconData = classInfo != null ? classInfo.options.icon : null;
 
             const classNode = node.addChild( 
@@ -108,10 +99,11 @@ class NodeTreeItemRenderer
                 node.selectable = true;
                 node.onSelect = (node) => 
                 {
-                    renderer.openTab("class", [zis.localPath, className]);
+                    renderer.openTab("class", [zis.env.name, zis.certname, className]);
                 };
-            }, "class-" + zis.localPath + "-" + className, renderer.openNodes);
+            }, "class-" + this.env.name + "-" + zis.certname + "-" + className, renderer.openNodes);
             
+            /*
             classNode.contextMenu([
                 {
                     label: "Reset To Defaults",
@@ -134,6 +126,7 @@ class NodeTreeItemRenderer
                     }
                 }
             ]);
+            */
 
             hadAny = true;
         }
@@ -141,6 +134,7 @@ class NodeTreeItemRenderer
         return hadAny;
     }
     
+    /*
     private renderResources(node: TreeViewNode, parentClassPath: string): boolean
     {
         const zis = this;
@@ -265,6 +259,7 @@ class NodeTreeItemRenderer
 
         return hadAny;
     }
+    */
 
     private render()
     {
@@ -274,22 +269,24 @@ class NodeTreeItemRenderer
             (node) => 
         {
             node.icon = $('<i class="fa fa-server"></i>');
-            node.title = zis.name;
+            node.title = zis.certname;
             node.selectable = false;
-        }, "node-" + zis.localPath, renderer.openNodes);
+        }, "node-" + zis.env.name + "-" + zis.certname, renderer.openNodes);
 
         this.n_node.contextMenu([
             {
                 label: "Assign New Class",
                 click: async () => 
                 {
-                    const className = await ipc.assignNewClassToNode(zis.localPath);
+                    /*
+                    const className = await ipc.assignNewClassToNode(zis.env.name, zis.certname);
 
                     if (className)
                     {
                         await renderer.refresh();
                         renderer.openTab("class", [zis.localPath, className]);
                     }
+                    */
                 }
             },
             {
@@ -305,6 +302,7 @@ class NodeTreeItemRenderer
                 label: "Remove",
                 click: async () => 
                 {
+                    /*
                     if (!await confirm("Are you sure you would like to delete this node?"))
                         return;
                     
@@ -312,6 +310,7 @@ class NodeTreeItemRenderer
                     {
                         return;
                     }
+                    */
 
                     await renderer.refresh();
                 }
@@ -326,7 +325,7 @@ class NodeTreeItemRenderer
             node.emptyText = "Node has no classes";
             node.leaf = false;
             node.selectable = false;
-        }, "node-" + zis.localPath + "-classes", renderer.openNodes);
+        }, "node-" + zis.env.name + "-" + zis.certname + "-classes", renderer.openNodes);
 
         this.renderClasses(n_classes, null);
 
@@ -335,6 +334,7 @@ class NodeTreeItemRenderer
                 label: "Assign New Class",
                 click: async () => 
                 {
+                    /*
                     const className = await ipc.assignNewClassToNode(zis.localPath);
 
                     if (className)
@@ -342,6 +342,7 @@ class NodeTreeItemRenderer
                         await renderer.refresh();
                         renderer.openTab("class", [zis.localPath, className]);
                     }
+                    */
                 }
             },
             {
@@ -351,12 +352,14 @@ class NodeTreeItemRenderer
                 label: "Remove All Classes",
                 click: async () => 
                 {
+                    /*
                     const classNames = await ipc.removeClassesFromNode(zis.localPath);
                     await renderer.refresh();
                     for (const className of classNames)
                     {
                         await renderer.closeTabKind("class", [zis.localPath, className]);
                     }
+                    */
                 }
             }
         ]);
@@ -369,7 +372,7 @@ class NodeTreeItemRenderer
             node.emptyText = "Node has no resources";
             node.leaf = false;
             node.selectable = false;
-        }, "node-" + zis.localPath + "-resources", renderer.openNodes);
+        }, "node-" + zis.env.name + "-" + zis.certname + "-resources", renderer.openNodes);
         
         n_resources.contextMenu([
             
@@ -377,6 +380,7 @@ class NodeTreeItemRenderer
                 label: "Create New Resource",
                 click: async () => 
                 {
+                    /*
                     const definedTypeName = await ipc.chooseDefinedType(zis.localPath);
                     if (!definedTypeName)
                         return;
@@ -392,6 +396,7 @@ class NodeTreeItemRenderer
                     await renderer.refresh();
                     await renderer.closeTabKind("resource", 
                         [zis.localPath, definedTypeName, newTitle]);
+                    */
                 }
             },
             {
@@ -401,6 +406,7 @@ class NodeTreeItemRenderer
                 label: "Remove All Resources",
                 click: async () => 
                 {
+                    /*
                     const removed = await ipc.removeAllResourcesFromNode(zis.localPath);
 
                     await renderer.refresh();
@@ -410,12 +416,14 @@ class NodeTreeItemRenderer
                         await renderer.closeTabKind("resource", 
                             [zis.localPath, obj[0], obj[1]]);
                     }
+                    */
                 }
             }
         ]);
 
-        this.renderResources(n_resources, null);
+        //this.renderResources(n_resources, null);
         
+        /*
         const n_facts = this.n_node.addChild( 
             (node) => 
         {
@@ -439,14 +447,17 @@ class NodeTreeItemRenderer
                 }
             }
         ])
+
+        */
     }
 }
 
 
 class EnvironmentTreeItemRenderer
 {
-    private renderer: WorkspaceRenderer;
-    private name: string;
+    public nodes: Dictionary<string, NodeItemRenderer>;
+    public renderer: WorkspaceRenderer;
+    public name: string;
 
     private n_environment: TreeViewNode;
     private readonly n_treeView: TreeViewNode;
@@ -456,6 +467,7 @@ class EnvironmentTreeItemRenderer
         this.renderer = renderer;
         this.name = name;
 
+        this.nodes = new Dictionary();
         this.n_treeView = treeView;
 
         this.render();
@@ -480,16 +492,18 @@ class EnvironmentTreeItemRenderer
                 label: "New Node",
                 click: async () => 
                 {
-                    const nodeName = await prompt("Enter a title for new node", "");
+                    const nodeName = await prompt("Enter a cert name for new node", "");
 
                     if (nodeName == null || nodeName.length == 0)
                         return;
                     
+                    /*
                     if (!await ipc.createNode(zis.name, nodeName))
                     {
                         alert("Failed to create a node");
                         return;
                     }
+                    */
 
                     await renderer.refresh();
                 }
@@ -518,7 +532,17 @@ class EnvironmentTreeItemRenderer
     public async init()
     {
         const tree = await ipc.getEnvironmentTree(this.name);
-        //await this.root.populate(tree);
+        const nodes = tree["nodes"] || {};
+
+        for (const certname in nodes)
+        {
+            const info = nodes[certname];
+
+            const itemRenderer = new NodeItemRenderer(this.n_environment, this, certname, info);
+            this.nodes.put(certname, itemRenderer);
+            await itemRenderer.init();
+        }
+        
     }
 }
 
@@ -631,7 +655,6 @@ export class WorkspaceRenderer
         this.tabClasses.put("default", DefaultTab);
         this.tabClasses.put("class", NodeClassTab);
         this.tabClasses.put("resource", NodeResourceTab);
-        this.tabClasses.put("facts", FactsTab);
 
         this.init();
     }

@@ -165,3 +165,32 @@ html, body {
 .container-w-padding-x2 {
     padding: 16px;
 }
+
+.container-grayed {
+    background-color: #f3f3f3;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 8px;
+}
+
+.caret-right {
+    border-bottom: 4px solid transparent;
+    border-top: 4px solid transparent;
+    border-left: 4px solid #000000;
+    display: inline-block;
+    height: 0;
+    opacity: 0.5;
+    margin: 9px 8px;
+    width: 0;
+}
+
+.select2-selection {
+    height: 35px !important;
+}
+
+.select2-selection .select2-selection__rendered {
+    padding: 2px 10px;
+}
+
+.select2-selection .select2-selection__arrow {
+    margin: 4px;
+}

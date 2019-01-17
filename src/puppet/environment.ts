@@ -24,11 +24,11 @@ export class Environment
     private readonly _name: string;
     private readonly _path: string;
     private readonly _cachePath: string;
-    private readonly _root: Folder;
     private readonly _workspace: Workspace;
     private readonly _hierarchy: Hierarchy;
     private readonly _global: Dictionary<string, string>;
     private readonly _nodes: Dictionary<string, NodeContext>;
+    private readonly _roots: Dictionary<string, Folder>;
     private readonly _warnings: Error[];
     private readonly _nodeFacts: any;
     private _modulesInfo: PuppetModulesInfo;
@@ -40,7 +40,7 @@ export class Environment
         this._path = _path;
         this._warnings = [];
         this._hierarchy = new Hierarchy(path.join(_path, "hiera.yaml"));
-        this._root = new Folder(this, "data", this.dataPath, name, null);
+        this._roots = new Dictionary();
         this._cachePath = cachePath;
         this._global = new Dictionary();
         this._global.put("environment", name);
@@ -53,9 +53,14 @@ export class Environment
         return this._global;
     }
 
-    public get root(): Folder
+    public getRoot(_path: string): Folder
     {
-        return this._root;
+        const existing = this._roots.get(_path);
+        if (existing)
+            return existing;
+        const root = new Folder(this, "data", path.join(this._path, _path), this.name, null);
+        this._roots.put(_path, root);
+        return root;
     }
 
     public get warnings(): Error[]
@@ -71,6 +76,11 @@ export class Environment
     public get certNodeFactsPath(): string
     {
         return path.join(this._cachePath, "facts")
+    }
+
+    public getNode(certname: string): NodeContext
+    {
+        return this._nodes.get(certname);
     }
 
     public getNodeFactsPath(certName: string): string
@@ -195,6 +205,26 @@ export class Environment
             await async.createDirectory(this.manifestsPath);
     }
 
+    public async tree(): Promise<any>
+    {
+        const nodes: any = {};
+
+        for (const certname of this._nodes.getKeys())
+        {
+            const node = this._nodes.get(certname);
+            nodes[certname] = await node.dump();
+        }
+
+        return {
+            "nodes": nodes
+        };
+    }
+
+    public get root(): Folder
+    {
+        return this.getRoot(this._hierarchy.datadir);
+    }
+
     public get dataPath(): string
     {
         return path.join(this._path, this._hierarchy.datadir);
@@ -245,8 +275,10 @@ export class Environment
         const classes: any = {};
         const types: any = {};
 
-        const globalClassInfo = this._workspace.modulesInfo.dump(classes, types);
-        if (this._modulesInfo) this._modulesInfo.dump(classes, types);
+        this._workspace.modulesInfo.dump(classes, types);
+
+        if (this._modulesInfo) 
+            this._modulesInfo.dump(classes, types);
 
         return {
             "classes": classes,
@@ -481,6 +513,14 @@ export class Environment
             await Promise.all(queries);
         }
 
+        if (updateProgressCategory) updateProgressCategory("[" + this.name + "] Resolving nodes...", true);
+
+        for (const certname in this._nodeFacts)
+        {
+            const facts = this._nodeFacts[certname];
+            const node = await this.enterNodeContext(certname, facts);
+            this._nodes.put(certname, node);
+        }
     }
 
     private async fetchNodeFacts(certname: string, count: any, progressCallback: any, settings: WorkspaceSettings)

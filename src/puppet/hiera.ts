@@ -27,14 +27,36 @@ export class CompiledHierarchyEntry
         return this._file;
     }
 
-    public async resolve(env: Environment): Promise<boolean>
+    public dump(): any
+    {
+        return {
+            "name": this.entry.name,
+            "path": this.path
+        };
+    }
+
+    public async create(env: Environment, hierarchy: Hierarchy): Promise<File>
     {
         const split = this.path.split("/");
 
-        const root = this.entry.datadir != null ? 
-            new Folder(env, this.entry.datadir, path.join(env.path, this.entry.datadir), 
-                this.entry.datadir, null) : env.root;
+        const rootPath = this.entry.datadir || hierarchy.datadir;
+        const root = env.getRoot(rootPath);
+        const f = await root.createFile(split);
 
+        if (f != null)
+        {
+            this._file = f;
+        }
+        
+        return f;
+    }
+
+    public async resolve(env: Environment, hierarchy: Hierarchy): Promise<boolean>
+    {
+        const split = this.path.split("/");
+
+        const rootPath = this.entry.datadir || hierarchy.datadir;
+        const root = env.getRoot(rootPath);
         const f = await root.findFile(split);
 
         if (f == null)
@@ -51,16 +73,40 @@ export class CompiledHierarchyEntry
 
 export class CompiledHierarchy
 {
-    private _hierarchy: Array<CompiledHierarchyEntry>;
+    private _entries: Array<CompiledHierarchyEntry>;
+    private _source: Hierarchy;
 
-    constructor(hierarchy: Array<CompiledHierarchyEntry>)
+    constructor(source: Hierarchy, entries: Array<CompiledHierarchyEntry>)
     {
-        this._hierarchy = hierarchy;
+        this._entries = entries;
+        this._source = source;
+    }
+
+    public get(hierarchy: number): CompiledHierarchyEntry
+    {
+        if (hierarchy < 0 || hierarchy >= this._entries.length)
+            return null;
+        return this._entries[hierarchy];
+    }
+
+    public get source(): Hierarchy
+    {
+        return this._source;
     }
 
     public get hierarhy(): Array<CompiledHierarchyEntry>
     {
-        return this._hierarchy;
+        return this._entries;
+    }
+
+    public dump(): any[]
+    {
+        const result: any[] = [];
+        for (const entry of this._entries)
+        {
+            result.push(entry.dump())
+        }
+        return result;
     }
 }
 
@@ -142,11 +188,11 @@ export class Hierarchy
             });
             
             const cc = new CompiledHierarchyEntry(compiledEntryPath, entry);
-            await cc.resolve(env);
+            await cc.resolve(env, this);
             c.push(cc);
         }
 
-        return new CompiledHierarchy(c);
+        return new CompiledHierarchy(this, c);
     }
 
     public async load(): Promise<boolean>

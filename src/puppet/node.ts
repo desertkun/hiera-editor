@@ -29,9 +29,9 @@ class NodeContextResolver implements Resolver
         return this.context.name;
     }
 
-    public resolveClass(className: string): Promise<PuppetASTClass>
+    public resolveClass(className: string, public_: boolean): Promise<PuppetASTClass>
     {
-        return this.context.resolveClass(className, this.global);
+        return this.context.resolveClass(className, this.global, public_);
     }
 
     public resolveFunction(name: string): Promise<PuppetASTFunction>
@@ -98,6 +98,318 @@ export class NodeContext
         }
     }
 
+    public compilePropertyPath(className: string, propertyName: string): string
+    {
+        return className + "::" + propertyName;
+    }
+
+    public async hasClassProperty(className: string, propertyName: string): Promise<boolean>
+    {
+        const classInfo = this.env.findClassInfo(className);
+        if (classInfo == null)
+            return false;
+
+        const compiled = await this.acquireClass(className, false);
+        if (!compiled)
+            return false;
+
+        const propertyPath = this.compilePropertyPath(className, propertyName);
+
+        return this.hasGlobal(propertyPath);
+    }
+    
+    public async removeClassProperty(className: string, hierarchy: number, propertyName: string): Promise<any>
+    {
+        const classInfo = this.env.findClassInfo(className);
+        if (classInfo == null)
+            return;
+
+        const compiled = await this.acquireClass(className);
+        if (!compiled)
+            return;
+            
+        const hierarchyEntry = this.hierarchy.get(hierarchy);
+        if (hierarchyEntry == null)
+            return;
+
+        const propertyPath = this.compilePropertyPath(className, propertyName);
+
+        const file = hierarchyEntry.file;
+        if (file == null)
+            return;
+
+        delete file.config[propertyPath];
+        await file.save();
+    }
+
+    public async dumpClass(className: string): Promise<any>
+    {
+        const classInfo = this.env.findClassInfo(className);
+
+        if (classInfo == null)
+            return {};
+
+        const compiled = await this.acquireClass(className, true);
+
+        const defaultValues: any = {};
+        const types: any = {};
+        const errors: any = {};
+        const hints: any = {};
+        const fields: string[] = [];
+        const definedFields: string[] = [];
+        const requiredFields: string[] = [];
+        const values: any = {};
+        const classHints: any = compiled.hints;
+
+        for (const name of compiled.resolvedFields.getKeys())
+        {
+            const property = compiled.getResolvedProperty(name);
+            fields.push(name);
+
+            if (classInfo.defaults.indexOf(name) < 0)
+            {
+                requiredFields.push(name);
+            }
+
+            if (property.hasType)
+            {
+                types[name] = {
+                    "type": property.type.constructor.name,
+                    "data": property.type
+                };
+            }
+
+            if (property.hasValue)
+            {
+                defaultValues[name] = property.value;
+            }
+
+            if (property.hasError)
+            {
+                errors[name] = {
+                    message: property.error.message,
+                    stack: property.error.stack
+                };
+            }
+
+            if (property.hasHints)
+            {
+                hints[name] = property.hints;
+            }
+
+            const propertyPath = this.compilePropertyPath(className, name);
+
+            if (this.hasGlobal(propertyPath))
+            {
+                const configValue: [string, number] = this.getGlobalWithHierarchy(propertyPath);
+                values[name] = configValue;
+                definedFields.push(name);
+            }
+        }
+
+        return {
+            "icon": classInfo.options.icon,
+            "values": values,
+            "classInfo": classInfo.dump(),
+            "defaults": defaultValues,
+            "types": types,
+            "errors": errors,
+            "propertyHints": hints,
+            "hints": classHints,
+            "definedFields": definedFields,
+            "fields": fields,
+            "requiredFields": requiredFields,
+            "hierarchy": this.hierarchy.dump()
+        }
+    }
+    
+    /*
+    public async dumpResource(definedTypeName: string, title: string): Promise<any>
+    {
+        const classInfo = this._env.findDefineTypeInfo(definedTypeName);
+
+        if (classInfo == null)
+            return {};
+
+        const compiled: ResolvedResource = await this.acquireResource(definedTypeName, title);
+
+        const defaultValues: any = {};
+        const types: any = {};
+        const fields: string[] = [];
+        const definedFields: string[] = [];
+        const requiredFields: string[] = [];
+        const errors: any = {};
+        const hints: any = {};
+        const values: any = {};
+
+        if (this.configResources[definedTypeName] != null)
+        {
+            const t = this.configResources[definedTypeName][title];
+
+            if (t != null)
+            {
+                for (const k in t)
+                {
+                    values[k] = t[k];
+                    definedFields.push(k);
+                }
+            }
+        }
+
+        for (const name of compiled.resource.resolvedFields.getKeys())
+        {
+            const property = compiled.resource.resolvedFields.get(name);
+
+            if (classInfo.defaults.indexOf(name) < 0)
+            {
+                requiredFields.push(name);
+            }
+
+            if (property.hasType)
+            {
+                types[name] = {
+                    "type": property.type.constructor.name,
+                    "data": property.type
+                };
+            }
+
+            if (property.hasError)
+            {
+                errors[name] = {
+                    message: property.error.message,
+                    stack: property.error.stack
+                };
+            }
+
+            if (property.hasHints)
+            {
+                hints[name] = property.hints;
+            }
+
+            if (property.hasValue)
+            {
+                defaultValues[name] = property.value;
+            }
+
+            fields.push(name);
+        }
+        
+        return {
+            "icon": classInfo.options.icon,
+            "values": values,
+            "classInfo": classInfo.dump(),
+            "defaults": defaultValues,
+            "types": types,
+            "errors": errors,
+            "propertyHints": hints,
+            "definedFields": definedFields,
+            "fields": fields,
+            "requiredFields": requiredFields
+        }
+    }
+    */
+
+    public async setClassProperty(className: string, hierarchy: number, propertyName: string, value: any): Promise<any>
+    {
+        const classInfo = this.env.findClassInfo(className);
+        if (classInfo == null)
+            return;
+
+        const compiled = await this.acquireClass(className);
+        if (!compiled)
+            return;
+
+        const hierarchyEntry = this.hierarchy.get(hierarchy);
+        if (hierarchyEntry == null)
+            return;
+
+        let file = hierarchyEntry.file;
+        if (file == null)
+        {
+            file = await hierarchyEntry.create(this.env, this._hierarchy.source);
+        }
+        const propertyPath = this.compilePropertyPath(className, propertyName);
+        file.config[propertyPath] = value;
+        await file.save();
+    }
+    
+    public async invalidateClass(className: string): Promise<void>
+    {
+        if (this._compiledClasses.has(className))
+        {
+            const compiled = this._compiledClasses.get(className);
+            this._compiledClasses.remove(className);
+
+            // invalidate also a direct parent, if any
+            if (compiled.parentName != null)
+            {
+                await this.invalidateClass(compiled.parentName);
+            }
+        }
+    }
+    
+    public async invalidateDefinedType(definedTypeName: string, title: string): Promise<void>
+    {
+        if (this._compiledResources.has(definedTypeName))
+        {
+            const titles = this._compiledResources.get(definedTypeName);
+
+            titles.remove(title);
+        }
+    }
+    
+    public async isDefinedTypeValid(definedTypeName: string, title: string): Promise<boolean>
+    {
+        if (this._compiledResources.has(definedTypeName))
+        {
+            const titles = this._compiledResources.get(definedTypeName);
+
+            return titles.has(title);
+        }
+
+        return false;
+    }
+
+    public async invalidate(): Promise<void>
+    {
+        this._compiledClasses.clear();
+        this._compiledResources.clear();
+    }
+
+    public async dump(): Promise<any>
+    {
+        const classes: any = {};
+        const hierarchy = [];
+
+        for (const clazz of this._compiledClasses.getValues())
+        {
+            if (!clazz.isPublic())
+                continue;
+                
+            const classInfo = this.env.findClassInfo(clazz.name);
+
+            if (classInfo == null)
+                continue;
+
+            classes[clazz.name] = classInfo.dump();
+        }
+
+        for (const entry of this._hierarchy.hierarhy)
+        {
+            hierarchy.push(entry.path);
+        }
+
+        return {
+            "classes": classes,
+            "hierarchy": hierarchy
+        };
+    }
+
+    public async isClassValid(className: string): Promise<boolean>
+    {
+        return this._compiledClasses.has(className);
+    }
+
     public get hierarchy()
     {
         return this._hierarchy;
@@ -143,7 +455,7 @@ export class NodeContext
         return false;
     }
 
-    public getGlobal(key: string): string
+    public getGlobal(key: string): any
     {
         switch (key)
         {
@@ -187,14 +499,59 @@ export class NodeContext
         return null;
     }
     
-    public async acquireClass(className: string): Promise<PuppetASTClass>
+    public getGlobalWithHierarchy(key: string): [any, number]
+    {
+        switch (key)
+        {
+            case "facts":
+            {
+                return [this._facts, -1];
+            }
+            case "trusted":
+            {
+                return [this._trusted_facts, -1];
+            }
+            case "environment":
+            {
+                return [this.env.name, -1];
+            }
+        }
+
+        if (this._trusted_facts.hasOwnProperty(key))
+            return [this._trusted_facts[key], -1];
+
+        if (this._facts.hasOwnProperty(key))
+            return [this._facts[key], -1];
+
+        if (this.env.global.has(key))
+            return [this.env.global.get(key), -1];
+
+        if (this.env.workspace.global.has(key))
+            return [this.env.workspace.global.get(key), -1];
+
+        for (let _id = 0, t = this._hierarchy.hierarhy.length; _id < t; _id++)
+        {
+            const e = this._hierarchy.hierarhy[_id];
+            const f = e.file;
+
+            if (f == null)
+                continue;
+
+            if (f.has(key))
+                return [f.get(key), _id];
+        }
+
+        return [null, -1];
+    }
+    
+    public async acquireClass(className: string, public_: boolean = true): Promise<PuppetASTClass>
     {
         const zis = this;
 
         return await this.resolveClass(className, {
             get: (key: string) => zis.getGlobal(key),
             has: (key: string) => zis.hasGlobal(key)
-        });
+        }, public_);
     }
 
     public isClassResolved(className: string): boolean
@@ -203,13 +560,18 @@ export class NodeContext
         return this._compiledClasses.has(className);
     }
     
-    public async resolveClass(className: string, global: GlobalVariableResolver): Promise<PuppetASTClass>
+    public async resolveClass(className: string, global: GlobalVariableResolver, public_: boolean): Promise<PuppetASTClass>
     {
         className = Node.fixClassName(className);
 
         if (this._compiledClasses.has(className))
         {
-            return this._compiledClasses.get(className);
+            const compiled = this._compiledClasses.get(className);
+            if (public_)
+            {
+                compiled.markPublic();
+            }
+            return compiled;
         }
 
         console.log("Compiling class " + className + " (for environment " + this.name + ")");
@@ -249,6 +611,11 @@ export class NodeContext
             console.log(e);
             this._compiledClasses.remove(className);
             throw new CompilationError("Failed to compile class: " + e);
+        }
+
+        if (public_)
+        {
+            clazz.markPublic();
         }
 
         return clazz;
@@ -363,6 +730,12 @@ export class NodeContext
     {
         console.log("Compiling manifests (for node " + this.name + " / environment " + this.env.name + ")");
 
+        if (!await async.fileExists(this.env.manifestsPath))
+        {
+            console.log("Cannot compile manifests, no such file(s)");
+            return;
+        }
+
         const modulesInfo = this.env.loadModulesInfo();
 
         if (modulesInfo == null)
@@ -424,7 +797,6 @@ export class NodeContext
         }
 
         this._hierarchy = await this.env.hierarchy.compile(this, this.env);
-
         await this.resolveManifests(this.globalResolver());
     }
 }

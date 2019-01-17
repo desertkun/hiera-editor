@@ -6,9 +6,9 @@ import { isString } from "util";
 
 export interface Resolver
 {
-    resolveClass(className: string): Promise<PuppetASTClass>;
+    resolveClass(className: string, public_: boolean): Promise<PuppetASTClass>;
     resolveFunction(name: string): Promise<PuppetASTFunction>;
-    getGlobalVariable(name: string): string;
+    getGlobalVariable(name: string): any;
     hasGlobalVariable(name: string): boolean;
     getNodeName(): String;
 }
@@ -1131,7 +1131,7 @@ export class PuppetASTClassOf extends PuppetASTObject
     {
         try
         {
-            return await resolver.resolveClass(this.className) != null;
+            return await resolver.resolveClass(this.className, false) != null;
         }
         catch (e)
         {
@@ -1607,6 +1607,7 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
     public readonly body: PuppetASTObject;
     public readonly parent: PuppetASTPrimitive;
 
+    private _public: boolean;
     private _resolvedParent: PuppetASTClass;
     public readonly resolvedLocals: Dictionary<string, PuppetASTResolvedProperty>;
     public readonly resolvedFields: Dictionary<string, PuppetASTResolvedProperty>;
@@ -1617,6 +1618,7 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
 
         const metaData: OrderedDictionary = <OrderedDictionary>args[0];
 
+        this._public = false;
         this.name = metaData.get("name").value;
         this.body = metaData.get("body");
         this.params = metaData.get("params") || new OrderedDictionary();
@@ -1624,6 +1626,16 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
         this._resolvedParent = null;
         this.resolvedLocals = new Dictionary();
         this.resolvedFields = new Dictionary();
+    }
+
+    public markPublic()
+    {
+        this._public = true;
+    }
+
+    public isPublic()
+    {
+        return this._public;
     }
 
     public get resolvedParent(): PuppetASTClass
@@ -1680,7 +1692,7 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
         {
             console.log("Resolving parent for class " + this.name);
             this.parentName = await this.parent.resolve(context, resolver);
-            this._resolvedParent = await resolver.resolveClass(this.parentName);
+            this._resolvedParent = await resolver.resolveClass(this.parentName, false);
             if (this._resolvedParent && this._resolvedParent.hasHints)
             {
                 this.carryHints(this._resolvedParent.hints);
@@ -2230,7 +2242,7 @@ export class PuppetASTVariable extends PuppetASTObject
         }
         else
         {
-            const class_:PuppetASTClass = await resolver.resolveClass(this.className);
+            const class_:PuppetASTClass = await resolver.resolveClass(this.className, false);
             const property = class_.getResolvedProperty(this.name);
 
             if (property && property.hasValue)
@@ -2268,7 +2280,7 @@ export class PuppetASTVariable extends PuppetASTObject
         }
         else
         {
-            const class_:PuppetASTClass = await resolver.resolveClass(this.className);
+            const class_:PuppetASTClass = await resolver.resolveClass(this.className, false);
             const property = class_.getResolvedProperty(this.name);
 
             if (property)

@@ -68,8 +68,16 @@
 }
 
 .node-class-property {
-    padding-bottom: 8px;
+    padding: 4px;
 }
+
+.node-class-property .text-small {
+}
+
+.node-class-property .text-small label {
+    margin-bottom: 2px;
+}
+
 
 .node-class-property-modified-icon {
     padding-right: 8px;

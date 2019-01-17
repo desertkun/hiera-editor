@@ -12,15 +12,17 @@ let renderer: CreateResourceRenderer;
 
 class CreateResourceRenderer
 {
-    private nodePath: string;
+    private environment: string;
+    private certname: string;
     private definedTypeName: string;
     private searchTimer: any;
     private searchResults: any;
     private searching: boolean;
 
-    constructor(nodePath: string, definedTypeName?: string)
+    constructor(environment: string, certname: string, definedTypeName?: string)
     {
-        this.nodePath = nodePath;
+        this.environment = environment;
+        this.certname = certname;
         this.definedTypeName = definedTypeName;
     }
 
@@ -101,7 +103,7 @@ class CreateResourceRenderer
                 return;
             }
 
-            const results = await ipc.searchDefinedTypes(this.nodePath, search);
+            const results = await ipc.searchDefinedTypes(this.environment, this.certname, search);
 
             if (results.length > 0)
             {

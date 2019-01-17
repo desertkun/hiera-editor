@@ -16,13 +16,13 @@ export class NodeResourceTab extends NodeClassTab
 
     public async init(): Promise<any>
     {
-        this.title = this.path[2];
+        this.title = this.path[3];
         return await super.init();
     }
     
     public async focusIn(): Promise<void>
     {
-        if (!(await ipc.isNodeDefinedTypeValid(this.nodePath, this.className, this.title)))
+        if (!(await ipc.isNodeDefinedTypeValid(this.environment, this.certname, this.className, this.title)))
         {
             await this.refresh();
         }
@@ -30,17 +30,19 @@ export class NodeResourceTab extends NodeClassTab
     
     protected async acquireInfo(): Promise<any>
     {
-        return await ipc.acquireNodeResource(this.nodePath, this.className, this.title);
+        return await ipc.acquireNodeResource(this.environment, this.certname, this.className, this.title);
     }
     
     protected async setProperty(propertyName: string, value: any)
     {
-        await ipc.setNodeResourceProperty(this.nodePath, this.className, this.title, propertyName, value);
+        await ipc.setNodeResourceProperty(this.environment, this.certname, 
+            this.hierarchyLevel, this.className, this.title, propertyName, value);
     }
 
     protected async removeProperty(propertyName: string)
     {
-        await ipc.removeNodeResourceProperty(this.nodePath, this.className, this.title, propertyName);
+        await ipc.removeNodeResourceProperty(this.environment, this.certname, 
+            this.hierarchyLevel, this.className, this.title, propertyName);
     }
     
     public getProperties(): Array<string>

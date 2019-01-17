@@ -46,20 +46,18 @@ export class Folder
         return await this.getFile(localPath[0]);
     }
 
-    public async createFile(name: string): Promise<File>
+    public async createFile(localPath: Array<string>): Promise<File>
     {
+        if (localPath.length > 1)
+        {
+            const dir = await this.getFolder(localPath[0]);
+            if (dir == null)
+                return null;
+            localPath.splice(0, 1);
+            return await dir.createFile(localPath);
+        }
+
         const entryPath = path.join(this._path, File.FilePath(name));
-
-        if (await async.isDirectory(entryPath))
-        {
-            return null;
-        }
-
-        if (await async.isFile(entryPath))
-        {
-            return null;
-        }
-
         const node = await this.acquireFile(this._env, name, entryPath, slash(path.join(this._localPath, name)));
 
         if (node == null)
@@ -193,10 +191,10 @@ export class Folder
             return this._nodes.get(name);
         }
 
-        const newNode = new File(env, name, filePath, nodePath, this);
-        this._nodes.put(name, newNode);
-        await newNode.init();
-        return newNode;
+        const newFile = new File(env, name, filePath, nodePath, this);
+        this._nodes.put(name, newFile);
+        await newFile.init();
+        return newFile;
     }
 
     public async getFile(name: string): Promise<File>
@@ -392,8 +390,15 @@ export class File
 
     public async parse()
     {
-        const document = await async.readYAML(this.path);
-        this._config = document.toJSON();
+        try
+        {
+            const document = await async.readYAML(this.path);
+            this._config = document.toJSON();
+        }
+        catch (e)
+        {
+            this._config = {};
+        }
     }
 
     public get name():string
@@ -410,7 +415,6 @@ export class File
     {
         return this._nodePath;
     }
-
 
     public has(key: string): boolean
     {

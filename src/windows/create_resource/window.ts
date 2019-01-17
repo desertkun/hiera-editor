@@ -7,14 +7,16 @@ import { throws } from "assert";
 export class CreateResourceWindow extends Window
 {
     private selected: boolean;
-    private readonly nodePath: string;
+    private readonly environment: string;
+    private readonly certname: string;
 
-    constructor (nodePath: string)
+    constructor (environment: string, certname: string)
     {
         super();
 
         this.selected = false;
-        this.nodePath = nodePath;
+        this.environment = environment;
+        this.certname = certname;
     }
 
     public show(): Promise<string>
@@ -27,7 +29,7 @@ export class CreateResourceWindow extends Window
                 autoHideMenuBar: true,
                 parent: workspace_window.browserWindow
             }, (browserWindow: BrowserWindow) => {
-                browserWindow.webContents.send('init', this.nodePath);
+                browserWindow.webContents.send('init', this.environment, this.certname);
             });
     
             ipcMain.on("resource-selected", (event: any, definedTypeName: string) => 

@@ -12,14 +12,16 @@ let renderer: AssignClassRenderer;
 
 class AssignClassRenderer
 {
-    private nodePath: string;
+    private environment: string;
+    private certname: string;
     private searchTimer: any;
     private searchResults: any;
     private searching: boolean;
 
-    constructor(nodePath: string)
+    constructor(environment: string, certname: string)
     {
-        this.nodePath = nodePath;
+        this.environment = environment;
+        this.certname = certname;
     }
 
     private renderNoResults(): void
@@ -99,7 +101,7 @@ class AssignClassRenderer
                 return;
             }
 
-            const results = await ipc.searchClasses(this.nodePath, search);
+            const results = await ipc.searchClasses(this.environment, this.certname, search);
 
             if (results.length > 0)
             {
@@ -163,8 +165,8 @@ window.eval = global.eval = function () {
     throw new Error(`Sorry, this app does not support window.eval().`)
 };
 
-ipcRenderer.on('init', function (event: any, nodePath: string) 
+ipcRenderer.on('init', function (event: any, environment: string, certname: string) 
 {
-    renderer = new AssignClassRenderer(nodePath);
+    renderer = new AssignClassRenderer(environment, certname);
     renderer.init();
 });

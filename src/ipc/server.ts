@@ -115,7 +115,7 @@ export class IpcServer implements IpcAPI
             return null;
         }
 
-        return await environment.root.tree();
+        return await environment.tree();
     }
 
     public async findFile(localPath: string): Promise<any> 
@@ -137,159 +137,149 @@ export class IpcServer implements IpcAPI
         return node.dump();
     }
 
-    public async acquireNodeClass(nodePath: string, className: string): Promise<any> 
+    public async acquireNodeClass(environment: string, certname: string, className: string): Promise<any> 
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
-        {
-            return null;
-        }
+            return false;
 
-        const node = await workspace.findFile(nodePath);
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
 
+        const node = env.getNode(certname);    
         if (node == null)
-        {
-            return null;
-        }
-
-        return {};//await node.dumpClass(className);
+            return;
+            
+        return await node.dumpClass(className);
     }
     
-    public async acquireNodeResource(nodePath: string, definedTypeName: string, title: string): Promise<any>
+    public async acquireNodeResource(environment: string, certname: string, definedTypeName: string, title: string): Promise<any>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
-        {
-            return null;
-        }
+            return false;
 
-        const node = await workspace.findFile(nodePath);
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
 
+        const node = env.getNode(certname);    
         if (node == null)
-        {
-            return null;
-        }
-
+            return;
+            
         return {};//await node.dumpResource(definedTypeName, title);
     }
 
     public async setNodeClassProperty(
-        nodePath: string, className: string, propertyName: string, value: any
+        environment: string, certname: string, hierarchy: number, 
+        className: string, propertyName: string, value: any
     ): Promise<any> 
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
-        {
             return null;
-        }
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return null;
+
+        const node = env.getNode(certname);    
         if (node == null)
-        {
             return null;
-        }
     
-        //return await node.setClassProperty(className, propertyName, value);
+        return await node.setClassProperty(className, hierarchy, propertyName, value);
     }
     
-    public async hasNodeClassProperty(nodePath: string, className: string, propertyName: string): Promise<boolean>
+    public async hasNodeClassProperty(environment: string, certname: string, 
+        className: string, propertyName: string): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
-        {
             return false;
-        }
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
+
+        const node = env.getNode(certname);    
         if (node == null)
-        {
             return false;
-        }
     
-        return false; //await node.hasClassProperty(className, propertyName);
+        return await node.hasClassProperty(className, propertyName);
     }
 
     public async removeNodeClassProperty(
-        nodePath: string, className: string, propertyName: string
+        environment: string, certname: string, hierarchy: number, className: string, propertyName: string
     ): Promise<any> 
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
-        {
-            return null;
-        }
-    
-        const node = await workspace.findFile(nodePath);
-    
+            return false;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
+
+        const node = env.getNode(certname);    
         if (node == null)
-        {
-            return null;
-        }
+            return false;
     
-        return; //await node.removeClassProperty(className, propertyName);
+        return await node.removeClassProperty(className, hierarchy, propertyName);
     }
 
-    public async setNodeResourceProperty(nodePath: string, definedTypeName: string, 
-        title: string, propertyName: string, value: any): Promise<any>
+    public async setNodeResourceProperty(environment: string, certname: string, 
+        hierarchy: number, definedTypeName: string, 
+        title: string, propertyName: string, value: any): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
-        {
-            return null;
-        }
-    
-        const node = await workspace.findFile(nodePath);
-    
+            return false;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
+
+        const node = env.getNode(certname);    
         if (node == null)
-        {
-            return null;
-        }
+            return false;
     
-        //return await node.setResourceProperty(definedTypeName, title, propertyName, value);
+        //return await node.setResourceProperty(definedTypeName, title, hierarchy, propertyName, value);
     }
 
-    public async removeNodeResourceProperty(nodePath: string, definedTypeName: string, title: string, propertyName: string): Promise<any>
+    public async removeNodeResourceProperty(
+        environment: string, certname: string, 
+        hierarchy: number, definedTypeName: string, 
+        title: string, propertyName: string): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
-        {
-            return null;
-        }
-    
-        const node = await workspace.findFile(nodePath);
-    
+            return false;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
+
+        const node = env.getNode(certname);    
         if (node == null)
-        {
-            return null;
-        }
+            return false;
     
-        //return await node.removeResourceProperty(definedTypeName, title, propertyName);
+        //return await node.removeResourceProperty(definedTypeName, title, hierarchy, propertyName);
     }
 
-    public async removeNodeClassProperties(nodePath: string, className: string): Promise<any>
+    public async removeNodeClassProperties(environment: string, certname: string, className: string): Promise<any>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
-        {
-            return null;
-        }
-    
-        const node = await workspace.findFile(nodePath);
-    
+            return false;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
+
+        const node = env.getNode(certname);    
         if (node == null)
-        {
-            return null;
-        }
+            return false;
     
         //return await node.removeClassProperties(className);
     }
@@ -362,19 +352,21 @@ export class IpcServer implements IpcAPI
         return workspace.path;
     }
     
-    public async assignNewClassToNode(nodePath: string): Promise<string>
+    public async assignNewClassToNode(environment: string, certname: string): Promise<string>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return null;
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return null;
+
+        const node = env.getNode(certname);    
         if (node == null)
             return null;
     
-        const window = new AssignClassWindow(nodePath);
+        const window = new AssignClassWindow(environment, certname);
         const className = await window.show();
 
         if (!className)
@@ -385,276 +377,280 @@ export class IpcServer implements IpcAPI
         return className;
     }
 
-    public async chooseDefinedType(nodePath: string): Promise<string>
+    public async chooseDefinedType(environment: string, certname: string): Promise<string>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return null;
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return null;
+
+        const node = env.getNode(certname);    
         if (node == null)
             return null;
     
-        const window = new CreateResourceWindow(nodePath);
+        const window = new CreateResourceWindow(environment, certname);
         const result = await window.show();
         return result;
     }
 
-    public async createNewResourceToNode(nodePath: string, definedTypeName: string, title: string): Promise<boolean>
+    public async createNewResourceToNode(environment: string, certname: string, 
+        definedTypeName: string, title: string): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return false;
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
+
+        const node = env.getNode(certname);    
         if (node == null)
             return false;
     
         return false;//await node.createResource(definedTypeName, title);
     }
     
-    public async removeClassFromNode(nodePath: string, className: string): Promise<void>
+    public async removeClassFromNode(environment: string, certname: string, className: string): Promise<void>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return;
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return;
+
+        const node = env.getNode(certname);    
         if (node == null)
             return;
 
         //await node.removeClass(className);
     }
     
-    public async removeResourceFromNode(nodePath: string, definedTypeName: string, title: string): Promise<void>
+    public async removeResourceFromNode(environment: string, certname: string, definedTypeName: string, title: string): Promise<void>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return;
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return;
+
+        const node = env.getNode(certname);    
         if (node == null)
             return;
 
         //await node.removeResource(definedTypeName, title);
     }
 
-    public async removeResourcesFromNode(nodePath: string, definedTypeName: string): Promise<string[]>
+    public async removeResourcesFromNode(environment: string, certname: string, definedTypeName: string): Promise<string[]>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return;
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return;
+
+        const node = env.getNode(certname);    
         if (node == null)
             return;
 
         //return await node.removeResources(definedTypeName);
     }
     
-    public async removeAllResourcesFromNode(nodePath: string): Promise<any[]>
+    public async removeAllResourcesFromNode(environment: string, certname: string): Promise<any[]>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return;
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return;
+
+        const node = env.getNode(certname);    
         if (node == null)
             return;
 
         //return await node.removeAllResources();
     }
 
-    public async renameNodeResource(nodePath: string, definedTypeName: string, title: string, newTitle: string): Promise<boolean>
+    public async renameNodeResource(environment: string, certname: string, 
+        definedTypeName: string, title: string, newTitle: string): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
-            return;
-    
-        const node = await workspace.findFile(nodePath);
-    
+            return false;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
+
+        const node = env.getNode(certname);    
         if (node == null)
-            return;
+            return false;
 
         //return await node.renameResource(definedTypeName, title, newTitle);
     }
 
-    public async removeClassesFromNode(nodePath: string): Promise<Array<string>>
+    public async removeClassesFromNode(environment: string, certname: string): Promise<Array<string>>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
-            return;
-    
-        const node = await workspace.findFile(nodePath);
-    
+            return null;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return null;
+
+        const node = env.getNode(certname);    
         if (node == null)
-            return;
+            return null;
 
         //return await node.removeAllClasses();
     }
 
-    public async searchClasses(nodePath: string, search: string): Promise<any[]>
+    public async searchClasses(environment: string, certname: string, search: string): Promise<any[]>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return [];
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return [];
+
+        const node = env.getNode(certname);    
         if (node == null)
             return [];
 
         return await node.env.searchClasses(search);
     }
 
-    public async searchDefinedTypes(nodePath: string, search: string): Promise<any[]>
+    public async searchDefinedTypes(environment: string, certname: string, search: string): Promise<any[]>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return [];
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return [];
+
+        const node = env.getNode(certname);    
         if (node == null)
             return [];
 
         return await node.env.searchDefinedTypes(search);
     }
     
-    public async acquireNodeFacts(nodePath: string): Promise<any>
+    public async acquireNodeFacts(environment: string, certname: string): Promise<any>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return null;
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return null;
+
+        const node = env.getNode(certname);    
         if (node == null)
             return null;
 
         //return await node.acquireFacts();
     }
 
-    public async setNodeFact(nodePath: string, fact: string, value: string): Promise<void>
+    public async invalidateNode(environment: string, certname: string): Promise<void>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return;
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return;
+
+        const node = env.getNode(certname);    
         if (node == null)
             return;
             
-        //await node.setFact(fact, value);
+        await node.invalidate();
     }
 
-    public async updateNodeFacts(nodePath: string, facts: any): Promise<void>
+    public async invalidateNodeClass(environment: string, certname: string, className: string): Promise<void>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return;
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return;
+
+        const node = env.getNode(certname);    
         if (node == null)
             return;
             
-        //await node.updateFacts(facts);
+        await node.invalidateClass(className);
     }
 
-    public async invalidateNode(nodePath: string): Promise<void>
+    public async invalidateNodeResource(environment: string, certname: string, definedTypeName: string, title: string): Promise<void>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
             return;
-    
-        const node = await workspace.findFile(nodePath);
-    
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return;
+
+        const node = env.getNode(certname);    
         if (node == null)
             return;
             
-        //await node.invalidate();
-    }
-
-    public async invalidateNodeClass(nodePath: string, className: string): Promise<void>
-    {
-        const workspace: Workspace = getCurrentWorkspace();
-
-        if (workspace == null)
-            return;
-    
-        const node = await workspace.findFile(nodePath);
-    
-        if (node == null)
-            return;
-            
-        //await node.invalidateClass(className);
-    }
-
-    public async invalidateNodeResource(nodePath: string, definedTypeName: string, title: string): Promise<void>
-    {
-        const workspace: Workspace = getCurrentWorkspace();
-
-        if (workspace == null)
-            return;
-    
-        const node = await workspace.findFile(nodePath);
-    
-        if (node == null)
-            return;
-            
-        //await node.invalidateDefinedType(definedTypeName, title);
+        await node.invalidateDefinedType(definedTypeName, title);
     }
     
-    public async isNodeClassValid(nodePath: string, className: string): Promise<boolean>
+    public async isNodeClassValid(environment: string, certname: string, className: string): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
-            return;
-    
-        const node = await workspace.findFile(nodePath);
-    
+            return false;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
+
+        const node = env.getNode(certname);    
         if (node == null)
-            return;
+            return false;
             
-        //return await node.isClassValid(className);
+        return await node.isClassValid(className);
     }
 
-    public async isNodeDefinedTypeValid(nodePath: string, definedTypeName: string, title: string): Promise<boolean>
+    public async isNodeDefinedTypeValid(environment: string, certname: string, definedTypeName: string, title: string): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
-
         if (workspace == null)
-            return;
-    
-        const node = await workspace.findFile(nodePath);
-    
+            return false;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
+
+        const node = env.getNode(certname);    
         if (node == null)
-            return;
+            return false;
             
-        //return await node.isDefinedTypeValid(definedTypeName, title);
+        return await node.isDefinedTypeValid(definedTypeName, title);
     }
     
     public async createFolder(path: string, name: string): Promise<boolean>
@@ -672,51 +668,6 @@ export class IpcServer implements IpcAPI
         return await directory.createFolder(name) != null;
     }
 
-    public async createNode(path: string, name: string): Promise<boolean>
-    {
-        const workspace: Workspace = getCurrentWorkspace();
-
-        if (workspace == null)
-            return;
-    
-        const directory = await workspace.findFolder(path);
-    
-        if (directory == null)
-            return;
-
-        return await directory.createFile(name) != null;
-    }
-
-    public async removeFolder(path: string): Promise<boolean>
-    {
-        const workspace: Workspace = getCurrentWorkspace();
-
-        if (workspace == null)
-            return;
-    
-        const directory = await workspace.findFolder(path);
-    
-        if (directory == null)
-            return;
-
-        return await directory.remove();
-    }
-
-    public async removeNode(path: string): Promise<boolean>
-    {
-        const workspace: Workspace = getCurrentWorkspace();
-
-        if (workspace == null)
-            return;
-    
-        const node = await workspace.findFile(path);
-    
-        if (node == null)
-            return;
-
-        return await node.remove();
-    }
-    
     public async removeEnvironment(name: string): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
