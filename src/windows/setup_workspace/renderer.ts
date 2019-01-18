@@ -4,6 +4,7 @@ import { ipcRenderer, ipcMain } from 'electron';
 
 const $ = require("jquery");
 const electron = require('electron');
+const shell = electron.shell;
 
 const ipc = IPC();
 
@@ -110,6 +111,9 @@ abstract class SetupStep
 
     protected complete()
     {
+        $('#setup-step-title').text("Complete");
+        $('#' + this.elementId + "-content").hide();
+        $('#setup-complete').show();
         $('#btn-configuration-next').hide();
         $('#btn-configuration-complete').show();
     }
@@ -226,11 +230,17 @@ class CSRStep extends SetupStep
         catch (e)
         {
             const text = e.toString();
-            if (text.indexOf("Bad Request") >= 0)
+            if (text.includes("Bad Request"))
             {
                 this.fail("Cannot upload certificate signing request. Please make sure there is no such certificate already requested. " + 
                 "If so, pick another name or remove previous certificate request. <br><br>You can do this by calling <br>" + 
                 "<code>/opt/puppetlabs/puppet/bin/puppet cert clean " + this.certname + "</code><br>on the Puppet Server.");
+            }
+            else if (text.includes("Forbidden"))
+            {
+                this.fail(text + "<br>If you cannot go past this step, you might try to " +
+                "<a href=\"https://puppet.com/docs/puppet/5.4/ssl_regenerate_certificates.html#step-1-clear-and-regenerate-certs-on-your-puppet-master\" " +
+                "target=\"_blank\">regenerate SSL certificates</a>. This also might happen due to misconfigured auth.conf");
             }
             else
             {
@@ -335,6 +345,39 @@ class AuthStep extends SetupStep
 
     public async next(): Promise<SetupStep>
     {
+        return new GetCertListStep(this.server, this.certname);
+    }
+    
+    public async init(): Promise<void>
+    {
+        const zis = this;
+        await super.init();
+
+        $('#auth-conf-example').html(this.certname);
+
+        $('#auth-editor').on("change", () => {
+            zis.enableNext($('#auth-editor').val().toLowerCase() == "master");
+        });
+
+        this.enableNext(false);
+    }
+}
+
+class GetCertListStep extends SetupStep
+{
+    private server: string;
+    private certname: string;
+
+    constructor(server: string, certname: string)
+    {
+        super("Step 6. Checking Authenthication", "setup-step-6", false);
+
+        this.server = server;
+        this.certname = certname;
+    }
+
+    public async next(): Promise<SetupStep>
+    {
         return null;
     }
     
@@ -342,8 +385,45 @@ class AuthStep extends SetupStep
     {
         await super.init();
 
-        $('#auth-conf-example').html(this.certname);
+        try
+        {
+            await ipc.checkAuthentication();
+        }
+        catch (e)
+        {
+            const text = e.toString();
+            this.fail(text + "<br>Make sure you did as explained " +
+            "<a href=\"https://github.com/desertkun/hiera-editor/wiki/How-To-Authenticate-Hiera-Editor#authenticate-hiera-editor\" " +
+            "target=\"_blank\">here</a>.");
+            return;
+        }
 
+        this.success();
+        renderer.setStep(new CompleteStep(this.server, this.certname));
+    }
+}
+
+class CompleteStep extends SetupStep
+{
+    private server: string;
+    private certname: string;
+
+    constructor(server: string, certname: string)
+    {
+        super("Complete", "setup-step-7", false);
+
+        this.server = server;
+        this.certname = certname;
+    }
+
+    public async next(): Promise<SetupStep>
+    {
+        return null;
+    }
+    
+    public async init(): Promise<void>
+    {
+        await super.init();
         this.complete();
     }
 }
@@ -435,6 +515,11 @@ class SetupWorkspaceRenderer
             {
                 await zis.setStep(next);
             }
+        });
+
+        $(document).on('click', 'a[href^="http"]', function(event: any) {
+            event.preventDefault();
+            shell.openExternal(this.href);
         });
         
     }

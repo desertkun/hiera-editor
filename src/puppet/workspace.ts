@@ -12,6 +12,7 @@ import { Environment } from "./environment"
 import { Ruby } from "./ruby"
 import { WorkspaceError, CompiledPromisesCallback } from "./util"
 import { Folder, File } from "./files"
+import { PuppetHTTP } from "./http";
 
 const PromisePool = require('es6-promise-pool');
 const slash = require('slash');
@@ -150,6 +151,22 @@ export class Workspace
 
     }
 
+    public async checkAuthentication(): Promise<void>
+    {
+        const settings = await this.getSettings();
+        const envs = await this.listEnvironments();
+        const env = envs.length == 0 ? "production" : envs[0].name;
+
+        try
+        {
+            await PuppetHTTP.GetCertList(env, settings);
+        }   
+        catch (e)
+        {
+            throw new WorkspaceError("Failed to check authentication", e.toString());
+        }
+    }
+
     public async publishCSR(server: string, certname: string): Promise<string>
     {
         const settings = await this.getSettings();
@@ -171,6 +188,7 @@ export class Workspace
                 "--vardir '" + paths.vardir + "'",
                 "--rundir '" + paths.rundir + "'",
                 "--logdir '" + paths.logdir + "'",
+                "--certname '" + certname + "'",
                 "--verbose"
             ], this.path, {});
         }   

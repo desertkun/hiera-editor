@@ -774,6 +774,18 @@ export class IpcServer implements IpcAPI
             
         await workspace.downloadSignedCertificate();
     }
+
+    public async checkAuthentication(): Promise<void>
+    {
+        const workspace: Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            throw new WorkspaceError("Failed to publich CRS", "No workspace");
+        }
+            
+        await workspace.checkAuthentication();
+    }
 }
 
 const server: IpcServer = new IpcServer();

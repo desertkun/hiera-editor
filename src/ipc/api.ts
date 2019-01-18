@@ -44,4 +44,5 @@ export interface IpcAPI
     installModules(): Promise<void>;
     publishCSR(server: string, certname: string): Promise<string>;
     downloadSignedCertificate(): Promise<void>;
+    checkAuthentication(): Promise<void>;
 }
