@@ -61,10 +61,12 @@ export abstract class WorkspaceTab
 
     public async refresh(): Promise<void>
     {
+        const scroll = $(this.contentNode).parent().scrollTop();
         $(this.contentNode).html('');
         await this.release();
         await this.init();
         this.render();
+        $(this.contentNode).parent().scrollTop(scroll);
     }
 
     public abstract async init(): Promise<any>;
