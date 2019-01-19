@@ -451,6 +451,8 @@ export class Environment
 
     public async init(progressCallback: any = null, updateProgressCategory: any = null): Promise<any>
     {
+        this._warnings.length = 0;
+
         if (!await async.isDirectory(this.cachePath))
         {
             if (!await async.makeDirectory(this.cachePath))

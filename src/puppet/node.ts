@@ -131,6 +131,20 @@ export class NodeContext
         return this.hasGlobal(propertyPath) >= 0;
     }
     
+    public async removeProperty(hierarchy: number, property: string): Promise<any>
+    {
+        const hierarchyEntry = this.hierarchy.get(hierarchy);
+        if (hierarchyEntry == null)
+            return;
+
+        const file = hierarchyEntry.file;
+        if (file == null)
+            return;
+
+        delete file.config[property];
+        await file.save();
+    }
+
     public async removeClassProperty(className: string, hierarchy: number, propertyName: string): Promise<any>
     {
         const classInfo = this.env.findClassInfo(className);
@@ -323,6 +337,21 @@ export class NodeContext
     }
     */
 
+    public async setProperty(hierarchy: number, property: string, value: any): Promise<any>
+    {
+        const hierarchyEntry = this.hierarchy.get(hierarchy);
+        if (hierarchyEntry == null)
+            return;
+
+        let file = hierarchyEntry.file;
+        if (file == null)
+        {
+            file = await hierarchyEntry.create(this.env, this._hierarchy.source);
+        }
+        file.config[property] = value;
+        await file.save();
+    }
+    
     public async setClassProperty(className: string, hierarchy: number, propertyName: string, value: any): Promise<any>
     {
         const classInfo = this.env.findClassInfo(className);

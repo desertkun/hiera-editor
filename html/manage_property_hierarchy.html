@@ -2,15 +2,16 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <title>Create a Resource</title>
+    <title>Manage Hierarchy of a Property</title>
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src * 'self' data: https:;">
     <link rel="stylesheet" href="../css/bootstrap.min.css">
     <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
     <link rel="stylesheet" href="../css/bootstrap-reboot.min.css">
     <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="../css/create-resource.css">
+    <link rel="stylesheet" href="../css/manage-property-hierarchy.css">
     <link rel="stylesheet" href="../css/font-awesome.min.css">
     <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
+    <link rel="stylesheet" href="../css/modified.css">
     <script type="text/javascript">
       window.$ = window.jQuery = require('jquery');
     </script>
@@ -18,20 +19,19 @@
     <script src="../js/bootstrap.min.js"></script>
   </head>
   <body>
-    <div class="create-resource-container w-100 h-100">
-        <div class="input-group mb-3" id="search-filter">
-            <input type="text" class="form-control form-control-sm" placeholder="Define Type Name" 
-            aria-label="Define Type Name" aria-describedby="class-name-filter-label" id="resource-name-filter" autofocus>
-        </div>
-        <div class="w-100 flex-results" id="search-results">
-        </div>
-        <div class="w-100 d-flex justify-content-end bottom-buttons">
-            <input type="button" id="cancel" class="btn btn-sm btn-primary" value="Cancel">
+    <div class="hierarchy-container w-100 h-100">
+        <p class="text-muted container-w-padding">
+          Please select on what levels of hierarchy would you like to have property 
+          <span class="badge badge-primary" id="property-name"></span> defined.
+          Only the highest level is actually used.
+        </p>
+        <div class="w-100 flex-results" id="hierarchy-levels">
+
         </div>
     </div>
 
     <script>
-      require('../dist/windows/create_resource/renderer.js')
+      require('../dist/windows/manage_property_hierarchy/renderer.js')
     </script>
   </body>
 </html>

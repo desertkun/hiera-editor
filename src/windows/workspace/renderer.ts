@@ -342,15 +342,44 @@ class NodeItemRenderer
                 node.selectable = false;
             }, "node-" + zis.env.name + "-" + zis.certname + "-hiera-" + includeName, renderer.openNodes);
 
+            let hierarcyName_ = "";
+
+            if (hierarchyLevel >= 0)
+            {
+                const hierarchy = zis.hierarchy[hierarchyLevel];
+
+                if (hierarchy.name)
+                {
+                    hierarcyName_ += hierarchy.name + " ";
+                }
+
+                hierarcyName_ += hierarchy.path;
+            }
+
+            const hierarcyName = hierarcyName_;
+
             const contextOptions: any = [
                 {
                     label: "Assign New Class",
                     click: async () => 
                     {
-                        const className = await ipc.assignNewHieraClass(zis.env.name, zis.certname, 
-                            includeName, hierarchyLevel, includeName);
+                        const className = await ipc.assignNewHieraClass(
+                            zis.env.name, zis.certname, includeName, hierarchyLevel);
     
                         if (className)
+                        {
+                            await renderer.refreshWorkspace();
+                        }
+                    }
+                },
+                {
+                    label: "Manage Hierarchy",
+                    click: async () => 
+                    {
+                        const changed = await ipc.managePropertyHierarchy(zis.env.name, zis.certname, 
+                            includeName, "array");
+    
+                        if (changed)
                         {
                             await renderer.refreshWorkspace();
                         }
@@ -363,33 +392,23 @@ class NodeItemRenderer
                     label: "Remove All Classes",
                     click: async () => 
                     {
-                        const classNames = await ipc.removeHieraClasses(zis.env.name, zis.certname, includeName);
-                        await renderer.refresh();
-                        for (const className of classNames)
-                        {
-                            await renderer.closeTabKind("class", [zis.env.name, zis.certname, className]);
-                        }
+                        if (!await confirm("This will completely destroy all classes defined in property \"" + includeName + 
+                            "\" on hierarchy level \"" + hierarcyName + "\". Are you sure?"))
+                            return;
+
+                        await ipc.removeNodeProperty(zis.env.name, zis.certname, hierarchyLevel, includeName);
+                        await renderer.refreshWorkspace();
                     }
                 }
             ];
 
             if (hierarchyLevel >= 0)
             {
-                const hierarchy = zis.hierarchy[hierarchyLevel];
-
-                let hierarcyName = "";
-                if (hierarchy.name)
-                {
-                    hierarcyName += hierarchy.name + " ";
-                }
-                hierarcyName += hierarchy.path;
-
                 contextOptions.splice(0, 0, {
                     label: "Defined at: " + hierarcyName,
                     enabled: false
                 });
             }
-
             n_classes.contextMenu(contextOptions)
     
             this.renderClasses(n_classes, includeName, hierarchyLevel);

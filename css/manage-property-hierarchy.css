@@ -1,0 +1,12 @@
+.hierarchy-entry {
+    margin: 16px 32px;
+}
+
+.hierarchy-container {
+    padding: 8px;
+    display: flex;
+    overflow: hidden;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+}

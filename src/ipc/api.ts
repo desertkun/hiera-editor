@@ -11,6 +11,8 @@ export interface IpcAPI
     acquireNodeClass(environment: string, certname: string, className: string): Promise<any>;
     hasNodeClassProperty(environment: string, certname: string, className: string, propertyName: string): Promise<boolean>;
     setNodeClassProperty(environment: string, certname: string, hierarchy: number, className: string, propertyName: string, value: any): Promise<any>;
+    setNodeProperty(environment: string, certname: string, hierarchy: number, property: string, value: any): Promise<any>;
+    removeNodeProperty(environment: string, certname: string, hierarchy: number, propertyName: string): Promise<any>;
     removeNodeClassProperty(environment: string, certname: string, hierarchy: number, className: string, propertyName: string): Promise<any>;
     removeNodeClassProperties(environment: string, certname: string, className: string): Promise<any>;
     invalidateNodeClass(environment: string, certname: string, className: string): Promise<void>;
@@ -18,7 +20,8 @@ export interface IpcAPI
     initWorkspace(): Promise<any>;
     showOpenDirectoryDialog(defaultPath?: string, mode?: Array<'openDirectory' | 'createDirectory' | 'promptToCreate'>): Promise<string>;
     getCurrentWorkspacePath(): Promise<string>;
-    assignNewHieraClass(environment: string, certname: string, key: string, hierarchy: number, includeName: string): Promise<string>;
+    assignNewHieraClass(environment: string, certname: string, includeName: string, hierarchy: number): Promise<string>;
+    managePropertyHierarchy(environment: string, certname: string, property: string, _constructor: string): Promise<boolean>;
     searchClasses(environment: string, certname: string, search: string): Promise<any[]>;
     searchDefinedTypes(environment: string, certname: string, search: string): Promise<any[]>;
     removeHieraClassFromNode(environment: string, certname: string, key: string, hierarchy: number, className: string): Promise<void>;

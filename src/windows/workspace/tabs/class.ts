@@ -395,17 +395,17 @@ export class NodeClassTab extends WorkspaceTab
 
         if (this.info.classInfo == null)
         {
-            const pad = $('<div class="container-w-padding-x2"></div>').appendTo(this.contentNode);
-            $('<div class="alert alert-danger" role="alert"></div>').appendTo(pad).html(this.noClassInfoText());
+            const pad = $('<div class="container-w-padding"></div>').appendTo(this.contentNode);
+            $('<div class="alert alert-danger" role="alert" style="margin-bottom: 0;"></div>').appendTo(pad).html(this.noClassInfoText());
         }
 
         if (this.hasHints())
         {
-            const pad = $('<div class="container-w-padding-x2"></div>').appendTo(this.contentNode);
+            const pad = $('<div class="container-w-padding"></div>').appendTo(this.contentNode);
 
             for (const hint of this.getHints())
             {
-                $('<div class="alert alert-warning" role="alert"></div>').appendTo(pad).html(hint.message);
+                $('<div class="alert alert-warning" role="alert" style="margin-bottom: 0;"></div>').appendTo(pad).html(hint.message);
             }
         }
 

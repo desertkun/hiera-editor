@@ -6,6 +6,7 @@ import { CreateResourceWindow } from "../windows/create_resource/window"
 import { CreateEnvironmentWindow } from "../windows/create_environment/window"
 import { CreateProjectWindow } from "../windows/create_project/window"
 import { ProgressWindow } from "../windows/progress/window"
+import { ManagePropertyHierarchyWindow } from "../windows/manage_property_hierarchy/window"
 import { ProjectModel } from "../projects"
 import { isDirectory, listFiles } from "../async"
 import { Workspace } from "../puppet/workspace";
@@ -171,6 +172,24 @@ export class IpcServer implements IpcAPI
         return {};//await node.dumpResource(definedTypeName, title);
     }
 
+    public async setNodeProperty(environment: string, certname: string, 
+        hierarchy: number, property: string, value: any): Promise<any>
+    {
+        const workspace: Workspace = getCurrentWorkspace();
+        if (workspace == null)
+            return null;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return null;
+
+        const node = env.getNode(certname);    
+        if (node == null)
+            return null;
+    
+        return await node.setProperty(hierarchy, property, value);
+    }
+
     public async setNodeClassProperty(
         environment: string, certname: string, hierarchy: number, 
         className: string, propertyName: string, value: any
@@ -207,6 +226,23 @@ export class IpcServer implements IpcAPI
             return false;
     
         return await node.hasClassProperty(className, propertyName);
+    }
+
+    public async removeNodeProperty(environment: string, certname: string, hierarchy: number, propertyName: string): Promise<any>
+    {
+        const workspace: Workspace = getCurrentWorkspace();
+        if (workspace == null)
+            return false;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
+
+        const node = env.getNode(certname);    
+        if (node == null)
+            return false;
+    
+        return await node.removeProperty(hierarchy, propertyName);
     }
 
     public async removeNodeClassProperty(
@@ -352,7 +388,7 @@ export class IpcServer implements IpcAPI
         return workspace.path;
     }
     
-    public async assignNewHieraClass(environment: string, certname: string, key: string, hierarchy: number, includeName: string): Promise<string>
+    public async assignNewHieraClass(environment: string, certname: string, includeName: string, hierarchy: number): Promise<string>
     {
         const workspace: Workspace = getCurrentWorkspace();
         if (workspace == null)
@@ -379,9 +415,38 @@ export class IpcServer implements IpcAPI
         if (!className)
             return null;
 
-        await node.assignClass(key, className, hierarchy);
+        await node.assignClass(includeName, className, hierarchy);
 
         return className;
+    }
+    
+    public async managePropertyHierarchy(environment: string, certname: string, property: string, _constructor: string): Promise<boolean>
+    {
+        const workspace: Workspace = getCurrentWorkspace();
+        if (workspace == null)
+            return null;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return null;
+
+        const node = env.getNode(certname);    
+        if (node == null)
+            return null;
+
+        const hierarchy: any[] = [];
+
+        for (const entry of node.hierarchy.hierarhy)
+        {
+            hierarchy.push({
+                name: entry.entry.name,
+                path: entry.path,
+                defined: entry.isPropertyDefined(property)
+            })
+        }
+
+        const window = new ManagePropertyHierarchyWindow(environment, certname, property, hierarchy, _constructor);
+        return await window.show();
     }
 
     public async chooseDefinedType(environment: string, certname: string): Promise<string>

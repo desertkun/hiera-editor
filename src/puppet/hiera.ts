@@ -27,6 +27,14 @@ export class CompiledHierarchyEntry
         return this._file;
     }
 
+    public isPropertyDefined(property: string): boolean
+    {
+        if (this.file == null)
+            return false;
+
+        return this.file.config.hasOwnProperty(property);
+    }
+
     public dump(): any
     {
         return {

@@ -12,12 +12,6 @@
     min-height:  32px;
 }
 
-#search-results {
-    flex-grow: 1;
-    margin: auto;
-    overflow-y: auto;
-}
-
 .search-result-message {
     text-align: center;
     padding: 32px;

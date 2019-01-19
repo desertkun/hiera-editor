@@ -154,6 +154,12 @@ html, body {
     height: 300px;
 }
 
+.flex-results {
+    flex-grow: 1;
+    margin: auto;
+    overflow-y: auto;
+}
+
 .btn-space {
     margin-right: 5px;
 }
