@@ -14,14 +14,20 @@ class AssignClassRenderer
 {
     private environment: string;
     private certname: string;
+    private hierarchy: number;
+    private nodeHierarchy: any;
+    private includeName: string;
     private searchTimer: any;
     private searchResults: any;
     private searching: boolean;
 
-    constructor(environment: string, certname: string)
+    constructor(environment: string, certname: string, hierarchy: number, nodeHierarchy: any, includeName: string)
     {
         this.environment = environment;
         this.certname = certname;
+        this.hierarchy = hierarchy;
+        this.nodeHierarchy = nodeHierarchy;
+        this.includeName = includeName;
     }
 
     private renderNoResults(): void
@@ -165,8 +171,8 @@ window.eval = global.eval = function () {
     throw new Error(`Sorry, this app does not support window.eval().`)
 };
 
-ipcRenderer.on('init', function (event: any, environment: string, certname: string) 
+ipcRenderer.on('init', function (event: any, environment: string, certname: string, hierarchy: number, nodeHierarchy: any, includeName: string) 
 {
-    renderer = new AssignClassRenderer(environment, certname);
+    renderer = new AssignClassRenderer(environment, certname, hierarchy, nodeHierarchy, includeName);
     renderer.init();
 });

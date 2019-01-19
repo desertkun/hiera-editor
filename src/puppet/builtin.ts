@@ -1,6 +1,8 @@
 
-import {PuppetASTObject, PuppetASTContainerContext, Resolver, ResolveError, PuppetASTReturn, PuppetASTAccess, PuppetASTClass, PuppetASTVariable} from "./ast";
+import { PuppetASTObject, PuppetASTContainerContext, Resolver, 
+    ResolveError, PuppetASTReturn, PuppetASTAccess, PuppetASTClass, PuppetASTVariable} from "./ast";
 import { isArray } from "util";
+import { GlobalVariableResolverResults } from "./util"
 
 type BuiltinFunctionCallback = (caller: PuppetASTObject, 
     context: PuppetASTContainerContext, resolver: Resolver, args: any[]) => Promise<any>;
@@ -30,7 +32,7 @@ const BuiltInFunctions: any = {
         {
             const var_ = <PuppetASTVariable>obj;
             const def = await var_.defined(context, resolver);
-            return def;
+            return def != GlobalVariableResolverResults.MISSING;
         }
 
         const def = await obj.resolve(context, resolver);
@@ -57,12 +59,31 @@ const BuiltInFunctions: any = {
     "hiera_include": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
     {
         const key = args[0];
+
+        const hierarchy = resolver.hasGlobalVariable(key);
+
+        if (hierarchy == GlobalVariableResolverResults.MISSING)
+        {
+            return;
+        }
+
+        resolver.registerHieraSource("hiera_include", key, hierarchy);
+
         const classes = resolver.getGlobalVariable(key);
+
         if (isArray(classes))
         {
             for (const className of classes)
             {
-                await resolver.resolveClass(className, true);
+                try
+                {
+                    const resolved = await resolver.resolveClass(className, true);
+                    resolved.setOption("hiera_include", key);
+                }
+                catch (e)
+                {
+                    console.log("Failed to resolve class " + className + " from hiera_include('" + key + "'): " + e.toString());
+                }
             }
         }
     },

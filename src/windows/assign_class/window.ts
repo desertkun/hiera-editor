@@ -9,14 +9,20 @@ export class AssignClassWindow extends Window
     private selected: boolean;
     private readonly environment: string;
     private readonly certname: string;
+    private readonly hierarchy: number;
+    private readonly nodeHierarchy: any;
+    private readonly includeName: string;
 
-    constructor (environment: string, certname: string)
+    constructor (environment: string, certname: string, hierarchy: number, nodeHierarchy: any, includeName: string)
     {
         super();
 
         this.selected = false;
         this.environment = environment;
         this.certname = certname;
+        this.hierarchy = hierarchy;
+        this.nodeHierarchy = nodeHierarchy;
+        this.includeName = includeName;
     }
 
     public show(): Promise<string>
@@ -29,7 +35,8 @@ export class AssignClassWindow extends Window
                 autoHideMenuBar: true,
                 parent: workspace_window.browserWindow
             }, (browserWindow: BrowserWindow) => {
-                browserWindow.webContents.send('init', this.environment, this.certname);
+                browserWindow.webContents.send('init', this.environment, this.certname,
+                     this.hierarchy, this.nodeHierarchy, this.includeName);
             });
     
             ipcMain.on("class-selected", (event: any, className: string) => 

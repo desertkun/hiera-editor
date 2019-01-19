@@ -3,6 +3,14 @@
   background: url("../images/environment.png");
 }
 
+.ic-puppet {
+  background: url("../images/puppet.png");
+}
+
+.ic-hiera {
+  background: url("../images/environment.png");
+}
+
 .ic {
   display: inline-block;
   background-size: cover;

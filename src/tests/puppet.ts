@@ -48,9 +48,9 @@ async function testRealWorkspace(workspaceName: string, environmentName: string,
         });
         await async.writeFile(path.join(d.name, "puppet.conf"), raw);
 
-        const workspace = new Workspace(getWorkspacePath(workspaceName), d.name, false);
+        const workspace = new Workspace(getWorkspacePath(workspaceName), d.name, true);
         await workspace.init();
-        const environment = await workspace.getEnvironment(environmentName);
+        const environment = await workspace.getEnvironment(environmentName, true);
         await environment.init();
         const node = await environment.enterNodeContext(nodeName);
         if (f)
@@ -148,9 +148,9 @@ async function testSimpleWorkspace(test: WorkspaceTest): Promise<NodeContext>
 
     try
     {
-        const workspace = new Workspace(d.name, null, false);
+        const workspace = new Workspace(d.name, null, true);
         await workspace.init();
-        const environment = await workspace.getEnvironment("dev");
+        const environment = await workspace.getEnvironment("dev", true);
         await environment.init();
         const node = await environment.enterNodeContext(test.certname || "node.puppet", test.facts);
         if (test.f)
@@ -495,7 +495,7 @@ describe('Workspaces', () =>
         });
     });
 
-    it('switch', () =>
+    it('? { ... }', () =>
     {
         return testSimpleWorkspace({
             files: {
@@ -523,6 +523,63 @@ describe('Workspaces', () =>
     
                 expect(class_.getResolvedProperty("v").value).to.be.equal("it_was_b");
                 expect(class_.getResolvedProperty("b").value).to.be.equal("ddddd");
+    
+            }
+        });
+    });
+    
+    it('case', () =>
+    {
+        return testSimpleWorkspace({
+            files: {
+                "init.pp": `
+                    class test (
+                        $a = running,
+                        $b = 'b',
+                        $c = 'd',
+                    ) {
+                        case $a {
+                            /^(running|stopped)$/: {
+                                $result_a = true
+                            }
+                            default: {
+                                $result_a = false
+                            }
+                        }
+                        case $b {
+                            /^(running|stopped)$/: {
+                                $result_b = true
+                            }
+                            default: {
+                                $result_b = false
+                            }
+                        }
+                        case $c {
+                            'd': {
+                                $result_c = true
+                            }
+                            default: {
+                                $result_c = false
+                            }
+                        }
+                    }
+                `
+            }, 
+            manifests: {
+                "site.pp": `
+                    include test
+                `  
+            },
+            f: async (
+                workspace: Workspace,
+                environment: Environment,
+                node: NodeContext) =>
+            {
+                const class_ = await node.acquireClass("test");
+    
+                expect(class_.getResolvedProperty("result_a").value).to.be.equal(true);
+                expect(class_.getResolvedProperty("result_b").value).to.be.equal(false);
+                expect(class_.getResolvedProperty("result_c").value).to.be.equal(true);
     
             }
         });

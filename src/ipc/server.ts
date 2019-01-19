@@ -352,7 +352,7 @@ export class IpcServer implements IpcAPI
         return workspace.path;
     }
     
-    public async assignNewClassToNode(environment: string, certname: string): Promise<string>
+    public async assignNewHieraClass(environment: string, certname: string, key: string, hierarchy: number, includeName: string): Promise<string>
     {
         const workspace: Workspace = getCurrentWorkspace();
         if (workspace == null)
@@ -365,14 +365,21 @@ export class IpcServer implements IpcAPI
         const node = env.getNode(certname);    
         if (node == null)
             return null;
+
+        const nodeHierarchy = node.hierarchy.get(hierarchy);
+        if (nodeHierarchy == null)
+            return;
     
-        const window = new AssignClassWindow(environment, certname);
+        const window = new AssignClassWindow(environment, certname, hierarchy, {
+            "name": nodeHierarchy.entry.name,
+            "path": nodeHierarchy.path
+        }, includeName);
         const className = await window.show();
 
         if (!className)
             return null;
 
-        //await node.assignClass(className);
+        await node.assignClass(key, className, hierarchy);
 
         return className;
     }
@@ -414,7 +421,7 @@ export class IpcServer implements IpcAPI
         return false;//await node.createResource(definedTypeName, title);
     }
     
-    public async removeClassFromNode(environment: string, certname: string, className: string): Promise<void>
+    public async removeHieraClassFromNode(environment: string, certname: string, key: string, hierarchy: number,  className: string): Promise<void>
     {
         const workspace: Workspace = getCurrentWorkspace();
         if (workspace == null)
@@ -428,7 +435,7 @@ export class IpcServer implements IpcAPI
         if (node == null)
             return;
 
-        //await node.removeClass(className);
+        await node.removeClass(key, className, hierarchy);
     }
     
     public async removeResourceFromNode(environment: string, certname: string, definedTypeName: string, title: string): Promise<void>
@@ -500,7 +507,7 @@ export class IpcServer implements IpcAPI
         //return await node.renameResource(definedTypeName, title, newTitle);
     }
 
-    public async removeClassesFromNode(environment: string, certname: string): Promise<Array<string>>
+    public async removeHieraClasses(environment: string, certname: string, includeName: string): Promise<Array<string>>
     {
         const workspace: Workspace = getCurrentWorkspace();
         if (workspace == null)
@@ -514,7 +521,7 @@ export class IpcServer implements IpcAPI
         if (node == null)
             return null;
 
-        //return await node.removeAllClasses();
+        //return await node.removeAllClasses(includeName);
     }
 
     public async searchClasses(environment: string, certname: string, search: string): Promise<any[]>

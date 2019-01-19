@@ -29,11 +29,12 @@ export class Environment
     private readonly _global: Dictionary<string, string>;
     private readonly _nodes: Dictionary<string, NodeContext>;
     private readonly _roots: Dictionary<string, Folder>;
-    private readonly _warnings: Error[];
+    private readonly _warnings: WorkspaceError[];
+    private readonly _offline: boolean;
     private readonly _nodeFacts: any;
     private _modulesInfo: PuppetModulesInfo;
 
-    constructor(workspace: Workspace, name: string, _path: string, cachePath: string)
+    constructor(workspace: Workspace, name: string, _path: string, cachePath: string, offline: boolean = false)
     {
         this._name = name;
         this._workspace = workspace;
@@ -46,6 +47,7 @@ export class Environment
         this._global.put("environment", name);
         this._nodes = new Dictionary();
         this._nodeFacts = {};
+        this._offline = offline;
     }
 
     public get global()
@@ -68,7 +70,7 @@ export class Environment
         return this._warnings;
     }
 
-    public addWarning(warning: Error)
+    public addWarning(warning: WorkspaceError)
     {
         this._warnings.push(warning);
     }
@@ -215,8 +217,18 @@ export class Environment
             nodes[certname] = await node.dump();
         }
 
+        const warnings = [];
+        for (const warn of this._warnings)
+        {
+            warnings.push({
+                title: warn.title,
+                message: warn.message
+            })
+        }
+
         return {
-            "nodes": nodes
+            "nodes": nodes,
+            "warnings": warnings
         };
     }
 
@@ -467,53 +479,65 @@ export class Environment
 
         let nodeList: string[];
 
-        if (await async.isFile(this.certListCachePath))
+        if (this._offline)
         {
-            try
-            {
-                nodeList = await this.updateCertList(updateProgressCategory, settings);
-            }
-            catch (e)
-            {
-                this.addWarning(e);
-                nodeList = await async.readJSON(this.certListCachePath);
-
-                if (!isArray(nodeList))
-                {
-                    nodeList = [];
-                    await async.writeJSON(this.certListCachePath, nodeList);
-                    throw e;
-                }
-            }
+            nodeList = [];
         }
         else
         {
-            nodeList = await this.updateCertList(updateProgressCategory, settings);
-        }
-
-        if (!await async.isDirectory(this.certNodeFactsPath))
-            await async.makeDirectory(this.certNodeFactsPath);
-
-        const count = {
-            c: 0,
-            total: nodeList.length
-        };
-
-        const queries = [];
-
-        for (const certName of nodeList)
-        {
-            queries.push(this.fetchNodeFacts(certName, count, progressCallback, settings));
-        }
-
-        if (queries.length > 0)
-        {
-            if (updateProgressCategory) updateProgressCategory("[" + this.name + "] Fetching node facts...", true);
+            if (await async.isFile(this.certListCachePath))
+            {
+                try
+                {
+                    nodeList = await this.updateCertList(updateProgressCategory, settings);
+                }
+                catch (e)
+                {
+                    this.addWarning(e);
+                    nodeList = await async.readJSON(this.certListCachePath);
     
-            await Promise.all(queries);
+                    if (!isArray(nodeList))
+                    {
+                        nodeList = [];
+                        await async.writeJSON(this.certListCachePath, nodeList);
+                        throw e;
+                    }
+                }
+            }
+            else
+            {
+                nodeList = await this.updateCertList(updateProgressCategory, settings);
+            }
         }
 
-        if (updateProgressCategory) updateProgressCategory("[" + this.name + "] Resolving nodes...", true);
+        if (!this._offline)
+        {
+            if (!await async.isDirectory(this.certNodeFactsPath))
+                await async.makeDirectory(this.certNodeFactsPath);
+
+            const count = {
+                c: 0,
+                total: nodeList.length
+            };
+
+            const queries = [];
+
+            for (const certName of nodeList)
+            {
+                queries.push(this.fetchNodeFacts(certName, count, progressCallback, settings));
+            }
+
+            if (queries.length > 0)
+            {
+                if (updateProgressCategory) updateProgressCategory("[" + this.name + "] Fetching node facts...", true);
+        
+                await Promise.all(queries);
+            }
+
+            if (updateProgressCategory) updateProgressCategory("[" + this.name + "] Resolving nodes...", true);
+        }
+
+        this._nodes.clear();
 
         for (const certname in this._nodeFacts)
         {

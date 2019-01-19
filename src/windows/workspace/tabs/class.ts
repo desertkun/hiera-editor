@@ -431,7 +431,7 @@ export class NodeClassTab extends WorkspaceTab
 
             const pad = $('<div class="container-grayed d-flex flex-row"></div>').appendTo(this.contentNode);
 
-            const title = $('<span class="text-muted" style="padding: 5px 10px 5px 10px;"></span>').appendTo(pad);
+            const title = $('<span class="text-muted" style="padding: 6px 10px 6px 10px;"></span>').appendTo(pad);
             $('<i class="fas fa-project-diagram" title="This selector affects at what level of hierarchy the edits are made" ' +
                 'data-toggle="tooltip" data-placement="bottom"></i>').tooltip().appendTo(title);
 
@@ -541,15 +541,12 @@ export class NodeClassTab extends WorkspaceTab
         }
 
         // show the modified marker is the class if there is any value to it (including null)
-        if (this.hadDefinedPropertyOriginally(propertyName))
+        if (this.hadDefinedPropertyOriginally(propertyName) && hierarchy >= 0)
         {
             modified.show();
 
-            if (hierarchy >= 0)
-            {
-                $(label).addClass("modified").addClass("modified-" + hierarchy);
-                $(node).addClass("modified").addClass("modified-" + hierarchy);
-            }
+            $(label).addClass("modified").addClass("modified-" + hierarchy);
+            $(node).addClass("modified").addClass("modified-" + hierarchy);
         }
 
         const group = $('<div class="input-group"></div>').appendTo(node);

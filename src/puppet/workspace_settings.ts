@@ -80,7 +80,7 @@ export class WorkspaceSettings
         return this.load(data);
     }
 
-    public async isValid(checkCertificates: boolean): Promise<boolean>
+    public async isValid(offline: boolean): Promise<boolean>
     {
         if (this.certname == null || this.certname == "")
             return false;
@@ -88,7 +88,7 @@ export class WorkspaceSettings
         if (this.server == null || this.server == "")
             return false;
 
-        if (checkCertificates)
+        if (!offline)
         {
             const {ssldir} = WorkspaceSettings.GetPaths();
     

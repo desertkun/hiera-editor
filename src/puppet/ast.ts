@@ -3,14 +3,24 @@ import {Dictionary} from "../dictionary";
 import { GetBuiltinFunction } from "./builtin";
 import { resolve } from "dns";
 import { isString } from "util";
+import { GlobalVariableResolverResults } from "./util";
 
 export interface Resolver
 {
     resolveClass(className: string, public_: boolean): Promise<PuppetASTClass>;
     resolveFunction(name: string): Promise<PuppetASTFunction>;
     getGlobalVariable(name: string): any;
-    hasGlobalVariable(name: string): boolean;
-    getNodeName(): String;
+    
+    /*
+    This method should return:
+       GlobalVariableResolverResults.MISSING when global cannot be found
+       GlobalVariableResolverResults.EXISTS when it exists but hierarchy is unknown
+       0 and above then it exists with hierarchy as value
+    */
+    hasGlobalVariable(name: string): number;
+
+    getNodeName(): string;
+    registerHieraSource(kind: string, key: string, hierarchy: number): void;
 }
 
 export interface PuppetASTContainerContext
@@ -413,6 +423,13 @@ export class PuppetASTSwitch extends PuppetASTObject
             {
                 default_ = await keyed.value.resolve(context, resolver);
             }
+            else if (keyed.key instanceof PuppetASTRegularExpression)
+            {
+                if (await keyed.key.matchesValue(context, resolver, resolvedValue))
+                {
+                    return await keyed.value.resolve(context, resolver);
+                }
+            }
             else
             {
                 const key = await keyed.key.resolve(context, resolver);
@@ -472,6 +489,13 @@ export class PuppetASTCase extends PuppetASTObject
                 {
                     default_ = then;
                     continue;
+                } 
+                else if (val instanceof PuppetASTRegularExpression)
+                {
+                    matches = await val.matchesValue(context, resolver, resolvedValue);
+
+                    if (matches)
+                        break;
                 }
 
                 const possibleValue = await val.resolve(context, resolver);
@@ -1001,6 +1025,12 @@ export class PuppetASTRegularExpression extends PuppetASTObject
     {
         const re = new RegExp(await this.resolve(context, resolver));
         const value = await object.resolve(context, resolver);
+        return re.test(value);
+    }
+
+    public async matchesValue(context: PuppetASTContainerContext, resolver: Resolver, value: string): Promise<boolean>
+    {
+        const re = new RegExp(await this.resolve(context, resolver));
         return re.test(value);
     }
 
@@ -1607,6 +1637,7 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
     public readonly body: PuppetASTObject;
     public readonly parent: PuppetASTPrimitive;
 
+    private _options: Dictionary<string, any>;
     private _public: boolean;
     private _resolvedParent: PuppetASTClass;
     public readonly resolvedLocals: Dictionary<string, PuppetASTResolvedProperty>;
@@ -1626,6 +1657,26 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
         this._resolvedParent = null;
         this.resolvedLocals = new Dictionary();
         this.resolvedFields = new Dictionary();
+    }
+
+    public setOption(key: string, value: any)
+    {
+        if (this._options == null)
+        {
+            this._options = new Dictionary();
+        }
+
+        this._options.put(key, value);
+    }
+
+    public get options(): Array<string>
+    {
+        return this._options != null ? this._options.getKeys() : [];
+    }
+
+    public getOption(key: string)
+    {
+        return this._options != null ? this._options.get(key) : null;
     }
 
     public markPublic()
@@ -1701,6 +1752,12 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
 
         console.log("Resolving class " + this.name);
 
+        {
+            const pp = new PuppetASTResolvedProperty();
+            pp.value = this.name;
+            this.resolvedLocals.put("title", pp);
+        }
+
         for (const paramName of this.params.keys)
         {
             const param: OrderedDictionary = this.params.get(paramName);
@@ -1722,7 +1779,7 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
 
             const globalParamName = this.name + "::" + paramName;
 
-            if (resolver.hasGlobalVariable(globalParamName))
+            if (resolver.hasGlobalVariable(globalParamName) != GlobalVariableResolverResults.MISSING)
             {
                 const globalParamValue = resolver.getGlobalVariable(globalParamName);
 
@@ -2219,7 +2276,7 @@ export class PuppetASTVariable extends PuppetASTObject
         return this.root || this.className == "";
     }
 
-    public async defined(context: PuppetASTContainerContext, resolver: Resolver): Promise<boolean>
+    public async defined(context: PuppetASTContainerContext, resolver: Resolver): Promise<number>
     {
         const isRoot = this.isRoot();
 
@@ -2230,13 +2287,14 @@ export class PuppetASTVariable extends PuppetASTObject
 
             if (property && property.hasValue)
             {
-                return true;
+                return GlobalVariableResolverResults.EXISTS;
             }
             else if (isRoot)
             {
-                if (resolver.hasGlobalVariable(this.name))
+                const has = resolver.hasGlobalVariable(this.name)
+                if (has != GlobalVariableResolverResults.MISSING)
                 {
-                    return true;
+                    return has;
                 }
             }
         }
@@ -2247,11 +2305,11 @@ export class PuppetASTVariable extends PuppetASTObject
 
             if (property && property.hasValue)
             {
-                return true;
+                return GlobalVariableResolverResults.EXISTS;
             }
         }
 
-        return false;
+        return GlobalVariableResolverResults.MISSING;
     }
 
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
@@ -2272,7 +2330,7 @@ export class PuppetASTVariable extends PuppetASTObject
             {
                 // if we've been asking for a variable without classpath mentioned,
                 // try to find a global variable
-                if (resolver.hasGlobalVariable(this.name))
+                if (resolver.hasGlobalVariable(this.name) != GlobalVariableResolverResults.MISSING)
                 {
                     return resolver.getGlobalVariable(this.name);
                 }

@@ -68,7 +68,7 @@ class NodeItemRenderer
         this.render();
     }
 
-    private renderClasses(node: TreeViewNode, parentClassPath: string): boolean
+    private renderClasses(node: TreeViewNode, hieraInclude: string, hierarchyLevel: number = -1): boolean
     {
         const zis = this;
         let hadAny: boolean = false;
@@ -80,6 +80,12 @@ class NodeItemRenderer
         {
             const classInfo = this.info.classes[className];
             const iconData = classInfo != null ? classInfo.options.icon : null;
+            const classHieraInclude = classInfo != null ? classInfo.options["hiera_include"] : null;
+
+            if (classInfo != null && hieraInclude != classHieraInclude)
+            {
+                continue;
+            }
 
             const classNode = node.addChild( 
                 (node) => 
@@ -103,30 +109,19 @@ class NodeItemRenderer
                 };
             }, "class-" + this.env.name + "-" + zis.certname + "-" + className, renderer.openNodes);
             
-            /*
-            classNode.contextMenu([
-                {
-                    label: "Reset To Defaults",
-                    click: async () => 
+            if (classHieraInclude != null)
+            {
+                classNode.contextMenu([
                     {
-                        await ipc.removeNodeClassProperties(zis.localPath, className);
-                        await renderer.refreshTabKind("class", [zis.localPath, className]);
+                        label: "Remove",
+                        click: async () => 
+                        {
+                            await ipc.removeHieraClassFromNode(zis.env.name, zis.certname, classHieraInclude, hierarchyLevel, className);
+                            await renderer.refreshWorkspace();
+                        }
                     }
-                },
-                {
-                    type: "separator"
-                },
-                {
-                    label: "Remove",
-                    click: async () => 
-                    {
-                        await ipc.removeClassFromNode(zis.localPath, className);
-                        await renderer.refresh();
-                        await renderer.closeTabKind("class", [zis.localPath, className]);
-                    }
-                }
-            ]);
-            */
+                ]);
+            }
 
             hadAny = true;
         }
@@ -261,6 +256,28 @@ class NodeItemRenderer
     }
     */
 
+    private havePuppetDefinedClasses(): boolean
+    {
+        const nodeClassNames = Object.keys(this.info.classes);
+
+        for (const className of nodeClassNames)
+        {
+            const classInfo = this.info.classes[className];
+
+            if (classInfo != null && classInfo.options["hiera_include"] == null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private get hierarchy(): any[]
+    {
+        return this.info.hierarchy;
+    }
+
     private render()
     {
         const zis = this;
@@ -274,21 +291,6 @@ class NodeItemRenderer
         }, "node-" + zis.env.name + "-" + zis.certname, renderer.openNodes);
 
         this.n_node.contextMenu([
-            {
-                label: "Assign New Class",
-                click: async () => 
-                {
-                    /*
-                    const className = await ipc.assignNewClassToNode(zis.env.name, zis.certname);
-
-                    if (className)
-                    {
-                        await renderer.refresh();
-                        renderer.openTab("class", [zis.localPath, className]);
-                    }
-                    */
-                }
-            },
             {
                 label: "Create New Resource",
                 click: () => {
@@ -317,53 +319,98 @@ class NodeItemRenderer
             }
         ])
 
-        const n_classes = this.n_node.addChild( 
-            (node) => 
+        const includeNames = Object.keys(this.info.hiera_includes);
+        includeNames.sort();
+
+        for (const includeName of includeNames)
         {
-            node.icon = $('<i class="fas fa-puzzle-piece"></i>');
-            node.title = "Classes";
-            node.emptyText = "Node has no classes";
-            node.leaf = false;
-            node.selectable = false;
-        }, "node-" + zis.env.name + "-" + zis.certname + "-classes", renderer.openNodes);
+            const hierarchyLevel = this.info.hiera_includes[includeName];
 
-        this.renderClasses(n_classes, null);
+            const nodeIcon = hierarchyLevel >= 0 ? '<span class="modified-' + 
+                (hierarchyLevel % 12) + '"><i class="fas fa-flask" style="margin-right: 4px"></i></span>' : 
+                '<i class="fas fa-flask" style="margin-right: 4px"></i>';
+            const nodeTitle = hierarchyLevel >= 0 ? '<span class="modified-' + 
+                (hierarchyLevel % 12) + '">Hiera [' + includeName + ']</span>' : 'Hiera [' + includeName + ']';
 
-        n_classes.contextMenu([
+            const n_classes = this.n_node.addChild( 
+                (node) => 
             {
-                label: "Assign New Class",
-                click: async () => 
-                {
-                    /*
-                    const className = await ipc.assignNewClassToNode(zis.localPath);
+                node.icon = $(nodeIcon);
+                node.title = nodeTitle;
+                node.emptyText = "This hiera_include has no classes";
+                node.leaf = false;
+                node.selectable = false;
+            }, "node-" + zis.env.name + "-" + zis.certname + "-hiera-" + includeName, renderer.openNodes);
 
-                    if (className)
+            const contextOptions: any = [
+                {
+                    label: "Assign New Class",
+                    click: async () => 
                     {
+                        const className = await ipc.assignNewHieraClass(zis.env.name, zis.certname, 
+                            includeName, hierarchyLevel, includeName);
+    
+                        if (className)
+                        {
+                            await renderer.refreshWorkspace();
+                        }
+                    }
+                },
+                {
+                    type: "separator"
+                },
+                {
+                    label: "Remove All Classes",
+                    click: async () => 
+                    {
+                        const classNames = await ipc.removeHieraClasses(zis.env.name, zis.certname, includeName);
                         await renderer.refresh();
-                        renderer.openTab("class", [zis.localPath, className]);
+                        for (const className of classNames)
+                        {
+                            await renderer.closeTabKind("class", [zis.env.name, zis.certname, className]);
+                        }
                     }
-                    */
                 }
-            },
-            {
-                type: "separator"
-            },
-            {
-                label: "Remove All Classes",
-                click: async () => 
-                {
-                    /*
-                    const classNames = await ipc.removeClassesFromNode(zis.localPath);
-                    await renderer.refresh();
-                    for (const className of classNames)
-                    {
-                        await renderer.closeTabKind("class", [zis.localPath, className]);
-                    }
-                    */
-                }
-            }
-        ]);
+            ];
 
+            if (hierarchyLevel >= 0)
+            {
+                const hierarchy = zis.hierarchy[hierarchyLevel];
+
+                let hierarcyName = "";
+                if (hierarchy.name)
+                {
+                    hierarcyName += hierarchy.name + " ";
+                }
+                hierarcyName += hierarchy.path;
+
+                contextOptions.splice(0, 0, {
+                    label: "Defined at: " + hierarcyName,
+                    enabled: false
+                });
+            }
+
+            n_classes.contextMenu(contextOptions)
+    
+            this.renderClasses(n_classes, includeName, hierarchyLevel);
+        }
+
+        if (this.havePuppetDefinedClasses())
+        {
+            const n_classes = this.n_node.addChild( 
+                (node) => 
+            {
+                node.icon = $('<i class="ic ic-puppet"></i>');
+                node.title = "Puppet Defined Classes";
+                node.emptyText = "Node has no classes";
+                node.leaf = false;
+                node.selectable = false;
+            }, "node-" + zis.env.name + "-" + zis.certname + "-classes", renderer.openNodes);
+    
+            this.renderClasses(n_classes, null);
+        }
+
+        /*
         const n_resources = this.n_node.addChild( 
             (node) => 
         {
@@ -380,7 +427,6 @@ class NodeItemRenderer
                 label: "Create New Resource",
                 click: async () => 
                 {
-                    /*
                     const definedTypeName = await ipc.chooseDefinedType(zis.localPath);
                     if (!definedTypeName)
                         return;
@@ -396,7 +442,6 @@ class NodeItemRenderer
                     await renderer.refresh();
                     await renderer.closeTabKind("resource", 
                         [zis.localPath, definedTypeName, newTitle]);
-                    */
                 }
             },
             {
@@ -406,7 +451,6 @@ class NodeItemRenderer
                 label: "Remove All Resources",
                 click: async () => 
                 {
-                    /*
                     const removed = await ipc.removeAllResourcesFromNode(zis.localPath);
 
                     await renderer.refresh();
@@ -415,14 +459,15 @@ class NodeItemRenderer
                     {
                         await renderer.closeTabKind("resource", 
                             [zis.localPath, obj[0], obj[1]]);
-                    }
-                    */
+                    }                   
                 }
             }
         ]);
 
         //this.renderResources(n_resources, null);
         
+        */
+
         /*
         const n_facts = this.n_node.addChild( 
             (node) => 
@@ -487,7 +532,7 @@ class EnvironmentTreeItemRenderer
         }, "environment-" + this.name, renderer.openNodes);
         
         this.n_environment.contextMenu([
-            
+            /*
             {
                 label: "New Node",
                 click: async () => 
@@ -497,13 +542,11 @@ class EnvironmentTreeItemRenderer
                     if (nodeName == null || nodeName.length == 0)
                         return;
                     
-                    /*
                     if (!await ipc.createNode(zis.name, nodeName))
                     {
                         alert("Failed to create a node");
                         return;
                     }
-                    */
 
                     await renderer.refresh();
                 }
@@ -511,6 +554,7 @@ class EnvironmentTreeItemRenderer
             {
                 type: "separator"
             },
+            */
             {
                 label: "Delete",
                 click: async () => 
@@ -533,6 +577,7 @@ class EnvironmentTreeItemRenderer
     {
         const tree = await ipc.getEnvironmentTree(this.name);
         const nodes = tree["nodes"] || {};
+        const warnings = tree["warnings"] || [];
 
         for (const certname in nodes)
         {
@@ -543,6 +588,31 @@ class EnvironmentTreeItemRenderer
             await itemRenderer.init();
         }
         
+        if (warnings.length > 0) 
+        {
+            const warningsNode = this.n_environment.addChild( 
+                (node) => 
+            {
+                node.title = "Warnings (" + warnings.length + ")";
+                node.leaf = true;
+                node.icon = $('<i class="fas fa-exclamation-triangle text-warning"></i>');
+            }, "environment-warnings-" + this.name, renderer.openNodes);
+
+            warningsNode.click(() => 
+            {
+                $('#warnings-modal-label').text("Warnings of " + this.name + " (" + warnings.length + ")");
+                const body = $('#warnings-modal-body').html('');
+
+                for (const warning of warnings)
+                {
+                    const div = $('<div></div>').appendTo(body);
+                    $('<p><i class="fas fa-exclamation-triangle text-warning"></i> ' + warning.title + '</p>').appendTo(div);
+                    $('<p style="white-space: pre-line; overflow: auto;"></p>').appendTo(div).text(warning.message);
+                }
+
+                $('#warnings-modal').modal();
+            });
+        }
     }
 }
 
@@ -733,6 +803,58 @@ export class WorkspaceRenderer
         await this.initModules();
 
         await this.enable();
+        await this.registerCallbacks();
+    }
+
+    private async registerCallbacks()
+    {
+        const zis = this;
+
+        $('#workspace-menu').click(function (event: any)
+        {
+            event.preventDefault();
+
+            const contextMenu = new Menu();
+            const menuEntries: any[] = [
+                {
+                    label: 'New Environment',
+                    async click () 
+                    { 
+                        const success = await ipc.createEnvironment();
+                        if (!success)
+                            return;
+    
+                        await renderer.refresh();
+                    }
+                },
+                {
+                    label: 'Install/Update Puppetfile modules',
+                    async click () 
+                    { 
+                        await ipc.installModules();
+                    }
+                },
+                {
+                    label: 'Refresh',
+                    async click () 
+                    { 
+                        await zis.refreshWorkspace();
+                    }
+                }
+            ];
+
+            for (const entry of menuEntries)
+            {
+                contextMenu.append(new MenuItem(entry));
+            }
+
+            contextMenu.popup({window: remote.getCurrentWindow()})
+        });
+
+        ipcRenderer.on('refresh', async function (event: any)
+        {
+            await renderer.refresh();
+        });
     }
 
     private async initUI()
@@ -760,7 +882,17 @@ export class WorkspaceRenderer
 
     private async initWorkspace()
     {
-        this.workspaceTree = new TreeView($('#workspace-tree'));
+        if (this.workspaceTree == null)
+        {
+            this.workspaceTree = new TreeView($('#workspace-tree'));
+        }
+        else
+        {
+            this.workspaceTree.clear();
+        }
+
+        this.environments.clear();
+
         const environments: string[] = await ipc.getEnvironmentList();
 
         for (const environment of environments)
@@ -772,7 +904,16 @@ export class WorkspaceRenderer
 
     private async initModules()
     {
-        this.modulesTree = new TreeView($('#workspace-modules'));
+        if (this.modulesTree == null)
+        {
+            this.modulesTree = new TreeView($('#workspace-modules'));
+        }
+        else
+        {
+            this.modulesTree.clear();
+        }
+
+        this.modules.clear();
 
         {
             // global modules
@@ -995,45 +1136,45 @@ export class WorkspaceRenderer
         return true;
     }
 
+    public async refreshWorkspace()
+    {
+        await this.disable();
+        
+        WorkspaceRenderer.OpenLoading();
+
+        try
+        {
+            await ipc.initWorkspace();
+        }
+        catch (e)
+        {
+            if (e.hasOwnProperty("title"))
+            {
+                WorkspaceRenderer.OpenError(e.title, e.message);
+            }
+            else
+            {
+                WorkspaceRenderer.OpenError("Failed to process the workspace", e.message);
+            }
+            return;
+        }
+
+        await this.initWorkspace();
+        await this.initModules();
+
+        await this.enable();
+    }
+
+    private async disable()
+    {
+        $('#workspace').addClass('disabled');
+    }
+
     private async enable()
     {
         $('#workspace').removeClass('disabled');
         this.openEditor();
         await this.checkEmpty();
-
-        $('#workspace-menu').click(function (event: any)
-        {
-            event.preventDefault();
-
-            const contextMenu = new Menu();
-
-            contextMenu.append(new MenuItem({
-                label: 'New Environment',
-                async click () 
-                { 
-                    const success = await ipc.createEnvironment();
-                    if (!success)
-                        return;
-
-                    await renderer.refresh();
-                }
-            }));
-
-            contextMenu.append(new MenuItem({
-                label: 'Install/Update Puppetfile modules',
-                async click () 
-                { 
-                    await ipc.installModules();
-                }
-            }));
-
-            contextMenu.popup({window: remote.getCurrentWindow()})
-        });
-
-        ipcRenderer.on('refresh', async function (event: any)
-        {
-            await renderer.refresh();
-        });
     }
 
     private initSidebar()

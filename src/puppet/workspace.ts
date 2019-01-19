@@ -24,18 +24,18 @@ export class Workspace
     private _name: string;
     private _environments: Dictionary<string, Environment>;
     private _modulesInfo: PuppetModulesInfo;
-    private readonly checkCertificates: boolean;
+    private readonly _offline: boolean;
 
     private readonly _cachePath: string;
     private readonly _global: Dictionary<string, string>;
 
-    constructor(workspacePath: string, cachePath: string = null, checkCertificates: boolean = true)
+    constructor(workspacePath: string, cachePath: string = null, offline: boolean = false)
     {
         this._environments = new Dictionary();
         this._path = workspacePath;
         this._cachePath = cachePath || path.join(this._path, ".pe-cache");
         this._global = new Dictionary();
-        this.checkCertificates = checkCertificates;
+        this._offline = offline;
     }
 
     public get global()
@@ -323,12 +323,12 @@ export class Workspace
 
         const settings = await this.getSettings();
 
-        if (!await settings.isValid(this.checkCertificates))
+        if (!await settings.isValid(this._offline))
         {
             if (updateProgressCategory) updateProgressCategory("Setting up workspace...", false);
             await this.setupWorkspace(settings);
             
-            if (!await settings.isValid(this.checkCertificates))
+            if (!await settings.isValid(this._offline))
             {
                 throw new WorkspaceError("Workspace setup complete, BUT", "There seem to be no downloaded certificates found.");
             }
@@ -407,7 +407,7 @@ export class Workspace
             await pool.start();
         }
 
-        for (const env of await this.listEnvironments())
+        for (const env of await this.listEnvironments(this._offline))
         {
             if (updateProgressCategory) updateProgressCategory("Processing environment: " + env.name, false);
             await env.init(progressCallback, updateProgressCategory)
@@ -436,7 +436,7 @@ export class Workspace
         return path.join(this._path, "environments");
     }
 
-    public async getEnvironment(name: string): Promise<Environment>
+    public async getEnvironment(name: string, offline?: boolean): Promise<Environment>
     {
         const environmentsPath = this.environmentsPath;
 
@@ -454,22 +454,24 @@ export class Workspace
             return null;
         }
 
-        return this.acquireEnvironment(name, environmentPath, path.join(this.cachePath, "env-" + name));
+        return this.acquireEnvironment(name, environmentPath, 
+            path.join(this.cachePath, "env-" + name), offline);
     }
 
-    private acquireEnvironment(name: string,  environmentPath: string, cachePath: string): Environment
+    private acquireEnvironment(name: string,  environmentPath: string, cachePath: string, 
+        offline?: boolean): Environment
     {
         if (this._environments.has(name))
         {
             return this._environments.get(name);
         }
 
-        const newEnv = new Environment(this, name, environmentPath, cachePath);
+        const newEnv = new Environment(this, name, environmentPath, cachePath, offline);
         this._environments.put(name, newEnv);
         return newEnv;
     }
 
-    public async listEnvironments(): Promise<Array<Environment>>
+    public async listEnvironments(offline?: boolean): Promise<Array<Environment>>
     {
         const environmentsPath = path.join(this._path, "environments");
 
@@ -488,7 +490,8 @@ export class Workspace
             if (!await async.isDirectory(envPath))
                 continue;
 
-            const env: Environment = this.acquireEnvironment(envName, envPath, path.join(this.cachePath, "env-" + envName));
+            const env: Environment = this.acquireEnvironment(envName, envPath,
+                path.join(this.cachePath, "env-" + envName), offline);
             result.push(env);
         }
 

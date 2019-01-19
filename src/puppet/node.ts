@@ -7,7 +7,7 @@ import { PuppetASTParser, PuppetASTClass, PuppetASTFunction, Resolver,
     PuppetASTResolvedDefinedType, PuppetASTDefinedType,
     PuppetASTEnvironment } from "./ast"
 
-import { ResolvedResource, GlobalVariableResolver, CompilationError } from "./util"
+import { ResolvedResource, GlobalVariableResolver, GlobalVariableResolverResults, CompilationError } from "./util"
 import { Environment } from "./environment"
 import { CompiledHierarchy } from "./hiera"
 
@@ -39,12 +39,23 @@ class NodeContextResolver implements Resolver
         return this.context.resolveFunction(name, this.global);
     }
 
+    public registerHieraSource(kind: string, key: string, hierarchy: number): void
+    {
+        this.context.registerHieraSource(kind, key, hierarchy);
+    }
+
     public getGlobalVariable(name: string): string
     {
         return this.global.get(name);
     }
 
-    public hasGlobalVariable(name: string): boolean
+    /*
+    This method should return:
+       GlobalVariableResolverResults.MISSING when global cannot be found
+       GlobalVariableResolverResults.EXISTS when it exists but hierarchy is unknown
+       0 and above then it exists with hierarchy as value
+    */
+    public hasGlobalVariable(name: string): number
     {
         return this.global.has(name);
     }
@@ -62,6 +73,7 @@ export class NodeContext
     private readonly _compiledClasses: Dictionary<string, PuppetASTClass>;
     private readonly _compiledFunctions: Dictionary<string, PuppetASTFunction>;
     private readonly _compiledResources: Dictionary<string, Dictionary<string, ResolvedResource>>;
+    private readonly _hieraIncludes: Dictionary<string, number>;
 
     constructor (certname: string, env: Environment)
     {
@@ -72,6 +84,7 @@ export class NodeContext
         this._compiledClasses = new Dictionary();
         this._compiledResources = new Dictionary();
         this._compiledFunctions = new Dictionary();
+        this._hieraIncludes = new Dictionary();
 
         this.ast = new PuppetASTEnvironment(env.name);
 
@@ -115,7 +128,7 @@ export class NodeContext
 
         const propertyPath = this.compilePropertyPath(className, propertyName);
 
-        return this.hasGlobal(propertyPath);
+        return this.hasGlobal(propertyPath) >= 0;
     }
     
     public async removeClassProperty(className: string, hierarchy: number, propertyName: string): Promise<any>
@@ -199,9 +212,10 @@ export class NodeContext
 
             const propertyPath = this.compilePropertyPath(className, name);
 
-            if (this.hasGlobal(propertyPath))
+            const hierarchy = this.hasGlobal(propertyPath);
+            if (hierarchy != GlobalVariableResolverResults.MISSING)
             {
-                const configValue: [string, number] = this.getGlobalWithHierarchy(propertyPath);
+                const configValue: [any, number] = [this.getGlobal(propertyPath), hierarchy];
                 values[name] = configValue;
                 definedFields.push(name);
             }
@@ -391,17 +405,26 @@ export class NodeContext
             if (classInfo == null)
                 continue;
 
-            classes[clazz.name] = classInfo.dump();
+            const dump = classInfo.dump();
+            const options: any = dump["options"];
+
+            for (const key of clazz.options)
+            {
+                options[key] = clazz.getOption(key);
+            }
+
+            classes[clazz.name] = dump;
         }
 
         for (const entry of this._hierarchy.hierarhy)
         {
-            hierarchy.push(entry.path);
+            hierarchy.push(entry.dump());
         }
 
         return {
             "classes": classes,
-            "hierarchy": hierarchy
+            "hierarchy": hierarchy,
+            "hiera_includes": this._hieraIncludes.dump()
         };
     }
 
@@ -420,7 +443,63 @@ export class NodeContext
         this._facts = facts;
     }
     
-    public hasGlobal(key: string): boolean
+    public async assignClass(key: string, className: string, hierarchy: number): Promise<void>
+    {
+        const entry = this.hierarchy.get(hierarchy);
+
+        let file = entry.file;
+
+        if (file == null)
+        {
+            file = await entry.create(this.env, this.hierarchy.source);
+        }
+
+        let classes = file.config[key];
+        if (classes == null)
+        {
+            classes = [];
+            file.config[key] = classes;
+        }
+
+        if (classes.indexOf(className) >= 0)
+            return;
+
+        classes.push(className);
+        await file.save();
+    }
+
+    public async removeClass(key: string, className: string, hierarchy: number): Promise<void>
+    {
+        const entry = this.hierarchy.get(hierarchy);
+
+        let file = entry.file;
+
+        if (file == null)
+        {
+            file = await entry.create(this.env, this.hierarchy.source);
+        }
+
+        let classes = file.config[key];
+        if (classes == null)
+        {
+            return;
+        }
+
+        const index = classes.indexOf(className);
+        if (index < 0)
+            return;
+
+        classes.splice(index, 1);
+        await file.save();
+    }
+
+    /*
+    This method should return:
+       GlobalVariableResolverResults.MISSING when global cannot be found
+       GlobalVariableResolverResults.EXISTS when it exists but hierarchy is unknown
+       0 and above then it exists with hierarchy as value
+    */
+    public hasGlobal(key: string): number
     {
         switch (key)
         {
@@ -428,31 +507,32 @@ export class NodeContext
             case "environment":
             case "trusted":
             {
-                return true;
+                return GlobalVariableResolverResults.EXISTS;
             }
         }
 
         if (this._trusted_facts.hasOwnProperty(key))
-            return true;
+            return GlobalVariableResolverResults.EXISTS;
 
         if (this._facts.hasOwnProperty(key))
-            return true;
+            return GlobalVariableResolverResults.EXISTS;
 
         if (this.env.global.has(key) || this.env.workspace.global.has(key))
-            return true;
+            return GlobalVariableResolverResults.EXISTS;
 
-        for (const e of this._hierarchy.hierarhy)
+        for (let hierarchyLevel = 0, t = this._hierarchy.hierarhy.length; hierarchyLevel < t; hierarchyLevel++)
         {
+            const e = this._hierarchy.hierarhy[hierarchyLevel];
             const f = e.file;
 
             if (f == null)
                 continue;
 
             if (f.has(key))
-                return true;
+                return hierarchyLevel;
         }
 
-        return false;
+        return GlobalVariableResolverResults.MISSING;
     }
 
     public getGlobal(key: string): any
@@ -499,49 +579,16 @@ export class NodeContext
         return null;
     }
     
-    public getGlobalWithHierarchy(key: string): [any, number]
+    public registerHieraSource(kind: string, key: string, hierarchy: number): void
     {
-        switch (key)
+        switch (kind)
         {
-            case "facts":
+            case "hiera_include":
             {
-                return [this._facts, -1];
-            }
-            case "trusted":
-            {
-                return [this._trusted_facts, -1];
-            }
-            case "environment":
-            {
-                return [this.env.name, -1];
+                this._hieraIncludes.put(key, hierarchy);
+                break;
             }
         }
-
-        if (this._trusted_facts.hasOwnProperty(key))
-            return [this._trusted_facts[key], -1];
-
-        if (this._facts.hasOwnProperty(key))
-            return [this._facts[key], -1];
-
-        if (this.env.global.has(key))
-            return [this.env.global.get(key), -1];
-
-        if (this.env.workspace.global.has(key))
-            return [this.env.workspace.global.get(key), -1];
-
-        for (let _id = 0, t = this._hierarchy.hierarhy.length; _id < t; _id++)
-        {
-            const e = this._hierarchy.hierarhy[_id];
-            const f = e.file;
-
-            if (f == null)
-                continue;
-
-            if (f.has(key))
-                return [f.get(key), _id];
-        }
-
-        return [null, -1];
     }
     
     public async acquireClass(className: string, public_: boolean = true): Promise<PuppetASTClass>
@@ -778,7 +825,7 @@ export class NodeContext
         const zis = this;
 
         return {
-            has: function(key: string): boolean
+            has: function(key: string): number
             {
                 return zis.hasGlobal(key);
             },

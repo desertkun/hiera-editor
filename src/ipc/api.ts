@@ -18,11 +18,11 @@ export interface IpcAPI
     initWorkspace(): Promise<any>;
     showOpenDirectoryDialog(defaultPath?: string, mode?: Array<'openDirectory' | 'createDirectory' | 'promptToCreate'>): Promise<string>;
     getCurrentWorkspacePath(): Promise<string>;
-    assignNewClassToNode(environment: string, certname: string): Promise<string>;
+    assignNewHieraClass(environment: string, certname: string, key: string, hierarchy: number, includeName: string): Promise<string>;
     searchClasses(environment: string, certname: string, search: string): Promise<any[]>;
     searchDefinedTypes(environment: string, certname: string, search: string): Promise<any[]>;
-    removeClassFromNode(environment: string, certname: string, className: string): Promise<void>;
-    removeClassesFromNode(environment: string, certname: string): Promise<Array<string>>;
+    removeHieraClassFromNode(environment: string, certname: string, key: string, hierarchy: number, className: string): Promise<void>;
+    removeHieraClasses(environment: string, certname: string, includeName: string): Promise<Array<string>>;
     acquireNodeResource(environment: string, certname: string, definedTypeName: string, title: string): Promise<any>;
     setNodeResourceProperty(environment: string, certname: string, hierarchy: number, definedTypeName: string, title: string, propertyName: string, value: any): Promise<boolean>;
     removeNodeResourceProperty(environment: string, certname: string, hierarchy: number, definedTypeName: string, title: string, propertyName: string): Promise<boolean>;

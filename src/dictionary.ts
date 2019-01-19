@@ -10,7 +10,7 @@ export interface IDictionary<K, V> {
   
   export class Dictionary<K extends string, V> implements IDictionary<K, V> {
   
-    readonly internalDict: any;
+    private readonly internalDict: any;
   
     constructor() {
       this.internalDict = {};
@@ -32,6 +32,11 @@ export interface IDictionary<K, V> {
         {
             yield i;
         }
+    }
+
+    public dump(): any
+    {
+      return this.internalDict;
     }
   
     public get(key: K): V {

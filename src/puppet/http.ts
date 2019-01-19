@@ -105,7 +105,7 @@ export class PuppetHTTP
                     {
                         if (res.statusCode >= 400)
                         {
-                            reject(new Error("Response: " + res.statusCode))
+                            reject(new Error("Error Response: " + res.statusCode + " " + data.join("")))
                         }
                         else
                         {
