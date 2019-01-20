@@ -46,7 +46,7 @@ export class Ruby
         const ruby = Ruby.Path();
 
         const argsTotal = [
-            path.join(ruby.path, script)
+            '"' + path.join(ruby.path, script) + '"'
         ];
 
         for (let arg of args)
@@ -69,8 +69,8 @@ export class Ruby
         const ruby = Ruby.Path();
 
         const argsTotal = [
-            ruby.rubyPath,
-            path.join(ruby.path, script)
+            '"' + ruby.rubyPath + '"',
+            '"' + path.join(ruby.path, script) + '"'
         ];
 
         for (let arg of args)
