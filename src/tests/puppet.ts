@@ -167,43 +167,6 @@ async function testSimpleWorkspace(test: WorkspaceTest): Promise<NodeContext>
 
 describe('Workspaces', () =>
 {
-    it('resources', () =>
-    {
-        return testSimpleWorkspace({
-            files: {
-                "init.pp": `
-                    class test {
-                        test::ddd { "sometitle":
-                            c => "anothertest"
-                        }
-                    }
-                `,
-                "ddd.pp": `
-                    define test::ddd (
-                        $a = $title,
-                        $b = "test",
-                        $c
-                    ) {
-                    }
-                `
-            }, 
-            manifests: {
-                "site.pp": `
-                    include test
-                `  
-            },
-            f: async (
-                workspace: Workspace,
-                environment: Environment,
-                node: NodeContext) =>
-            {
-                await node.acquireClass("test");
-            }
-        });
-    });
-
-    return;
-
     it('missing directory', () =>
     {
         return expect(testRealWorkspace("missing...", "dev", "test")).to.be.rejectedWith(WorkspaceError);
@@ -382,7 +345,17 @@ describe('Workspaces', () =>
             files: {
                 "init.pp": `
                     class test {
-                      notice { "hello": }
+                        test::ddd { "sometitle":
+                            c => "anothertest"
+                        }
+                    }
+                `,
+                "ddd.pp": `
+                    define test::ddd (
+                        $a = $title,
+                        $b = "test",
+                        $c
+                    ) {
                     }
                 `
             }, 
