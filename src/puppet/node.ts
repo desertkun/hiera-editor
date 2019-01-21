@@ -4,12 +4,12 @@ import * as path from "path"
 
 import { Dictionary } from "../dictionary"
 import { PuppetASTParser, PuppetASTClass, PuppetASTFunction, Resolver,
-    PuppetASTResolvedDefinedType, PuppetASTDefinedType,
-    PuppetASTEnvironment } from "./ast"
+    PuppetASTDefinedType, PuppetASTEnvironment, PuppetASTResource, HieraSourceResolveCallback } from "./ast"
 
-import { ResolvedResource, GlobalVariableResolver, GlobalVariableResolverResults, CompilationError } from "./util"
+import { GlobalVariableResolver, GlobalVariableResolverResults, CompilationError } from "./util"
 import { Environment } from "./environment"
 import { CompiledHierarchy } from "./hiera"
+import { ClassDump, ResourceDump, NodeDump, ClassInfoDump, DefiledTypeInfoDump, NodeDefinedTypeDump } from "../ipc/objects"
 
 const parseDomain = require('domain-name-parser');
 
@@ -29,6 +29,11 @@ class NodeContextResolver implements Resolver
         return this.context.name;
     }
 
+    public resolveDefinedType(definedTypeName: string, public_: boolean): Promise<PuppetASTDefinedType>
+    {
+        return this.context.resolveDefinedType(definedTypeName, this.global, public_);
+    }
+
     public resolveClass(className: string, public_: boolean): Promise<PuppetASTClass>
     {
         return this.context.resolveClass(className, this.global, public_);
@@ -39,9 +44,14 @@ class NodeContextResolver implements Resolver
         return this.context.resolveFunction(name, this.global);
     }
 
-    public registerHieraSource(kind: string, key: string, hierarchy: number): void
+    public async resolveHieraSource(kind: string, key: string, resolve: HieraSourceResolveCallback): Promise<void>
     {
-        this.context.registerHieraSource(kind, key, hierarchy);
+        await this.context.registerHieraSource(kind, key, resolve);
+    }
+    
+    public registerResource(resource: PuppetASTResource): void
+    {
+        this.context.registerResource(resource);
     }
 
     public getGlobalVariable(name: string): string
@@ -72,8 +82,10 @@ export class NodeContext
 
     private readonly _compiledClasses: Dictionary<string, PuppetASTClass>;
     private readonly _compiledFunctions: Dictionary<string, PuppetASTFunction>;
-    private readonly _compiledResources: Dictionary<string, Dictionary<string, ResolvedResource>>;
-    private readonly _hieraIncludes: Dictionary<string, number>;
+    private readonly _compiledDefinedTypes: Dictionary<string, PuppetASTDefinedType>;
+    private readonly _registeredResources: Dictionary<string, Dictionary<string, PuppetASTResource>>;
+    private readonly _hieraIncludes: Dictionary<string, [number, HieraSourceResolveCallback]>;
+    private readonly _hieraResources: Dictionary<string, [number, HieraSourceResolveCallback]>;
 
     constructor (certname: string, env: Environment)
     {
@@ -82,9 +94,11 @@ export class NodeContext
 
         this._facts = {};
         this._compiledClasses = new Dictionary();
-        this._compiledResources = new Dictionary();
+        this._compiledDefinedTypes = new Dictionary();
+        this._registeredResources = new Dictionary();
         this._compiledFunctions = new Dictionary();
         this._hieraIncludes = new Dictionary();
+        this._hieraResources = new Dictionary();
 
         this.ast = new PuppetASTEnvironment(env.name);
 
@@ -169,23 +183,22 @@ export class NodeContext
         await file.save();
     }
 
-    public async dumpClass(className: string): Promise<any>
+    public async dumpClass(className: string): Promise<ClassDump>
     {
         const classInfo = this.env.findClassInfo(className);
 
         if (classInfo == null)
-            return {};
+            return null;
 
         const compiled = await this.acquireClass(className, true);
 
-        const defaultValues: any = {};
         const types: any = {};
         const errors: any = {};
         const hints: any = {};
         const fields: string[] = [];
-        const definedFields: string[] = [];
         const requiredFields: string[] = [];
         const values: any = {};
+        const modified: any = {};
         const classHints: any = compiled.hints;
 
         for (const name of compiled.resolvedFields.getKeys())
@@ -208,7 +221,7 @@ export class NodeContext
 
             if (property.hasValue)
             {
-                defaultValues[name] = property.value;
+                values[name] = property.value;
             }
 
             if (property.hasError)
@@ -224,71 +237,70 @@ export class NodeContext
                 hints[name] = property.hints;
             }
 
-            const propertyPath = this.compilePropertyPath(className, name);
-
-            const hierarchy = this.hasGlobal(propertyPath);
-            if (hierarchy != GlobalVariableResolverResults.MISSING)
-            {
-                const configValue: [any, number] = [this.getGlobal(propertyPath), hierarchy];
-                values[name] = configValue;
-                definedFields.push(name);
-            }
+            modified[name] = property.hierarchy;
         }
 
         return {
             "icon": classInfo.options.icon,
             "values": values,
             "classInfo": classInfo.dump(),
-            "defaults": defaultValues,
+            "modified": modified,
             "types": types,
             "errors": errors,
             "propertyHints": hints,
             "hints": classHints,
-            "definedFields": definedFields,
             "fields": fields,
             "requiredFields": requiredFields,
             "hierarchy": this.hierarchy.dump()
         }
     }
     
-    /*
-    public async dumpResource(definedTypeName: string, title: string): Promise<any>
+    public registerResource(resource: PuppetASTResource): void
     {
-        const classInfo = this._env.findDefineTypeInfo(definedTypeName);
+        const definedTypeName = resource.definedType.name;
 
-        if (classInfo == null)
-            return {};
+        let titles = this._registeredResources.get(definedTypeName);
+        if (titles == null)
+        {
+            titles = new Dictionary();
+            this._registeredResources.put(definedTypeName, titles);
+        }
 
-        const compiled: ResolvedResource = await this.acquireResource(definedTypeName, title);
+        titles.put(resource.getTitle(), resource);
+    }
+    
+    public async dumpResource(definedTypeName: string, title: string): Promise<ResourceDump>
+    {
+        const definedTypeInfo = this.env.findDefineTypeInfo(definedTypeName);
+
+        if (definedTypeInfo == null)
+            return null;
+            
+        if (!this._registeredResources.has(definedTypeName))
+            return null;
+           
+        const titles = this._registeredResources.get(definedTypeName);
+
+        if (!titles.has(title))
+            return null;
+        
+        const compiled = titles.get(title);
 
         const defaultValues: any = {};
         const types: any = {};
         const fields: string[] = [];
-        const definedFields: string[] = [];
+        const modified: any = {};
         const requiredFields: string[] = [];
         const errors: any = {};
         const hints: any = {};
         const values: any = {};
+        const options: any = {};
 
-        if (this.configResources[definedTypeName] != null)
+        for (const name of compiled.resolvedFields.getKeys())
         {
-            const t = this.configResources[definedTypeName][title];
+            const property = compiled.resolvedFields.get(name);
 
-            if (t != null)
-            {
-                for (const k in t)
-                {
-                    values[k] = t[k];
-                    definedFields.push(k);
-                }
-            }
-        }
-
-        for (const name of compiled.resource.resolvedFields.getKeys())
-        {
-            const property = compiled.resource.resolvedFields.get(name);
-
-            if (classInfo.defaults.indexOf(name) < 0)
+            if (definedTypeInfo.defaults.indexOf(name) < 0)
             {
                 requiredFields.push(name);
             }
@@ -309,6 +321,11 @@ export class NodeContext
                 };
             }
 
+            if (property.hasValue)
+            {
+                values[name] = property.value;
+            };
+
             if (property.hasHints)
             {
                 hints[name] = property.hints;
@@ -319,23 +336,96 @@ export class NodeContext
                 defaultValues[name] = property.value;
             }
 
+            modified[name] = property.hierarchy;
             fields.push(name);
+        }
+
+        for (const option of compiled.options)
+        {
+            options[option] = compiled.getOption(option);
         }
         
         return {
-            "icon": classInfo.options.icon,
+            "icon": definedTypeInfo.options.icon,
             "values": values,
-            "classInfo": classInfo.dump(),
-            "defaults": defaultValues,
+            "definedTypeInfo": definedTypeInfo.dump(),
             "types": types,
             "errors": errors,
+            "options": options,
+            "hierarchyLevel": compiled.hierarchy,
             "propertyHints": hints,
-            "definedFields": definedFields,
             "fields": fields,
-            "requiredFields": requiredFields
+            "modified": modified,
+            "hints": hints,
+            "requiredFields": requiredFields,
+            "hierarchy": this.hierarchy.dump()
         }
     }
-    */
+
+    public async setResourceProperty(definedTypeName: string, title: string, 
+        hierarchy: number, key: string, propertyName: string, value: any): Promise<any>
+    {
+        if (propertyName == "title")
+            return;
+
+        const hierarchyEntry = this.hierarchy.get(hierarchy);
+        if (hierarchyEntry == null)
+            return;
+
+        let file = hierarchyEntry.file;
+        if (file == null)
+        {
+            file = await hierarchyEntry.create(this.env, this._hierarchy.source);
+        }
+
+        let config = file.config[key];
+        if (config == null)
+        {
+            config = {};
+            file.config[key] = config;
+        }
+
+        const d = config[definedTypeName];
+
+        if (d[title] == null)
+            d[title] = {};
+
+        const t = d[title];
+
+        t[propertyName] = value;
+
+        await file.save();
+        await this.invalidateResources(key);
+    }
+    
+    public async removeResourceProperty(definedTypeName: string, title: string, 
+        hierarchy: number, key: string, propertyName: string): Promise<any>
+    {
+        const hierarchyEntry = this.hierarchy.get(hierarchy);
+        if (hierarchyEntry == null)
+            return;
+
+        const file = hierarchyEntry.file;
+        if (file == null)
+            return;
+
+        const config = file.config[key];
+        if (config == null)
+            return;
+        
+        const d = config[definedTypeName];
+        if (d == null)
+            return;
+
+        const t = d[title];
+        if (t == null)
+            return;
+
+        delete t[propertyName];
+
+        await file.save();
+        await this.invalidateResources(key);
+    }
 
     public async setProperty(hierarchy: number, property: string, value: any): Promise<any>
     {
@@ -391,22 +481,24 @@ export class NodeContext
         }
     }
     
-    public async invalidateDefinedType(definedTypeName: string, title: string): Promise<void>
+    public async invalidateResources(hieraResourceName: string): Promise<void>
     {
-        if (this._compiledResources.has(definedTypeName))
-        {
-            const titles = this._compiledResources.get(definedTypeName);
+        const resouces = this._hieraResources.get(hieraResourceName);
 
-            titles.remove(title);
-        }
+        if (resouces == null)
+            return;
+
+        const [hierarchy, resolve] = resouces;
+
+        // resolve again
+        resouces[0] = await resolve();
     }
     
-    public async isDefinedTypeValid(definedTypeName: string, title: string): Promise<boolean>
+    public async isResourceValid(definedTypeName: string, title: string): Promise<boolean>
     {
-        if (this._compiledResources.has(definedTypeName))
+        if (this._registeredResources.has(definedTypeName))
         {
-            const titles = this._compiledResources.get(definedTypeName);
-
+            const titles = this._registeredResources.get(definedTypeName);
             return titles.has(title);
         }
 
@@ -416,12 +508,13 @@ export class NodeContext
     public async invalidate(): Promise<void>
     {
         this._compiledClasses.clear();
-        this._compiledResources.clear();
+        this._compiledDefinedTypes.clear();
     }
 
-    public async dump(): Promise<any>
+    public async dump(): Promise<NodeDump>
     {
-        const classes: any = {};
+        const classes: { [key:string]: ClassInfoDump } = {};
+        const resources: { [key:string]: NodeDefinedTypeDump } = {};
         const hierarchy = [];
 
         for (const clazz of this._compiledClasses.getValues())
@@ -445,15 +538,67 @@ export class NodeContext
             classes[clazz.name] = dump;
         }
 
+        for (const definedTypeName of this._registeredResources.getKeys())
+        {
+            const definedTypeInfo = this.env.findDefineTypeInfo(definedTypeName);
+
+            if (definedTypeInfo == null)
+                continue;
+
+            const dump = definedTypeInfo.dump();
+            const titles: any = {};
+
+            const res: NodeDefinedTypeDump = {
+                definedType: dump,
+                titles: titles
+            };
+
+            resources[definedTypeName] = res;
+
+            const titles_ = this._registeredResources.get(definedTypeName);
+            for (const title of titles_.getKeys())
+            {
+                const resource = titles_.get(title);
+
+                const options: any = {};
+
+                for (const key of resource.options)
+                {
+                    options[key] = resource.getOption(key);
+                }
+
+                titles[title] = {
+                    "options": options
+                };
+            }
+        }
+
         for (const entry of this._hierarchy.hierarhy)
         {
             hierarchy.push(entry.dump());
         }
 
+        const hiera_includes: {[key: string]: number} = {};
+        const hiera_resources: {[key: string]: number} = {};
+
+        for (const key of this._hieraIncludes.getKeys())
+        {
+            const [hierarchy, resolve] = this._hieraIncludes.get(key);
+            hiera_includes[key] = hierarchy;
+        }
+
+        for (const key of this._hieraResources.getKeys())
+        {
+            const [hierarchy, resolve] = this._hieraResources.get(key);
+            hiera_resources[key] = hierarchy;
+        }
+
         return {
-            "classes": classes,
-            "hierarchy": hierarchy,
-            "hiera_includes": this._hieraIncludes.dump()
+            classes: classes,
+            resources: resources,
+            hierarchy: hierarchy,
+            hiera_includes: hiera_includes,
+            hiera_resources: hiera_resources
         };
     }
 
@@ -496,8 +641,8 @@ export class NodeContext
         classes.push(className);
         await file.save();
     }
-
-    public async removeClass(key: string, className: string, hierarchy: number): Promise<void>
+    
+    public async createResource(key: string, hierarchy: number, definedTypeName: string, title: string): Promise<boolean>
     {
         const entry = this.hierarchy.get(hierarchy);
 
@@ -508,11 +653,38 @@ export class NodeContext
             file = await entry.create(this.env, this.hierarchy.source);
         }
 
+        let resources = file.config[key];
+        if (resources == null)
+        {
+            resources = {};
+            file.config[key] = resources;
+        }
+
+        let definedType = resources[definedTypeName];
+        if (definedType == null)
+        {
+            definedType = {}
+            resources[definedTypeName] = definedType;
+        }
+
+        definedType[title] = {};
+
+        await file.save();
+
+        return true;
+    }
+
+    public async removeClass(key: string, className: string, hierarchy: number): Promise<void>
+    {
+        const entry = this.hierarchy.get(hierarchy);
+
+        let file = entry.file;
+        if (file == null)
+            return;
+
         let classes = file.config[key];
         if (classes == null)
-        {
             return;
-        }
 
         const index = classes.indexOf(className);
         if (index < 0)
@@ -520,6 +692,97 @@ export class NodeContext
 
         classes.splice(index, 1);
         await file.save();
+    }
+
+    public async removeResource(key: string, hierarchy: number, definedTypeName: string, title: string): Promise<boolean>
+    {
+        const entry = this.hierarchy.get(hierarchy);
+
+        let file = entry.file;
+        if (file == null)
+            return false;
+
+        const resources = file.config[key];
+        if (resources == null)
+            return false;
+
+        const definedType = resources[definedTypeName];
+        if (definedType == null)
+            return false;
+
+        if (!definedType.hasOwnProperty(title))
+            return false;
+
+        delete definedType[title];
+
+        await file.save();
+        return true;
+    }
+
+    public async removeResources(key: string, hierarchy: number, definedTypeName: string): Promise<boolean>
+    {
+        const entry = this.hierarchy.get(hierarchy);
+
+        let file = entry.file;
+        if (file == null)
+            return false;
+
+        const resources = file.config[key];
+        if (resources == null)
+            return false;
+
+        if (!resources.hasOwnProperty(definedTypeName))
+            return false;
+            
+        delete resources[definedTypeName];
+
+        await file.save();
+        return true;
+    }
+
+    public async removeAllResources(key: string, hierarchy: number)
+    {
+        const entry = this.hierarchy.get(hierarchy);
+
+        let file = entry.file;
+        if (file == null)
+            return false;
+
+        const resources = file.config[key];
+        if (resources == null)
+            return false;
+
+        delete file.config[key];
+
+        await file.save();
+        return true;
+    }
+
+    public async renameResource(key: string, hierarchy: number, definedTypeName: string, title: string, newTitle: string)
+    {
+        const entry = this.hierarchy.get(hierarchy);
+
+        let file = entry.file;
+        if (file == null)
+            return false;
+
+        const resources = file.config[key];
+        if (resources == null)
+            return false;
+
+        const definedType = resources[definedTypeName];
+        if (definedType == null)
+            return false;
+
+        if (!definedType.hasOwnProperty(title))
+            return false;
+
+        const moveTo = definedType[title];
+        delete definedType[title];
+        definedType[newTitle] = moveTo;
+
+        await file.save();
+        return true;
     }
 
     /*
@@ -608,13 +871,20 @@ export class NodeContext
         return null;
     }
     
-    public registerHieraSource(kind: string, key: string, hierarchy: number): void
+    public async registerHieraSource(kind: string, key: string, resolve: HieraSourceResolveCallback): Promise<void>
     {
+        const hierarchy = await resolve();
+
         switch (kind)
         {
             case "hiera_include":
             {
-                this._hieraIncludes.put(key, hierarchy);
+                this._hieraIncludes.put(key, [hierarchy, resolve]);
+                break;
+            }
+            case "hiera_resources":
+            {
+                this._hieraResources.put(key, [hierarchy, resolve]);
                 break;
             }
         }
@@ -635,7 +905,7 @@ export class NodeContext
         className = Node.fixClassName(className);
         return this._compiledClasses.has(className);
     }
-    
+
     public async resolveClass(className: string, global: GlobalVariableResolver, public_: boolean): Promise<PuppetASTClass>
     {
         className = Node.fixClassName(className);
@@ -737,24 +1007,29 @@ export class NodeContext
         return function_;
     }
 
-    public async resolveResource(definedTypeName: string, title: string, properties: any, global: GlobalVariableResolver): Promise<ResolvedResource>
+    public async resolveDefinedType(definedTypeName: string, global: GlobalVariableResolver, public_: boolean): Promise<PuppetASTDefinedType>
     {
-        if (this._compiledResources.has(definedTypeName))
+        if (this._compiledDefinedTypes.has(definedTypeName))
         {
-            const titles = this._compiledResources.get(definedTypeName);
+            const compiled = this._compiledDefinedTypes.get(definedTypeName);
 
-            if (titles.has(title))
+            if (public_)
             {
-                return titles.get(title);
+                compiled.markPublic();
             }
+
+            return compiled;
         }
 
-        console.log("Compiling resource " + definedTypeName + " (with title " + title + " for environment " + this.name + ")");
+        console.log("Compiling resource " + definedTypeName + " (for environment " + this.name + ")");
 
         const definedTypeInfo = this.env.findDefineTypeInfo(definedTypeName);
 
         if (definedTypeInfo == null)
-            throw new CompilationError("No such defined type info: " + definedTypeName);
+        {
+            console.log("Cannot resolve defined type: " + definedTypeName + " (not exists)")
+            return;
+        }
 
         const compiledPath = definedTypeInfo.modulesInfo.getCompiledClassPath(definedTypeInfo.file);
         let parsedJSON = null;
@@ -775,31 +1050,14 @@ export class NodeContext
 
         const definedType: PuppetASTDefinedType = obj;
 
-        let resource: PuppetASTResolvedDefinedType;
-        try
+        if (public_)
         {
-            resource = await definedType.resolveAsResource(title, properties, new NodeContextResolver(this, global));
-        }
-        catch (e)
-        {
-            console.log(e);
-            throw new CompilationError("Failed to compile class: " + e);
-        }
-        
-        let titles = this._compiledResources.get(definedTypeName);
-        if (titles == null)
-        {
-            titles = new Dictionary();
-            this._compiledResources.put(definedTypeName, titles);
+            definedType.markPublic();
         }
 
-        const resolved = new ResolvedResource();
+        this._compiledDefinedTypes.put(definedTypeName, definedType);
 
-        resolved.definedType = definedType;
-        resolved.resource = resource;
-
-        titles.put(title, resolved);
-        return resolved;
+        return definedType;
     }
     
     public async resolveManifests(global: GlobalVariableResolver): Promise<void>

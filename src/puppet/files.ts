@@ -4,8 +4,6 @@ import * as async from "../async";
 
 import { Environment } from "./environment"
 import { Dictionary } from "../dictionary";
-import { PuppetASTParser, PuppetASTClass, PuppetASTDefinedType, PuppetASTFunction, PuppetASTResolvedDefinedType, Resolver } from "../puppet/ast";
-import { ResolvedResource, GlobalVariableResolver, CompilationError } from "./util"
 
 const slash = require('slash');
 

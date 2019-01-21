@@ -1,7 +1,7 @@
 import { IPC } from "../../../ipc/client";
-import {WorkspaceTab} from "./tab";
-import {WorkspaceRenderer} from "../renderer";
-import { dialog } from "electron";
+import { WorkspaceTab } from "./tab";
+import { WorkspaceRenderer } from "../renderer";
+import { ClassDump, HierarchyEntryDump } from "../../../ipc/objects"
 import { isNumber, isObject, isBoolean } from "util";
 
 const ipc = IPC();
@@ -22,12 +22,12 @@ type PropertyChangedCallback = (value: any) => void;
 
 interface PropertyRenderer
 {
-    render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty;
+    render(group: any, propertyId: string, value: any, changed: PropertyChangedCallback): RenderedProperty;
 }
 
 class StringPropertyRenderer implements PropertyRenderer
 {
-    public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    public render(group: any, propertyId: string, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
         const zis = this;
 
@@ -39,9 +39,9 @@ class StringPropertyRenderer implements PropertyRenderer
                 changed($(this).val());
             });
 
-        if (defaultValue)
+        if (value)
         {
-            $(textField).attr('placeholder', defaultValue);
+            $(textField).attr('placeholder', value);
         }
 
         return {
@@ -63,7 +63,7 @@ class StringPropertyRenderer implements PropertyRenderer
 
 class HashPropertyRenderer implements PropertyRenderer
 {
-    public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    public render(group: any, propertyId: string, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
         const zis = this;
 
@@ -110,7 +110,7 @@ class EnumPropertyRenderer implements PropertyRenderer
         this.values = values;
     }
 
-    public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    public render(group: any, propertyId: string, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
         const zis = this;
 
@@ -159,7 +159,7 @@ class NumberPropertyRenderer implements PropertyRenderer
         return true;
     }  
 
-    public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    public render(group: any, propertyId: string, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
         const zis = this;
 
@@ -172,9 +172,9 @@ class NumberPropertyRenderer implements PropertyRenderer
                 changed(parseInt($(this).val()));
             });
 
-        if (defaultValue != null)
+        if (value != null)
         {
-            $(textField).attr('placeholder', defaultValue);
+            $(textField).attr('placeholder', value);
         }
 
         return {
@@ -196,7 +196,7 @@ class NumberPropertyRenderer implements PropertyRenderer
 
 class BooleanPropertyRenderer implements PropertyRenderer
 {
-    public render(group: any, propertyId: string, defaultValue: any, value: any, changed: PropertyChangedCallback): RenderedProperty
+    public render(group: any, propertyId: string, value: any, changed: PropertyChangedCallback): RenderedProperty
     {
         const zis = this;
 
@@ -230,7 +230,8 @@ class BooleanPropertyRenderer implements PropertyRenderer
 
 export class NodeClassTab extends WorkspaceTab
 {
-    protected info: any;
+    private info: ClassDump;
+
     protected environment: string;
     protected certname: string;
     protected className: string;
@@ -259,15 +260,16 @@ export class NodeClassTab extends WorkspaceTab
         this.environment = this.path[0];
         this.certname = this.path[1];
         this.className = this.path[2];
-        this.info = await this.acquireInfo();
+
+        await this.acquireInfo();
     }
 
-    protected async acquireInfo(): Promise<any>
+    protected async acquireInfo()
     {
-        return await ipc.acquireNodeClass(this.environment, this.certname, this.className);
+        this.info = await ipc.acquireNodeClass(this.environment, this.certname, this.className);
     }
 
-    public get hierarchy(): any[]
+    public get hierarchy(): HierarchyEntryDump[]
     {
         return this.info.hierarchy;
     }
@@ -389,11 +391,65 @@ export class NodeClassTab extends WorkspaceTab
         return "This object does not seem to be recognized, because of compilation issues."
     }
 
-    public render(): any
+    protected renderHierarchySelector()
     {
         const zis = this;
 
-        if (this.info.classInfo == null)
+        const data: any[] = [];
+        let _id = 0;
+
+        for (const hierarchyEntry of this.hierarchy)
+        {
+            let title = "";
+            if (hierarchyEntry.name != null)
+            {
+                title += hierarchyEntry.name;
+            }
+            title += hierarchyEntry.path;
+            data.push({
+                "id": _id,
+                "text": title
+            });
+
+            _id++;
+        }
+
+        const pad = $('<div class="container-grayed d-flex flex-row"></div>').appendTo(this.contentNode);
+
+        const title = $('<span class="text-muted" style="padding: 6px 10px 6px 10px;"></span>').appendTo(pad);
+        $('<i class="fas fa-project-diagram" title="This selector affects at what level of hierarchy the edits are made" ' +
+            'data-toggle="tooltip" data-placement="bottom"></i>').tooltip().appendTo(title);
+
+        function format(entry: any) 
+        {
+            if (!entry.id) 
+            {
+                return entry.text;
+            }
+            const _id = parseInt(entry.id);
+            return $('<span class="modified-' + (_id % 12) + '"><i class="fas fa-stop"></i> ' + entry.text + '</span>');
+        }
+        
+        const hierarchySelector = $('<select class="workspace-selector"></select>').appendTo(pad).select2({
+            "width": "100%",
+            "data": data,
+            "templateSelection": format,
+            "templateResult": format
+        });
+
+        hierarchySelector.val(zis.hierarchyLevel).trigger("change");
+
+        hierarchySelector.on("change", () => 
+        {
+            zis.hierarchyLevel = parseInt(hierarchySelector.val());
+            // wtf electron
+            setTimeout(() => zis.refresh(), 1);
+        })
+    }
+
+    public render(): any
+    {
+        if (this.classInfo() == null)
         {
             const pad = $('<div class="container-w-padding"></div>').appendTo(this.contentNode);
             $('<div class="alert alert-danger" role="alert" style="margin-bottom: 0;"></div>').appendTo(pad).html(this.noClassInfoText());
@@ -409,58 +465,7 @@ export class NodeClassTab extends WorkspaceTab
             }
         }
 
-        {
-            const data: any[] = [];
-            let _id = 0;
-
-            for (const hierarchyEntry of this.hierarchy)
-            {
-                let title = "";
-                if (hierarchyEntry.name != null)
-                {
-                    title += hierarchyEntry.name;
-                }
-                title += hierarchyEntry.path;
-                data.push({
-                    "id": _id,
-                    "text": title
-                });
-
-                _id++;
-            }
-
-            const pad = $('<div class="container-grayed d-flex flex-row"></div>').appendTo(this.contentNode);
-
-            const title = $('<span class="text-muted" style="padding: 6px 10px 6px 10px;"></span>').appendTo(pad);
-            $('<i class="fas fa-project-diagram" title="This selector affects at what level of hierarchy the edits are made" ' +
-                'data-toggle="tooltip" data-placement="bottom"></i>').tooltip().appendTo(title);
-
-            function format(entry: any) 
-            {
-                if (!entry.id) 
-                {
-                    return entry.text;
-                }
-                const _id = parseInt(entry.id);
-                return $('<span class="modified-' + (_id % 12) + '"><i class="fas fa-stop"></i> ' + entry.text + '</span>');
-            }
-            
-            const hierarchySelector = $('<select class="workspace-selector"></select>').appendTo(pad).select2({
-                "width": "100%",
-                "data": data,
-                "templateSelection": format,
-                "templateResult": format
-            });
-
-            hierarchySelector.val(zis.hierarchyLevel).trigger("change");
-
-            hierarchySelector.on("change", () => 
-            {
-                zis.hierarchyLevel = parseInt(hierarchySelector.val());
-                // wtf electron
-                setTimeout(() => zis.refresh(), 1);
-            })
-        }
+        this.renderHierarchySelector();
 
         const editorHolder = $('<div class="w-100 node-class-properties"></div>').appendTo(this.contentNode);
         this.renderProperties(editorHolder);
@@ -517,10 +522,8 @@ export class NodeClassTab extends WorkspaceTab
             return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
         });
 
-        const defaultValue = this.getDefaultValue(propertyName);
-        const r_ = this.getPropertyValue(propertyName);
-        const value = r_[0] || defaultValue;
-        const hierarchy = r_[1];
+        const modifiedHierarchy = this.isValueModified(propertyName);
+        const value = this.getPropertyValue(propertyName);
 
         const label = $('<span class="text-small"></span>').appendTo(node);
         
@@ -541,12 +544,12 @@ export class NodeClassTab extends WorkspaceTab
         }
 
         // show the modified marker is the class if there is any value to it (including null)
-        if (this.hadDefinedPropertyOriginally(propertyName) && hierarchy >= 0)
+        if (modifiedHierarchy >= 0)
         {
             modified.show();
 
-            $(label).addClass("modified").addClass("modified-" + hierarchy);
-            $(node).addClass("modified").addClass("modified-" + hierarchy);
+            $(label).addClass("modified").addClass("modified-" + modifiedHierarchy);
+            $(node).addClass("modified").addClass("modified-" + modifiedHierarchy);
         }
 
         const group = $('<div class="input-group"></div>').appendTo(node);
@@ -565,7 +568,7 @@ export class NodeClassTab extends WorkspaceTab
         }
 
         const renderedProperty = this.renderedProperties[propertyName] = 
-            renderer.render(group, propertyId, defaultValue, value, async function(value: any)
+            renderer.render(group, propertyId, value, async function(value: any)
         {
             await zis.setProperty(propertyName, value);
             await zis.refresh();
@@ -573,7 +576,7 @@ export class NodeClassTab extends WorkspaceTab
         
         modified.click(async () => {
             modified.tooltip('hide');
-            await zis.removeProperty(propertyName, hierarchy);
+            await zis.removeProperty(propertyName, modifiedHierarchy);
             await zis.refresh();
         }).tooltip();
         
@@ -676,11 +679,6 @@ export class NodeClassTab extends WorkspaceTab
         return this.info.fields;
     }
 
-    public get defaults(): any
-    {
-        return this.info.defaults;
-    }
-
     public get values(): any
     {
         return this.info.values;
@@ -696,19 +694,14 @@ export class NodeClassTab extends WorkspaceTab
         return this.info.types[propertyName];
     }
 
-    protected getPropertyValue(propertyName: string): [any, number]
+    protected getPropertyValue(propertyName: string): any
     {
-        return this.values[propertyName] || [null, -1];
+        return this.values[propertyName];
     }
 
-    protected getDefaultValue(propertyName: string): any
+    protected isValueModified(propertyName: string): number
     {
-        return this.defaults[propertyName];
-    }
-
-    protected hasDefaultValue(propertyName: string): boolean
-    {
-        return this.defaults.hasOwnProperty(propertyName);
+        return this.info.modified[propertyName];
     }
 
     protected isFieldRequired(propertyName: string): boolean
@@ -733,11 +726,6 @@ export class NodeClassTab extends WorkspaceTab
         await ipc.removeNodeClassProperty(this.environment, this.certname, 
             hierarchyLevel, this.className, propertyName);
         await ipc.invalidateNodeClass(this.environment, this.certname, this.className);
-    }
-
-    protected hadDefinedPropertyOriginally(propertyName: string): boolean
-    {
-        return this.info.definedFields.indexOf(propertyName) >= 0;
     }
 
     public getIcon(): any

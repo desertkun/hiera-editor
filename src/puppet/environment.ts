@@ -16,6 +16,7 @@ import { Folder } from "./files";
 import { PuppetHTTP } from "./http"
 import { isArray } from "util";
 import { WorkspaceSettings } from "./workspace_settings";
+import { EnvironmentTreeDump, NodeDump } from "../ipc/objects"
 
 const PromisePool = require('es6-promise-pool');
 
@@ -207,9 +208,9 @@ export class Environment
             await async.createDirectory(this.manifestsPath);
     }
 
-    public async tree(): Promise<any>
+    public async tree(): Promise<EnvironmentTreeDump>
     {
-        const nodes: any = {};
+        const nodes: {[key: string]: NodeDump} = {};
 
         for (const certname of this._nodes.getKeys())
         {

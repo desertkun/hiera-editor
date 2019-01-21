@@ -16,6 +16,7 @@ import { IpcAPI } from "./api"
 import { WorkspaceSettings } from "../puppet/workspace_settings";
 import { Ruby } from "../puppet/ruby";
 import { WorkspaceError } from "../puppet/util";
+import { ClassDump, ResourceDump, EnvironmentTreeDump } from "./objects";
 
 export class IpcServer implements IpcAPI
 {
@@ -100,7 +101,7 @@ export class IpcServer implements IpcAPI
         return names;    
     }
 
-    public async getEnvironmentTree(name: string): Promise<any> 
+    public async getEnvironmentTree(name: string): Promise<EnvironmentTreeDump> 
     {
         const workspace: Workspace = getCurrentWorkspace();
 
@@ -138,38 +139,38 @@ export class IpcServer implements IpcAPI
         return node.dump();
     }
 
-    public async acquireNodeClass(environment: string, certname: string, className: string): Promise<any> 
+    public async acquireNodeClass(environment: string, certname: string, className: string): Promise<ClassDump> 
     {
         const workspace: Workspace = getCurrentWorkspace();
         if (workspace == null)
-            return false;
+            return null;
 
         const env = await workspace.getEnvironment(environment);
         if (env == null)
-            return false;
+            return null;
 
         const node = env.getNode(certname);    
         if (node == null)
-            return;
+            return null;
             
         return await node.dumpClass(className);
     }
     
-    public async acquireNodeResource(environment: string, certname: string, definedTypeName: string, title: string): Promise<any>
+    public async acquireNodeResource(environment: string, certname: string, definedTypeName: string, title: string): Promise<ResourceDump>
     {
         const workspace: Workspace = getCurrentWorkspace();
         if (workspace == null)
-            return false;
+            return null;
 
         const env = await workspace.getEnvironment(environment);
         if (env == null)
-            return false;
+            return null;
 
         const node = env.getNode(certname);    
         if (node == null)
-            return;
+            return null;
             
-        return {};//await node.dumpResource(definedTypeName, title);
+        return await node.dumpResource(definedTypeName, title);
     }
 
     public async setNodeProperty(environment: string, certname: string, 
@@ -265,7 +266,7 @@ export class IpcServer implements IpcAPI
     }
 
     public async setNodeResourceProperty(environment: string, certname: string, 
-        hierarchy: number, definedTypeName: string, 
+        hierarchy: number, key: string, definedTypeName: string, 
         title: string, propertyName: string, value: any): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
@@ -280,12 +281,12 @@ export class IpcServer implements IpcAPI
         if (node == null)
             return false;
     
-        //return await node.setResourceProperty(definedTypeName, title, hierarchy, propertyName, value);
+        return await node.setResourceProperty(definedTypeName, title, hierarchy, key, propertyName, value);
     }
 
     public async removeNodeResourceProperty(
         environment: string, certname: string, 
-        hierarchy: number, definedTypeName: string, 
+        hierarchy: number, key: string, definedTypeName: string, 
         title: string, propertyName: string): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
@@ -300,7 +301,7 @@ export class IpcServer implements IpcAPI
         if (node == null)
             return false;
     
-        //return await node.removeResourceProperty(definedTypeName, title, hierarchy, propertyName);
+        return await node.removeResourceProperty(definedTypeName, title, hierarchy, key, propertyName);
     }
 
     public async removeNodeClassProperties(environment: string, certname: string, className: string): Promise<any>
@@ -469,7 +470,7 @@ export class IpcServer implements IpcAPI
     }
 
     public async createNewResourceToNode(environment: string, certname: string, 
-        definedTypeName: string, title: string): Promise<boolean>
+        key: string, hierarchy: number, definedTypeName: string, title: string): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
         if (workspace == null)
@@ -483,10 +484,11 @@ export class IpcServer implements IpcAPI
         if (node == null)
             return false;
     
-        return false;//await node.createResource(definedTypeName, title);
+        return await node.createResource(key, hierarchy, definedTypeName, title);
     }
     
-    public async removeHieraClassFromNode(environment: string, certname: string, key: string, hierarchy: number,  className: string): Promise<void>
+    public async removeHieraClassFromNode(environment: string, certname: string, 
+        key: string, hierarchy: number,  className: string): Promise<void>
     {
         const workspace: Workspace = getCurrentWorkspace();
         if (workspace == null)
@@ -503,7 +505,8 @@ export class IpcServer implements IpcAPI
         await node.removeClass(key, className, hierarchy);
     }
     
-    public async removeResourceFromNode(environment: string, certname: string, definedTypeName: string, title: string): Promise<void>
+    public async removeResourceFromNode(environment: string, certname: string, 
+        key: string, hierarchy: number, definedTypeName: string, title: string): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
         if (workspace == null)
@@ -517,27 +520,12 @@ export class IpcServer implements IpcAPI
         if (node == null)
             return;
 
-        //await node.removeResource(definedTypeName, title);
-    }
-
-    public async removeResourcesFromNode(environment: string, certname: string, definedTypeName: string): Promise<string[]>
-    {
-        const workspace: Workspace = getCurrentWorkspace();
-        if (workspace == null)
-            return;
-
-        const env = await workspace.getEnvironment(environment);
-        if (env == null)
-            return;
-
-        const node = env.getNode(certname);    
-        if (node == null)
-            return;
-
-        //return await node.removeResources(definedTypeName);
+        return await node.removeResource(key, hierarchy, definedTypeName, title);
     }
     
-    public async removeAllResourcesFromNode(environment: string, certname: string): Promise<any[]>
+
+    public async removeResourcesFromNode(environment: string, certname: string, 
+        key: string, hierarchy: number, definedTypeName: string): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
         if (workspace == null)
@@ -551,10 +539,29 @@ export class IpcServer implements IpcAPI
         if (node == null)
             return;
 
-        //return await node.removeAllResources();
+        return await node.removeResources(key, hierarchy, definedTypeName);
+    }
+    
+    public async removeAllResourcesFromNode(environment: string, certname: string, 
+        key: string, hierarchy: number): Promise<boolean>
+    {
+        const workspace: Workspace = getCurrentWorkspace();
+        if (workspace == null)
+            return;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return;
+
+        const node = env.getNode(certname);    
+        if (node == null)
+            return;
+
+        return await node.removeAllResources(key, hierarchy);
     }
 
     public async renameNodeResource(environment: string, certname: string, 
+        key: string, hierarchy: number,
         definedTypeName: string, title: string, newTitle: string): Promise<boolean>
     {
         const workspace: Workspace = getCurrentWorkspace();
@@ -569,7 +576,7 @@ export class IpcServer implements IpcAPI
         if (node == null)
             return false;
 
-        //return await node.renameResource(definedTypeName, title, newTitle);
+        return await node.renameResource(key, hierarchy, definedTypeName, title, newTitle);
     }
 
     public async removeHieraClasses(environment: string, certname: string, includeName: string): Promise<Array<string>>
@@ -673,23 +680,6 @@ export class IpcServer implements IpcAPI
             
         await node.invalidateClass(className);
     }
-
-    public async invalidateNodeResource(environment: string, certname: string, definedTypeName: string, title: string): Promise<void>
-    {
-        const workspace: Workspace = getCurrentWorkspace();
-        if (workspace == null)
-            return;
-
-        const env = await workspace.getEnvironment(environment);
-        if (env == null)
-            return;
-
-        const node = env.getNode(certname);    
-        if (node == null)
-            return;
-            
-        await node.invalidateDefinedType(definedTypeName, title);
-    }
     
     public async isNodeClassValid(environment: string, certname: string, className: string): Promise<boolean>
     {
@@ -722,7 +712,7 @@ export class IpcServer implements IpcAPI
         if (node == null)
             return false;
             
-        return await node.isDefinedTypeValid(definedTypeName, title);
+        return await node.isResourceValid(definedTypeName, title);
     }
     
     public async createFolder(path: string, name: string): Promise<boolean>

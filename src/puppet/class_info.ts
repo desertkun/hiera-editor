@@ -1,5 +1,6 @@
 
 import { PuppetModulesInfo } from "./modules_info"
+import { ClassInfoDump, DefiledTypeInfoDump } from "../ipc/objects"
 
 export class PuppetClassInfo
 {
@@ -88,7 +89,7 @@ export class PuppetClassInfo
         return this._modules;
     }
 
-    public dump()
+    public dump(): ClassInfoDump
     {
         return {
             "name": this.name,
@@ -189,7 +190,7 @@ export class PuppetDefinedTypeInfo
         return this.info["file"];
     }
 
-    public dump()
+    public dump(): DefiledTypeInfoDump
     {
         return {
             "name": this.name,

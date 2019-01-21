@@ -22,6 +22,7 @@ import {NodeResourceTab} from "./tabs/resource";
 import { ipcRenderer } from 'electron';
 
 import {TreeView, TreeViewNode} from "./treeview";
+import { NodeDump } from "../../ipc/objects";
 
 const dialogs = Dialogs();
 let renderer: WorkspaceRenderer;
@@ -51,11 +52,11 @@ class NodeItemRenderer
 {
     private certname: string;
     private env: EnvironmentTreeItemRenderer;
-    private info: any;
+    private info: NodeDump;
     private n_node: TreeViewNode;
     private n_parent: TreeViewNode;
 
-    constructor(n_parent: TreeViewNode, env: EnvironmentTreeItemRenderer, certname: string, info: any)
+    constructor(n_parent: TreeViewNode, env: EnvironmentTreeItemRenderer, certname: string, info: NodeDump)
     {
         this.certname = certname;
         this.env = env;
@@ -92,12 +93,12 @@ class NodeItemRenderer
             {
                 if (iconData != null)
                 {
-                    node.icon = $('<img class="node-entry-icon" src="' + iconData + 
+                    node.icon = $('<img class="node-entry-icon treeview-node-offset" src="' + iconData + 
                         '" style="width: 16px; height: 16px;">');
                 }
                 else
                 {
-                    node.icon = $('<i class="node-entry-icon fas fa-puzzle-piece"></i>');
+                    node.icon = $('<i class="node-entry-icon fas fa-puzzle-piece treeview-node-offset"></i>');
                 }
 
                 node.title = className;
@@ -129,11 +130,9 @@ class NodeItemRenderer
         return hadAny;
     }
     
-    /*
-    private renderResources(node: TreeViewNode, parentClassPath: string): boolean
+    private renderResources(node: TreeViewNode, hieraInclude: string, hierarchyLevel: number)
     {
         const zis = this;
-        let hadAny: boolean = false;
 
         const nodeResources = this.info.resources;
         const nodeResourcesNames = Object.keys(nodeResources);
@@ -141,7 +140,33 @@ class NodeItemRenderer
 
         for (const definedTypeName of nodeResourcesNames)
         {
-            const resourceTypeInfo = this.classInfo.types[definedTypeName];
+            const resourceType = this.info.resources[definedTypeName];
+
+            const resourceTypeInfo = resourceType.definedType;
+            if (resourceTypeInfo == null)
+                continue;
+
+            const resourceTitles = resourceType.titles;
+
+            const resourceTitleKeys = Object.keys(resourceTitles);
+            resourceTitleKeys.sort();
+
+            let haveAny = false;
+
+            for (const title of resourceTitleKeys)
+            {
+                const entry = resourceTitles[title];
+                const resourceInclude = entry.options != null ? entry.options["hiera_resources"] : null;
+                if (resourceInclude == hieraInclude)
+                {
+                    haveAny = true;
+                    break;
+                }
+            }
+                
+            if (!haveAny)
+                continue;
+
             const iconData = resourceTypeInfo != null && resourceTypeInfo.options != null ? resourceTypeInfo.options.icon : null;
 
             const resourceNode = node.addChild( 
@@ -149,17 +174,17 @@ class NodeItemRenderer
             {
                 if (iconData != null)
                 {
-                    node.icon = $('<img class="node-entry-icon" src="' + iconData + 
+                    node.icon = $('<img class="node-entry-icon treeview-node-offset" src="' + iconData + 
                         '" style="width: 16px; height: 16px;">');
                 }
                 else
                 {
-                    node.icon = $('<i class="node-entry-icon fas fa-puzzle-piece"></i>');
+                    node.icon = $('<i class="node-entry-icon fas fa-puzzle-piece treeview-node-offset"></i>');
                 }
 
                 node.title = definedTypeName;
                 node.leaf = false;
-            }, "resources-" + zis.localPath + "-" + definedTypeName, renderer.openNodes);
+            }, "resources-" + zis.env.name + "-" + zis.certname + "-" + definedTypeName, renderer.openNodes);
             
             resourceNode.contextMenu([
                 {
@@ -171,12 +196,14 @@ class NodeItemRenderer
                         if (newTitle == null)
                             return;
     
-                        if (!(await ipc.createNewResourceToNode(zis.localPath, definedTypeName, newTitle)))
+                        if (!(await ipc.createNewResourceToNode(zis.env.name, zis.certname, 
+                            hieraInclude, hierarchyLevel, definedTypeName, newTitle)))
                             return;
     
-                        await renderer.refresh();
-                        await renderer.closeTabKind("resource", 
-                            [zis.localPath, definedTypeName, newTitle]);
+                        await renderer.refreshWorkspace();
+                        await renderer.openTab("resource", 
+                            [zis.env.name, zis.certname, definedTypeName, newTitle]);
+                        
                     }
                 },
                 {
@@ -186,32 +213,36 @@ class NodeItemRenderer
                     label: "Remove All",
                     click: async () => 
                     {
-                        const names = await ipc.removeResourcesFromNode(zis.localPath, definedTypeName);
-                        await renderer.refresh();
-                        for (const name of names)
-                        {
-                            await renderer.closeTabKind("resource", [zis.localPath, definedTypeName, name]);
-                        }
+                        await ipc.removeResourcesFromNode(zis.env.name, zis.certname, 
+                            hieraInclude, hierarchyLevel, definedTypeName);
+
+                        await renderer.refreshWorkspace();
                     }
                 }
             ]);
             
-            const titles = nodeResources[definedTypeName];
-
-            for (const title of titles)
+            for (const title of resourceTitleKeys)
             {
+                const entry = resourceTitles[title];
+
+                const resourceInclude = entry.options != null ? entry.options["hiera_resources"] : null;
+                if (resourceInclude != hieraInclude)
+                {
+                    continue;
+                }
+    
                 const resourceNameNode = resourceNode.addChild( 
                     (node) => 
                 {
-                    node.icon = $('<i class="node-entry-icon far fa-clone"></i>');
+                    node.icon = $('<i class="node-entry-icon far fa-clone treeview-node-offset"></i>');
                     node.title = title;
                     node.selectable = true;
                     node.leaf = true;
                     node.onSelect = (node) => 
                     {
-                        renderer.openTab("resource", [zis.localPath, definedTypeName, title]);
+                        renderer.openTab("resource", [zis.env.name, zis.certname, definedTypeName, title]);
                     };
-                }, "resource-" + zis.localPath + "-" + definedTypeName + "-" + title, renderer.openNodes);
+                }, "resource-" + zis.env.name + "-" + zis.certname + "-" + definedTypeName + "-" + title, renderer.openNodes);
                 
                 resourceNameNode.contextMenu([
                     {
@@ -223,15 +254,11 @@ class NodeItemRenderer
                             if (newTitle == null || newTitle == title)
                                 return;
 
-                            if (!(await ipc.renameNodeResource(zis.localPath, definedTypeName, title, newTitle)))
+                            if (!(await ipc.renameNodeResource(zis.env.name, zis.certname, 
+                                hieraInclude, hierarchyLevel, definedTypeName, title, newTitle)))
                                 return;
 
-                            await renderer.refresh();
-                            
-                            if (await renderer.closeTabKind("resource", [zis.localPath, definedTypeName, title]))
-                            {
-                                await renderer.openTab("resource", [zis.localPath, definedTypeName, newTitle])
-                            }
+                            await renderer.refreshWorkspace();
                         }
                     },
                     {
@@ -241,20 +268,16 @@ class NodeItemRenderer
                         label: "Remove",
                         click: async () => 
                         {
-                            await ipc.removeResourceFromNode(zis.localPath, definedTypeName, title);
-                            await renderer.refresh();
-                            await renderer.closeTabKind("resource", [zis.localPath, definedTypeName, title]);
+                            await ipc.removeResourceFromNode(zis.env.name, zis.certname, 
+                                hieraInclude, hierarchyLevel, definedTypeName, title);
+                            await renderer.refreshWorkspace();
                         }
                     }
                 ]);
             }
-
-            hadAny = true;
         }
 
-        return hadAny;
     }
-    */
 
     private havePuppetDefinedClasses(): boolean
     {
@@ -285,39 +308,15 @@ class NodeItemRenderer
         this.n_node = this.n_parent.addChild( 
             (node) => 
         {
-            node.icon = $('<i class="fa fa-server"></i>');
+            node.icon = $('<i class="fa fa-server treeview-node-offset"></i>');
             node.title = zis.certname;
             node.selectable = false;
         }, "node-" + zis.env.name + "-" + zis.certname, renderer.openNodes);
 
+        /*
         this.n_node.contextMenu([
-            {
-                label: "Create New Resource",
-                click: () => {
-                    //
-                }
-            },
-            {
-                type: "separator"
-            },
-            {
-                label: "Remove",
-                click: async () => 
-                {
-                    /*
-                    if (!await confirm("Are you sure you would like to delete this node?"))
-                        return;
-                    
-                    if (!await ipc.removeNode(zis.localPath))
-                    {
-                        return;
-                    }
-                    */
-
-                    await renderer.refresh();
-                }
-            }
         ])
+        */
 
         const includeNames = Object.keys(this.info.hiera_includes);
         includeNames.sort();
@@ -327,10 +326,10 @@ class NodeItemRenderer
             const hierarchyLevel = this.info.hiera_includes[includeName];
 
             const nodeIcon = hierarchyLevel >= 0 ? '<span class="modified-' + 
-                (hierarchyLevel % 12) + '"><i class="fas fa-flask" style="margin-right: 4px"></i></span>' : 
-                '<i class="fas fa-flask" style="margin-right: 4px"></i>';
+                (hierarchyLevel % 12) + '"><i class="fas fa-flask treeview-node-offset"></i></span>' : 
+                '<i class="fas fa-flask treeview-node-offset"></i>';
             const nodeTitle = hierarchyLevel >= 0 ? '<span class="modified-' + 
-                (hierarchyLevel % 12) + '">Hiera [' + includeName + ']</span>' : 'Hiera [' + includeName + ']';
+                (hierarchyLevel % 12) + '">Hiera Classes [' + includeName + ']</span>' : 'Hiera Classes [' + includeName + ']';
 
             const n_classes = this.n_node.addChild( 
                 (node) => 
@@ -363,6 +362,19 @@ class NodeItemRenderer
                     label: "Assign New Class",
                     click: async () => 
                     {
+                        if (hierarchyLevel < 0)
+                        {
+                            const changed = await ipc.managePropertyHierarchy(zis.env.name, zis.certname, 
+                                includeName, "array");
+        
+                            if (changed)
+                            {
+                                await renderer.refreshWorkspace();
+                            }
+
+                            return;
+                        }
+
                         const className = await ipc.assignNewHieraClass(
                             zis.env.name, zis.certname, includeName, hierarchyLevel);
     
@@ -414,12 +426,133 @@ class NodeItemRenderer
             this.renderClasses(n_classes, includeName, hierarchyLevel);
         }
 
+        const recourceIncludeNames = Object.keys(this.info.hiera_resources);
+        recourceIncludeNames.sort();
+
+        if (recourceIncludeNames.length > 0)
+        {
+            for (const includeName of recourceIncludeNames)
+            {
+                const hierarchyLevel = this.info.hiera_resources[includeName];
+    
+                let hierarcyName_ = "";
+
+                if (hierarchyLevel >= 0)
+                {
+                    const hierarchy = zis.hierarchy[hierarchyLevel];
+    
+                    if (hierarchy.name)
+                    {
+                        hierarcyName_ += hierarchy.name + " ";
+                    }
+    
+                    hierarcyName_ += hierarchy.path;
+                }
+    
+                const hierarcyName = hierarcyName_;
+    
+                const nodeIcon = hierarchyLevel >= 0 ? '<span class="modified-' + 
+                    (hierarchyLevel % 12) + '"><i class="fas fa-clone treeview-node-offset"></i></span>' : 
+                    '<i class="fas fa-clone treeview-node-offset"></i>';
+                const nodeTitle = hierarchyLevel >= 0 ? '<span class="modified-' + 
+                    (hierarchyLevel % 12) + '">Hiera Resources [' + includeName + ']</span>' : 'Hiera Resources [' + includeName + ']';
+    
+                const n_resources = this.n_node.addChild( 
+                    (node) => 
+                {
+                    node.icon = $(nodeIcon);
+                    node.title = nodeTitle;
+                    node.emptyText = "Node has no resources";
+                    node.leaf = false;
+                    node.selectable = false;
+                }, "node-" + zis.env.name + "-" + zis.certname + "-resources", renderer.openNodes);
+                
+                const contextOptions: any[] = [
+                    {
+                        label: "Create New Resource",
+                        click: async () => 
+                        {
+                            if (hierarchyLevel < 0)
+                            {
+                                const changed = await ipc.managePropertyHierarchy(zis.env.name, zis.certname, 
+                                    includeName, "object");
+            
+                                if (changed)
+                                {
+                                    await renderer.refreshWorkspace();
+                                }
+
+                                return;
+                            }
+
+                            const definedTypeName = await ipc.chooseDefinedType(zis.env.name, zis.certname);
+                            if (!definedTypeName)
+                                return;
+        
+                            const newTitle = await prompt("Enter a title for new resource " + definedTypeName, "");
+        
+                            if (newTitle == null)
+                                return;
+        
+                            if (!(await ipc.createNewResourceToNode(zis.env.name, zis.certname, 
+                                includeName, hierarchyLevel, definedTypeName, newTitle)))
+                                return;
+        
+                            await renderer.refreshWorkspace();
+                            await renderer.openTab("resource", 
+                                [zis.env.name, zis.certname, definedTypeName, newTitle]);
+                        }
+                    },
+                    {
+                        label: "Manage Hierarchy",
+                        click: async () => 
+                        {
+                            const changed = await ipc.managePropertyHierarchy(zis.env.name, zis.certname, 
+                                includeName, "object");
+        
+                            if (changed)
+                            {
+                                await renderer.refreshWorkspace();
+                            }
+                        }
+                    },
+                    {
+                        type: "separator"
+                    },
+                    {
+                        label: "Remove All Resources",
+                        click: async () => 
+                        {
+                            if (!await confirm("This will completely destroy all resources defined in property \"" + includeName + 
+                                "\" on hierarchy level \"" + hierarcyName + "\". Are you sure?"))
+                                return;
+    
+                            await ipc.removeAllResourcesFromNode(zis.env.name, zis.certname, includeName, hierarchyLevel);
+                            await renderer.refreshWorkspace();               
+                        }
+                    }
+                ];
+
+                if (hierarchyLevel >= 0)
+                {
+                    contextOptions.splice(0, 0, {
+                        label: "Defined at: " + hierarcyName,
+                        enabled: false
+                    });
+                }
+
+                n_resources.contextMenu(contextOptions);
+
+                this.renderResources(n_resources, includeName, hierarchyLevel);
+            }
+        }
+
         if (this.havePuppetDefinedClasses())
         {
             const n_classes = this.n_node.addChild( 
                 (node) => 
             {
-                node.icon = $('<i class="ic ic-puppet"></i>');
+                node.icon = $('<i class="ic ic-puppet treeview-node-offset"></i>');
                 node.title = "Puppet Defined Classes";
                 node.emptyText = "Node has no classes";
                 node.leaf = false;
@@ -429,69 +562,12 @@ class NodeItemRenderer
             this.renderClasses(n_classes, null);
         }
 
-        /*
-        const n_resources = this.n_node.addChild( 
-            (node) => 
-        {
-            node.icon = $('<i class="far fa-clone"></i>');
-            node.title = "Resources";
-            node.emptyText = "Node has no resources";
-            node.leaf = false;
-            node.selectable = false;
-        }, "node-" + zis.env.name + "-" + zis.certname + "-resources", renderer.openNodes);
-        
-        n_resources.contextMenu([
-            
-            {
-                label: "Create New Resource",
-                click: async () => 
-                {
-                    const definedTypeName = await ipc.chooseDefinedType(zis.localPath);
-                    if (!definedTypeName)
-                        return;
-
-                    const newTitle = await prompt("Enter a title for new resource " + definedTypeName, "");
-
-                    if (newTitle == null)
-                        return;
-
-                    if (!(await ipc.createNewResourceToNode(zis.localPath, definedTypeName, newTitle)))
-                        return;
-
-                    await renderer.refresh();
-                    await renderer.closeTabKind("resource", 
-                        [zis.localPath, definedTypeName, newTitle]);
-                }
-            },
-            {
-                type: "separator"
-            },
-            {
-                label: "Remove All Resources",
-                click: async () => 
-                {
-                    const removed = await ipc.removeAllResourcesFromNode(zis.localPath);
-
-                    await renderer.refresh();
-
-                    for (const obj of removed)
-                    {
-                        await renderer.closeTabKind("resource", 
-                            [zis.localPath, obj[0], obj[1]]);
-                    }                   
-                }
-            }
-        ]);
-
-        //this.renderResources(n_resources, null);
-        
-        */
 
         /*
         const n_facts = this.n_node.addChild( 
             (node) => 
         {
-            node.icon = $('<i class="fas fa-bars"></i>');
+            node.icon = $('<i class="fas fa-bars treeview-node-offset"></i>');
             node.title = "Facts";
             node.leaf = true;
             node.selectable = true;
@@ -547,7 +623,7 @@ class EnvironmentTreeItemRenderer
             node.title = zis.name;
             node.bold = true;
             node.emptyText = "No nodes";
-            node.icon = $('<i class="ic ic-environment"/></i>');
+            node.icon = $('<i class="ic ic-environment treeview-node-offset"/></i>');
         }, "environment-" + this.name, renderer.openNodes);
         
         this.n_environment.contextMenu([
@@ -595,8 +671,8 @@ class EnvironmentTreeItemRenderer
     public async init()
     {
         const tree = await ipc.getEnvironmentTree(this.name);
-        const nodes = tree["nodes"] || {};
-        const warnings = tree["warnings"] || [];
+        const nodes = tree.nodes;
+        const warnings = tree.warnings;
 
         for (const certname in nodes)
         {
@@ -614,7 +690,7 @@ class EnvironmentTreeItemRenderer
             {
                 node.title = "Warnings (" + warnings.length + ")";
                 node.leaf = true;
-                node.icon = $('<i class="fas fa-exclamation-triangle text-warning"></i>');
+                node.icon = $('<i class="fas fa-exclamation-triangle text-warning treeview-node-offset"></i>');
             }, "environment-warnings-" + this.name, renderer.openNodes);
 
             warningsNode.click(() => 
@@ -663,7 +739,7 @@ class EnvironmentModulesRenderer
             node.title = zis.global ? "global" : zis.name;
             node.bold = true;
             node.emptyText = "No modules";
-            node.icon = $(zis.global ? '<i class="fas text-danger fa-sitemap"></i>' : '<i class="fas text-primary fa-sitemap"></i>');
+            node.icon = $(zis.global ? '<i class="fas text-danger fa-sitemap treeview-node-offset"></i>' : '<i class="fas text-primary fa-sitemap"></i>');
         }, this.global ? "modules" : ("modules-" + this.name), this.renderer.openNodes);
         
         this.n_modules.contextMenu([

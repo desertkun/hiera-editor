@@ -1,7 +1,12 @@
 
 import { PuppetASTObject, PuppetASTContainerContext, Resolver, 
-    ResolveError, PuppetASTReturn, PuppetASTAccess, PuppetASTClass, PuppetASTVariable} from "./ast";
-import { isArray } from "util";
+    ResolveError, PuppetASTReturn, PuppetASTResourcesDeclaration, PuppetASTVariable,
+    OrderedDictionary, 
+    PuppetASTValue,
+    PuppetASTPrimitive,
+    PuppetASTList, 
+    PuppetASTKeyedEntry} from "./ast";
+import { isArray, isObject } from "util";
 import { GlobalVariableResolverResults } from "./util"
 
 type BuiltinFunctionCallback = (caller: PuppetASTObject, 
@@ -60,36 +65,115 @@ const BuiltInFunctions: any = {
     {
         const key = args[0];
 
-        const hierarchy = resolver.hasGlobalVariable(key);
-
-        if (hierarchy == GlobalVariableResolverResults.MISSING)
+        const resolve = async (): Promise<number> =>
         {
-            return;
-        }
+            const hierarchy = resolver.hasGlobalVariable(key);
 
-        resolver.registerHieraSource("hiera_include", key, hierarchy);
-
-        const classes = resolver.getGlobalVariable(key);
-
-        if (isArray(classes))
-        {
-            for (const className of classes)
+            if (hierarchy == GlobalVariableResolverResults.MISSING)
             {
-                try
+                return hierarchy;
+            }
+
+            const classes = resolver.getGlobalVariable(key);
+
+            if (isArray(classes))
+            {
+                for (const className of classes)
                 {
-                    const resolved = await resolver.resolveClass(className, true);
-                    resolved.setOption("hiera_include", key);
-                }
-                catch (e)
-                {
-                    console.log("Failed to resolve class " + className + " from hiera_include('" + key + "'): " + e.toString());
+                    try
+                    {
+                        const resolved = await resolver.resolveClass(className, true);
+                        resolved.setOption("hiera_include", key);
+                    }
+                    catch (e)
+                    {
+                        console.log("Failed to resolve class " + className + " from hiera_include('" + key + "'): " + e.toString());
+                    }
                 }
             }
-        }
+
+            return hierarchy;
+        };
+
+        resolver.resolveHieraSource("hiera_include", key, resolve);
     },
     "hiera_resources": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
     {
-        // todo
+        const key = args[0];
+
+        const resolve = async (): Promise<number> => 
+        {
+            const hierarchy = resolver.hasGlobalVariable(key);
+    
+            if (hierarchy == GlobalVariableResolverResults.MISSING)
+            {
+                return hierarchy;
+            }
+
+            const resources = resolver.getGlobalVariable(key);
+
+            if (isObject(resources))
+            {
+                for (const definedTypeName in resources)
+                {
+                    const titles = resources[definedTypeName];
+                
+                    // TODO
+                    // we declare resources by simulating valid PuppetASTResourcesEntry
+                    // later that sould be fixed by actually evaluating ruby scripts
+
+                    const bodies = new Array<PuppetASTObject>();
+
+                    for (const title in titles)
+                    {
+                        const entry = new OrderedDictionary();
+                        entry.put("title", new PuppetASTValue(title));
+                        const ops = new Array<PuppetASTObject>();
+                        entry.put("ops", new PuppetASTList(ops));
+
+                        const properties = titles[title];
+
+                        for (const propertyName in properties)
+                        {
+                            const value = properties[propertyName];
+
+                            ops.push(new PuppetASTKeyedEntry([
+                                new PuppetASTValue(propertyName),
+                                new PuppetASTValue(value)
+                            ]));
+                        }
+
+                        bodies.push(entry);
+                    }
+
+                    const options = new OrderedDictionary();
+                    options.put("type", new PuppetASTPrimitive(definedTypeName));
+                    options.put("bodies", new PuppetASTList(bodies));
+
+                    const resourcesEntry = new PuppetASTResourcesDeclaration([options], true)
+                    resourcesEntry.hierarchy = hierarchy;
+                    
+                    try
+                    {
+                        await resourcesEntry.resolve(context, resolver);
+                    }
+                    catch (e)
+                    {
+                        console.log(e.toString());
+                        continue;
+                    }
+
+                    for (const resource of resourcesEntry.entries.getValues())
+                    {
+                        resource.setOption("hiera_resources", key);
+                    }
+                }
+            }
+
+            return hierarchy;
+        };
+
+        await resolver.resolveHieraSource("hiera_resources", key, resolve);
     },
     "return": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
     {

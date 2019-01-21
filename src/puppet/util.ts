@@ -1,5 +1,5 @@
 
-import {PuppetASTDefinedType, PuppetASTResolvedDefinedType} from "./ast";
+import { Dictionary } from "../dictionary";
 
 export class CompiledPromisesCallback
 {
@@ -47,10 +47,4 @@ export interface GlobalVariableResolver
        0 and above then it exists with hierarchy as value
     */
     has (key: string): number;
-}
-
-export class ResolvedResource
-{
-    public definedType: PuppetASTDefinedType;
-    public resource: PuppetASTResolvedDefinedType;
 }

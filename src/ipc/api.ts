@@ -1,4 +1,6 @@
 
+import { ClassDump, ResourceDump, EnvironmentTreeDump } from "./objects"
+
 export interface IpcAPI
 {
     addProject(path: string): Promise<boolean>;
@@ -6,9 +8,9 @@ export interface IpcAPI
     createProject(): Promise<void>;
     getProjectList(): Promise<any>;
     getEnvironmentList(): Promise<string[]>;
-    getEnvironmentTree(name: string): Promise<any>;
+    getEnvironmentTree(name: string): Promise<EnvironmentTreeDump>;
     findFile(localPath: string): Promise<any>;
-    acquireNodeClass(environment: string, certname: string, className: string): Promise<any>;
+    acquireNodeClass(environment: string, certname: string, className: string): Promise<ClassDump>;
     hasNodeClassProperty(environment: string, certname: string, className: string, propertyName: string): Promise<boolean>;
     setNodeClassProperty(environment: string, certname: string, hierarchy: number, className: string, propertyName: string, value: any): Promise<any>;
     setNodeProperty(environment: string, certname: string, hierarchy: number, property: string, value: any): Promise<any>;
@@ -26,16 +28,15 @@ export interface IpcAPI
     searchDefinedTypes(environment: string, certname: string, search: string): Promise<any[]>;
     removeHieraClassFromNode(environment: string, certname: string, key: string, hierarchy: number, className: string): Promise<void>;
     removeHieraClasses(environment: string, certname: string, includeName: string): Promise<Array<string>>;
-    acquireNodeResource(environment: string, certname: string, definedTypeName: string, title: string): Promise<any>;
-    setNodeResourceProperty(environment: string, certname: string, hierarchy: number, definedTypeName: string, title: string, propertyName: string, value: any): Promise<boolean>;
-    removeNodeResourceProperty(environment: string, certname: string, hierarchy: number, definedTypeName: string, title: string, propertyName: string): Promise<boolean>;
-    removeResourceFromNode(environment: string, certname: string, definedTypeName: string, title: string): Promise<void>;
-    renameNodeResource(environment: string, certname: string, definedTypeName: string, title: string, newTitle: string): Promise<boolean>;
-    removeResourcesFromNode(environment: string, certname: string, definedTypeName: string): Promise<string[]>;
-    invalidateNodeResource(environment: string, certname: string, definedTypeName: string, title: string): Promise<void>;
+    acquireNodeResource(environment: string, certname: string, definedTypeName: string, title: string): Promise<ResourceDump>;
+    setNodeResourceProperty(environment: string, certname: string, hierarchy: number, key: string, definedTypeName: string, title: string, propertyName: string, value: any): Promise<boolean>;
+    removeNodeResourceProperty(environment: string, certname: string, hierarchy: number, key: string, definedTypeName: string, title: string, propertyName: string): Promise<boolean>;
+    removeResourceFromNode(environment: string, certname: string, key: string, hierarchy: number, definedTypeName: string, title: string): Promise<boolean>;
+    renameNodeResource(environment: string, certname: string, key: string, hierarchy: number, definedTypeName: string, title: string, newTitle: string): Promise<boolean>;
+    removeResourcesFromNode(environment: string, certname: string, key: string, hierarchy: number, definedTypeName: string): Promise<boolean>;
     chooseDefinedType(environment: string, certname: string): Promise<string>;
-    createNewResourceToNode(environment: string, certname: string, definedTypeName: string, title: string): Promise<any>;
-    removeAllResourcesFromNode(environment: string, certname: string): Promise<any[]>;
+    createNewResourceToNode(environment: string, certname: string, key: string, hierarchy: number, definedTypeName: string, title: string): Promise<any>;
+    removeAllResourcesFromNode(environment: string, certname: string, key: string, hierarchy: number): Promise<boolean>;
     acquireNodeFacts(environment: string, certname: string): Promise<any>;
     invalidateNode(environment: string, certname: string): Promise<void>;
     isNodeClassValid(environment: string, certname: string, className: string): Promise<boolean>;

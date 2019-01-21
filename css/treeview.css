@@ -29,7 +29,7 @@ div.treeview-node-childs-empty:only-child {
     padding: 6px;
 }
 
-.treeview-node-text :first-child {
+.treeview-node-offset {
     margin-right: 6px;
 }
 
