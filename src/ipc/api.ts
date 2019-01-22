@@ -49,4 +49,6 @@ export interface IpcAPI
     publishCSR(server: string, certname: string): Promise<string>;
     downloadSignedCertificate(): Promise<void>;
     checkAuthentication(): Promise<void>;
+    ignoreNode(cername: string): Promise<void>;
+    clearIgnoreNodeList(): Promise<boolean>;
 }

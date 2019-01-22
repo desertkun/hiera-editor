@@ -848,6 +848,30 @@ export class IpcServer implements IpcAPI
             
         await workspace.checkAuthentication();
     }
+
+    public async ignoreNode(cername: string): Promise<void>
+    {
+        const workspace: Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            throw new WorkspaceError("Failed to publich CRS", "No workspace");
+        }
+            
+        await workspace.addNodeToIgnoreList(cername);
+    }
+    
+    public async clearIgnoreNodeList(): Promise<boolean>
+    {
+        const workspace: Workspace = getCurrentWorkspace();
+
+        if (workspace == null)
+        {
+            throw new WorkspaceError("Failed to publich CRS", "No workspace");
+        }
+            
+        return await workspace.clearNodeIgnoreList();
+    }
 }
 
 const server: IpcServer = new IpcServer();

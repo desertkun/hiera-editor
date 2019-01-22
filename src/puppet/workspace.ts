@@ -13,6 +13,7 @@ import { Ruby } from "./ruby"
 import { WorkspaceError, CompiledPromisesCallback } from "./util"
 import { Folder, File } from "./files"
 import { PuppetHTTP } from "./http";
+import { isArray } from "util";
 
 const PromisePool = require('es6-promise-pool');
 const slash = require('slash');
@@ -28,6 +29,7 @@ export class Workspace
 
     private readonly _cachePath: string;
     private readonly _global: Dictionary<string, string>;
+    private _nodeIgnoreList: Array<string>;
 
     constructor(workspacePath: string, cachePath: string = null, offline: boolean = false)
     {
@@ -36,6 +38,7 @@ export class Workspace
         this._cachePath = cachePath || path.join(this._path, ".pe-cache");
         this._global = new Dictionary();
         this._offline = offline;
+        this._nodeIgnoreList = [];
     }
 
     public get global()
@@ -48,9 +51,50 @@ export class Workspace
         return this._cachePath;
     }
 
+    public get nodeIgnoreLustPath(): string
+    {
+        return path.join(this._cachePath, ".nodeignore");
+    }
+
     public get settingsPath(): string
     {
         return path.join(this._cachePath, "puppet.conf");
+    }
+
+    public getNodeIgnoreList(): string[]
+    {
+        return this._nodeIgnoreList;
+    }
+
+    public async clearNodeIgnoreList(): Promise<boolean>
+    {
+        const updated = this._nodeIgnoreList.length > 0;
+
+        this._nodeIgnoreList = [];
+
+        try
+        {
+            await async.writeJSON(this.nodeIgnoreLustPath, this._nodeIgnoreList);
+            return updated;
+        }
+        catch (e)
+        {
+            return false;
+        }
+    }
+
+    public async addNodeToIgnoreList(certname: string)
+    {
+        this._nodeIgnoreList.push(certname);
+
+        try
+        {
+            await async.writeJSON(this.nodeIgnoreLustPath, this._nodeIgnoreList);
+        }
+        catch (e)
+        {
+            //
+        }
     }
 
     public async getSettings(): Promise<WorkspaceSettings>
@@ -311,6 +355,22 @@ export class Workspace
         if (!await async.isDirectory(this.path))
         {
             throw new WorkspaceError("Workspace path does not exist", this.path);
+        }
+
+        if (await async.isFile(this.nodeIgnoreLustPath))
+        {
+            try
+            {
+                const nodeIgnoreList = await async.readJSON(this.nodeIgnoreLustPath);
+                if (isArray(nodeIgnoreList))
+                {
+                    this._nodeIgnoreList = nodeIgnoreList;
+                }
+            }
+            catch (e)
+            {
+                //
+            }
         }
 
         if (!await async.isDirectory(this.cachePath))

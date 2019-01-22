@@ -32,7 +32,7 @@ export class Environment
     private readonly _roots: Dictionary<string, Folder>;
     private readonly _warnings: WorkspaceError[];
     private readonly _offline: boolean;
-    private readonly _nodeFacts: any;
+    private readonly _nodeFacts: Dictionary<string, any>;
     private _modulesInfo: PuppetModulesInfo;
 
     constructor(workspace: Workspace, name: string, _path: string, cachePath: string, offline: boolean = false)
@@ -47,7 +47,7 @@ export class Environment
         this._global = new Dictionary();
         this._global.put("environment", name);
         this._nodes = new Dictionary();
-        this._nodeFacts = {};
+        this._nodeFacts = new Dictionary();
         this._offline = offline;
     }
 
@@ -518,6 +518,10 @@ export class Environment
             }
         }
 
+        const nodeIgnoreList = this.workspace.getNodeIgnoreList();
+        nodeList = nodeList.filter((value: string) => nodeIgnoreList.indexOf(value) < 0);
+        this._nodeFacts.clear();
+
         if (!this._offline)
         {
             if (!await async.isDirectory(this.certNodeFactsPath))
@@ -547,9 +551,9 @@ export class Environment
 
         this._nodes.clear();
 
-        for (const certname in this._nodeFacts)
+        for (const certname of this._nodeFacts.getKeys())
         {
-            const facts = this._nodeFacts[certname];
+            const facts = this._nodeFacts.get(certname);
             const node = await this.enterNodeContext(certname, facts);
             this._nodes.put(certname, node);
         }
@@ -592,7 +596,7 @@ export class Environment
             }
         }
 
-        this._nodeFacts[certname] = facts;
+        this._nodeFacts.put(certname, facts);
         
         if (progressCallback)
         {

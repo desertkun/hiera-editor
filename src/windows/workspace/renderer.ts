@@ -313,10 +313,16 @@ class NodeItemRenderer
             node.selectable = false;
         }, "node-" + zis.env.name + "-" + zis.certname, renderer.openNodes);
 
-        /*
         this.n_node.contextMenu([
+            {
+                label: "Ignore This Node",
+                click: async () => 
+                {
+                    await ipc.ignoreNode(zis.certname);
+                    await renderer.refreshWorkspace();
+                }
+            }
         ])
-        */
 
         const includeNames = Object.keys(this.info.hiera_includes);
         includeNames.sort();
@@ -934,6 +940,14 @@ export class WorkspaceRenderer
                     async click () 
                     { 
                         await zis.refreshWorkspace();
+                    }
+                },
+                {
+                    label: 'Clear Node Ignore List',
+                    async click () 
+                    { 
+                        if (await ipc.clearIgnoreNodeList())
+                            await zis.refreshWorkspace();
                     }
                 }
             ];
