@@ -178,6 +178,286 @@ const BuiltInFunctions: any = {
     "return": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
     {
         throw new PuppetASTReturn(args[0]);
+    },
+    "all": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "annotate": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "any": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "assert_type": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "binary_file": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "break": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "call": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "convert_to": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "crit": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "debug": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "dig": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "digest": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "each": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "emerg": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "empty": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "epp": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "err": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "eyaml_lookup_key": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "file": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "filter": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "find_file": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "flatten": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "fqdn_rand": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "generate": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "hiera": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "hiera_array": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "hiera_hash": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "hocon_data": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "import": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "info": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "inline_epp": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "inline_template": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "join": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "json_data": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "keys": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "length": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "lest": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "lookup": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "map": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "match": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "md5": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "module_directory": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "new": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    " next": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "notice": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "realize": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "reduce": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "regsubst": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "reverse_each": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "scanf": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "sha1": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "sha256": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "shellquote": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "slice": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "split": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "sprintf": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "step": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "strftime": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "tag": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "tagged": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "then": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "tree_each": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "type": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "unique": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "unwrap": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "values": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "versioncmp": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "warning": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "with": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
+    },
+    "yaml_data": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        //not implemented
     }
 };
 
