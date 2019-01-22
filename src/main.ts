@@ -4,10 +4,10 @@ import "./ipc/server";
 import { init, projects_window } from "./global"
 const { autoUpdater } = require("electron-updater")
 
-function initialize() 
+async function initialize() 
 {
     autoUpdater.checkForUpdatesAndNotify();
-    init();
+    await init(app.getAppPath());
     projects_window.show();
 }
 

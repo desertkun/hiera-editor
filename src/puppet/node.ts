@@ -4,12 +4,15 @@ import * as path from "path"
 
 import { Dictionary } from "../dictionary"
 import { PuppetASTParser, PuppetASTClass, PuppetASTFunction, Resolver,
-    PuppetASTDefinedType, PuppetASTEnvironment, PuppetASTResource, HieraSourceResolveCallback } from "./ast"
+    PuppetASTDefinedType, PuppetASTEnvironment, PuppetASTResource, HieraSourceResolveCallback,
+    ResolvedFunction, PuppetASTContainerContext,
+    PuppetASTObject} from "./ast"
 
 import { GlobalVariableResolver, GlobalVariableResolverResults, CompilationError } from "./util"
 import { Environment } from "./environment"
 import { CompiledHierarchy } from "./hiera"
 import { ClassDump, ResourceDump, NodeDump, ClassInfoDump, DefiledTypeInfoDump, NodeDefinedTypeDump } from "../ipc/objects"
+import { rubyBridge } from "../global"
 
 const parseDomain = require('domain-name-parser');
 
@@ -39,9 +42,9 @@ class NodeContextResolver implements Resolver
         return this.context.resolveClass(className, this.global, public_);
     }
 
-    public resolveFunction(name: string): Promise<PuppetASTFunction>
+    public resolveFunction(context: PuppetASTContainerContext, resolver: Resolver, name: string): Promise<ResolvedFunction>
     {
-        return this.context.resolveFunction(name, this.global);
+        return this.context.resolveFunction(context, resolver, name, this.global);
     }
 
     public async resolveHieraSource(kind: string, key: string, resolve: HieraSourceResolveCallback): Promise<void>
@@ -81,7 +84,7 @@ export class NodeContext
     private _hierarchy: CompiledHierarchy;
 
     private readonly _compiledClasses: Dictionary<string, PuppetASTClass>;
-    private readonly _compiledFunctions: Dictionary<string, PuppetASTFunction>;
+    private readonly _compiledFunctions: Dictionary<string, ResolvedFunction>;
     private readonly _compiledDefinedTypes: Dictionary<string, PuppetASTDefinedType>;
     private readonly _registeredResources: Dictionary<string, Dictionary<string, PuppetASTResource>>;
     private readonly _hieraIncludes: Dictionary<string, [number, HieraSourceResolveCallback]>;
@@ -966,8 +969,9 @@ export class NodeContext
 
         return clazz;
     }
-    
-    public async resolveFunction(name: string, global: GlobalVariableResolver): Promise<PuppetASTFunction>
+
+    public async resolveFunction(context: PuppetASTContainerContext, resolver: Resolver, 
+        name: string, global: GlobalVariableResolver): Promise<ResolvedFunction>
     {
         name = Node.fixClassName(name);
 
@@ -976,35 +980,60 @@ export class NodeContext
             return this._compiledFunctions.get(name);
         }
 
-        console.log("Compiling function " + name + " (for environment " + this.name + ")");
-
         const functionInfo = this.env.findFunctionInfo(name);
-
         if (functionInfo == null)
+            return null;
+
+        let resolved: ResolvedFunction;
+
+        if (functionInfo.isPuppet())
         {
-            return null;   
+            
+            console.log("Compiling function " + name + " (for environment " + this.name + ")");
+
+            const compiledPath = functionInfo.modulesInfo.getCompiledFunctionPath(functionInfo.file);
+            let parsedJSON = null;
+
+            try
+            {
+                parsedJSON = await async.readJSON(compiledPath);
+            }
+            catch (e)
+            {
+                throw new CompilationError("Failed to parse function " + name);
+            }
+
+            const obj = PuppetASTParser.Parse(parsedJSON);
+
+            if (!(obj instanceof PuppetASTFunction))
+                throw "Not a function";
+
+            const function_: PuppetASTFunction = obj;
+
+            resolved = async (args: PuppetASTObject[]) => 
+            {
+                return await function_.apply(context, resolver, args);
+            }
+        }
+        else
+        {
+            
+            resolved = async (args: PuppetASTObject[]) => 
+            {
+                const resolvedArgs: any[] = [];
+
+                for (const arg of args)
+                {
+                    const a = await arg.resolve(context, resolver);
+                    resolvedArgs.push(a);
+                }
+
+                return await rubyBridge.call(name, resolvedArgs);
+            }
         }
 
-        const compiledPath = functionInfo.modulesInfo.getCompiledFunctionPath(functionInfo.file);
-        let parsedJSON = null;
-
-        try
-        {
-            parsedJSON = await async.readJSON(compiledPath);
-        }
-        catch (e)
-        {
-            throw new CompilationError("Failed to parse function " + name);
-        }
-
-        const obj = PuppetASTParser.Parse(parsedJSON);
-
-        if (!(obj instanceof PuppetASTFunction))
-            throw "Not a function";
-
-        const function_: PuppetASTFunction = obj;
-        this._compiledFunctions.put(name, function_);
-        return function_;
+        this._compiledFunctions.put(name, resolved);
+        return resolved;
     }
 
     public async resolveDefinedType(definedTypeName: string, global: GlobalVariableResolver, public_: boolean): Promise<PuppetASTDefinedType>

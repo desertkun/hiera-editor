@@ -13,6 +13,7 @@ import { NodeContext } from "../puppet/node";
 import { PuppetASTAccess, PuppetASTPrimitive, PuppetASTQualifiedName, 
     PuppetASTType, PuppetASTTypeOf, PuppetHintBodyCompilationError, PuppetASTClass } from "../puppet/ast";
 import { WorkspaceError, CompilationError } from "../puppet/util"
+import { rubyBridge } from "../global"
 
 const ini = require('ini');
 const chai = require('chai');
@@ -167,6 +168,8 @@ async function testSimpleWorkspace(test: WorkspaceTest): Promise<NodeContext>
 
 describe('Workspaces', () =>
 {
+    rubyBridge.start(".");
+
     it('missing directory', () =>
     {
         return expect(testRealWorkspace("missing...", "dev", "test")).to.be.rejectedWith(WorkspaceError);

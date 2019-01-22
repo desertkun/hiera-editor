@@ -4,10 +4,12 @@ import { ProjectsWindow } from "./windows/projects/window"
 import { WorkspaceWindow } from "./windows/workspace/window"
 import { Menu } from "electron";
 import { Workspace } from "./puppet/workspace"
+import { PuppetRubyBridge } from "./puppet/lib"
 
 export const projects_list: ProjectsModel = new ProjectsModel();
 export const projects_window: ProjectsWindow = new ProjectsWindow();
 export const workspace_window: WorkspaceWindow = new WorkspaceWindow();
+export const rubyBridge: PuppetRubyBridge = new PuppetRubyBridge();
 
 export let workspace_menu: Menu;
 export let projects_menu: Menu;
@@ -63,10 +65,11 @@ function initMenu()
     Menu.setApplicationMenu(projects_menu);
 }
 
-export function init()
+export async function init(cwd: string)
 {
     initMenu();
-    projects_list.load();
+    rubyBridge.start(cwd);
+    await projects_list.load();
 }
 
 export function getCurrentWorkspace(): Workspace

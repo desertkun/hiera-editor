@@ -405,12 +405,23 @@ export class Workspace
             if (updateProgressCategory) updateProgressCategory("Compiling classes...", true);
 
             await pool.start();
+        }                
+        
+        if (modulesInfo != null)
+        {
+            if (updateProgressCategory) updateProgressCategory("Compiling parser functions...", false);
+            await modulesInfo.loadRubyFunctions();
         }
 
         for (const env of await this.listEnvironments(this._offline))
         {
             if (updateProgressCategory) updateProgressCategory("Processing environment: " + env.name, false);
             await env.init(progressCallback, updateProgressCategory)
+            if (env.modulesInfo != null)
+            {
+                if (updateProgressCategory) updateProgressCategory("Processing environment: " + env.name + " (parser)");
+                await env.modulesInfo.loadRubyFunctions();
+            }            
         }
 
         if (updateProgressCategory) updateProgressCategory("Processing environments complete!", false);

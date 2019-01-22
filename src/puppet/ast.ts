@@ -4,14 +4,17 @@ import { GetBuiltinFunction } from "./builtin";
 import { resolve } from "dns";
 import { isString } from "util";
 import { GlobalVariableResolverResults } from "./util";
+import { rubyBridge } from "../global";
 
 export type HieraSourceResolveCallback = () => Promise<number>;
+
+export type ResolvedFunction = (args: PuppetASTObject[]) => Promise<any>;
 
 export interface Resolver
 {
     resolveClass(className: string, public_: boolean): Promise<PuppetASTClass>;
     resolveDefinedType(definedTypeName: string, public_: boolean): Promise<PuppetASTDefinedType>;
-    resolveFunction(name: string): Promise<PuppetASTFunction>;
+    resolveFunction(context: PuppetASTContainerContext, resolver: Resolver, name: string): Promise<ResolvedFunction>;
     getGlobalVariable(name: string): any;
     
     /*
@@ -1503,30 +1506,22 @@ export class PuppetASTCall extends PuppetASTObject
     protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
     {
         const functorName = await this.functor.resolve(context, resolver);
-        let function_ = null;
+        const builtin = GetBuiltinFunction(functorName);
 
-        try
+        if (builtin != null)
         {
-            function_ = await resolver.resolveFunction(functorName);
-        }
-        catch (e)
-        {
-            this.hint(new PuppetHintFunctionNotFound(functorName));
-        }
-
-        if (function_ == null)
-        {
-            const builtin = GetBuiltinFunction(functorName);
-
-            if (builtin == null)
-            {
-                this.hint(new PuppetHintFunctionNotFound(functorName));
-                return null;
-            }
-
             return await builtin(this, context, resolver, this.functorArgs.entries);
         }
-        return await function_.apply(context, resolver, this.functorArgs.entries);
+
+        const function_ = await resolver.resolveFunction(context, resolver, functorName);
+        if (function_ != null)
+        {
+            return await function_(this.functorArgs.entries);
+        }
+        
+        this.hint(new PuppetHintFunctionNotFound(functorName));
+
+        return null;
     }
 
     public static Create(args: Array<PuppetASTObject>): PuppetASTObject

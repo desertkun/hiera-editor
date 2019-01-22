@@ -6,6 +6,9 @@ import { Dictionary } from "../dictionary";
 import { PuppetClassInfo, PuppetDefinedTypeInfo, PuppetFunctionInfo } from "./class_info"
 import { CompiledPromisesCallback } from "./util"
 import { Ruby } from "./ruby"
+import { rubyBridge } from "../global"
+
+const slash = require('slash');
 
 export class PuppetModulesInfo
 {
@@ -50,6 +53,25 @@ export class PuppetModulesInfo
     public getCompiledFunctionPath(fileName: string)
     {
         return path.join(this._cachePath, "func", fileName + ".o");
+    }
+
+    public async loadRubyFunctions()
+    {
+        const fixedScripts: string[] = [];
+
+        for (const f of this._functions.getValues())
+        {
+            if (!f.isRuby())
+                continue;
+            
+            console.log("Loading function " + f.name + " (" + f.type + ")");
+            fixedScripts.push(slash(path.join(this._modulesPath, f.file)));
+        }
+
+        if (fixedScripts.length == 0)
+            return;
+
+        await rubyBridge.load(fixedScripts);
     }
 
     public async searchClasses(search: string, results: Array<any>): Promise<void>

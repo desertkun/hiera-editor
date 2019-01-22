@@ -51,6 +51,11 @@ export class Environment
         this._offline = offline;
     }
 
+    public get modulesInfo(): PuppetModulesInfo
+    {
+        return this._modulesInfo;
+    }
+
     public get global()
     {
         return this._global;

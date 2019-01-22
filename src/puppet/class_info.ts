@@ -211,6 +211,7 @@ export class PuppetFunctionInfo
     private readonly _tags: any;
     private readonly _options: any;
     private readonly _description: string;
+    private readonly _type: string;
     private readonly _modules: PuppetModulesInfo;
 
     constructor(name: string, info: any, modules: PuppetModulesInfo)
@@ -220,6 +221,7 @@ export class PuppetFunctionInfo
         this._modules = modules;
         this._options = {};
         this._tags = {};
+        this._type = info["type"];
 
         const docstring = info["docstring"];
         if (docstring)
@@ -254,6 +256,28 @@ export class PuppetFunctionInfo
         {
             this._description = "";
         }
+    }
+
+    public get type(): string
+    {
+        return this._type;
+    }
+
+    public isRuby(): boolean
+    {
+        switch (this._type)
+        {
+            case "ruby3x":
+            case "ruby4x":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    public isPuppet(): boolean
+    {
+        return this._type == "puppet";
     }
 
     public get modulesInfo(): PuppetModulesInfo
