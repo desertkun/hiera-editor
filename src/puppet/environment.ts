@@ -17,7 +17,9 @@ import { PuppetHTTP } from "./http"
 import { isArray } from "util";
 import { WorkspaceSettings } from "./workspace_settings";
 import { EnvironmentTreeDump, NodeDump } from "../ipc/objects"
+import { HIERA_EDITOR_FIELD, HIERA_EDITOR_VALUE } from "./cert"
 
+const forge = require("node-forge");
 const PromisePool = require('es6-promise-pool');
 
 export class Environment
@@ -33,6 +35,7 @@ export class Environment
     private readonly _warnings: WorkspaceError[];
     private readonly _offline: boolean;
     private readonly _nodeFacts: Dictionary<string, any>;
+    private readonly _certificates: Dictionary<string, any>;
     private _modulesInfo: PuppetModulesInfo;
 
     constructor(workspace: Workspace, name: string, _path: string, cachePath: string, offline: boolean = false)
@@ -48,6 +51,7 @@ export class Environment
         this._global.put("environment", name);
         this._nodes = new Dictionary();
         this._nodeFacts = new Dictionary();
+        this._certificates = new Dictionary();
         this._offline = offline;
     }
 
@@ -94,6 +98,11 @@ export class Environment
     public getNodeFactsPath(certName: string): string
     {
         return path.join(this._cachePath, "facts", certName + ".json")
+    }
+
+    public get certificateCachePath(): string
+    {
+        return path.join(this._cachePath, "certs")
     }
 
     public get certListCachePath(): string
@@ -436,6 +445,69 @@ export class Environment
 
     }
 
+    public getCertificate(certname: string): any
+    {
+        return this._certificates.get(certname);
+    }
+
+    private async loadCertificates(updateProgressCategory: any, certList: string[], settings: WorkspaceSettings)
+    {
+        
+        if (!await async.isDirectory(this.certificateCachePath))
+        {
+            await async.makeDirectory(this.certificateCachePath);
+        }
+
+        const certsExist = [];
+
+        for (const certname of certList)
+        {
+            certsExist.push(async.isFile(path.join(this.certificateCachePath, certname + ".txt")));
+        }
+
+        const ex = await Promise.all(certsExist.map(p => p.catch(() => undefined)));
+        const loadCerts = [];
+
+        for (let i = 0, t = certList.length; i < t; i++)
+        {
+            const certname = certList[i];
+            const exists = ex[i];
+
+            if (exists)
+            {
+                loadCerts.push(async.readFile(path.join(this.certificateCachePath, certname + ".txt")));
+            }
+            else
+            {
+                loadCerts.push(Promise.resolve(null));
+            }
+        }
+        
+        const certs = await Promise.all(loadCerts.map(p => p.catch((e: any): any => undefined)));
+
+        for (let i = 0, t = certList.length; i < t; i++)
+        {
+            const certname = certList[i];
+            let certificate = certs[i];
+
+            if (certificate == null)
+            {
+                if (updateProgressCategory) updateProgressCategory(
+                    "[" + this.name + "] Downloading certificate for node " + certname + "...", false);
+        
+                certificate = await PuppetHTTP.GetCertificate(certname, this.name, settings);
+                await async.writeFile(path.join(this.certificateCachePath, certname + ".txt"), certificate);
+            }
+
+            const cert = forge.pki.certificateFromPem(certificate);
+
+            if (cert == null)
+                continue;
+
+            this._certificates.put(certname, cert);
+        }
+    }
+
     private async updateCertList(updateProgressCategory: any, settings: WorkspaceSettings): Promise<string[]>
     {
         if (updateProgressCategory) updateProgressCategory("[" + this.name + "] Updating certificate list...", false);
@@ -451,12 +523,16 @@ export class Environment
             throw new WorkspaceError("Failed to obtain certificate list", e.toString());
         }
 
+        await this.loadCertificates(updateProgressCategory, certList, settings);
+
         await async.writeJSON(this.certListCachePath, certList);
         return certList;
     }
 
     public async init(progressCallback: any = null, updateProgressCategory: any = null): Promise<any>
     {
+        const zis = this;
+
         this._warnings.length = 0;
 
         if (!await async.isDirectory(this.cachePath))
@@ -519,7 +595,26 @@ export class Environment
         }
 
         const nodeIgnoreList = this.workspace.getNodeIgnoreList();
-        nodeList = nodeList.filter((value: string) => nodeIgnoreList.indexOf(value) < 0);
+        nodeList = nodeList.filter((certname: string) => 
+        {
+            if (nodeIgnoreList.indexOf(certname) >= 0)
+                return false;
+            
+            const cert = zis._certificates.get(certname);
+            if (cert != null)
+            {
+                const ext = cert.getExtension({id: HIERA_EDITOR_FIELD});
+                if (ext != null)
+                {
+                    // cut the fist two characters
+                    // https://puppet.com/docs/puppet/6.0/ssl_attributes_extensions.html#manually-checking-for-extensions-in-csrs-and-certificates
+                    if (ext.value.substr(2) == HIERA_EDITOR_VALUE)
+                        return false;
+                }
+            }
+
+            return true;
+        });
         this._nodeFacts.clear();
 
         if (!this._offline)

@@ -1,8 +1,9 @@
 
 import * as http from "http"
-import * as https from "https"
+import * as request from "request"
 import * as path from "path"
 import * as async from "../async"
+import * as net from "net"
 import { WorkspaceSettings } from "./workspace_settings"
 
 export class PuppetHTTP
@@ -19,12 +20,6 @@ export class PuppetHTTP
 
         for (const d of response)
         {
-            if (d.name == settings.certname)
-            {
-                // exclude ourselves
-                continue;
-            }
-
             if (d.state == "signed")
             {
                 result.push(d.name);
@@ -32,6 +27,18 @@ export class PuppetHTTP
         }
 
         return result;
+    }
+    
+    public static async GetCertificate(certname: string, environment: string, settings: WorkspaceSettings): Promise<any>
+    {
+        const response = await this.Request(
+            "/puppet-ca/v1/certificate/" + certname + "?environment=" + environment,
+            "GET",
+            settings,
+            {}
+        );
+        
+        return response;
     }
 
     public static async GetNodeFacts(environment: string, certname: string, settings: WorkspaceSettings): Promise<any>
@@ -81,45 +88,27 @@ export class PuppetHTTP
 
             Promise.all([key_, cert_, ca_]).then((out: string[]) => 
             {
+                const requestPath = "https://" + hostname + ":" + port + path_;
+
                 const options = {
-                    hostname: hostname,
-                    port: port,
-                    path: path_,
                     method: method,
-                    key: out[0],
-                    cert: out[1],
-                    ca: out[2],
+                    key: Buffer.alloc(out[0].length, out[0]),
+                    cert:Buffer.alloc(out[1].length, out[1]),
+                    ca: Buffer.alloc(out[2].length, out[2]),
                     headers: headers
                 }
 
-                const data: string[] = [];
-
-                const req = https.request(options, (res: http.IncomingMessage) => 
+                const req = request(requestPath, options, (error: any, response: request.Response, body: any) => 
                 {
-                    res.on("data", (data_: Buffer) => 
+                    if (error)
                     {
-                        data.push(data_.toString());
-                    })
-
-                    res.on("end", () => 
+                        reject(error);
+                    }
+                    else
                     {
-                        if (res.statusCode >= 400)
-                        {
-                            reject(new Error("Error Response: " + res.statusCode + " " + data.join("")))
-                        }
-                        else
-                        {
-                            resolve(data.join(""));
-                        }  
-                    })
+                        resolve(body);
+                    }
                 });
-
-
-                req.on('error', (e: any) => {
-                    reject(e);
-                });
-
-                req.end();
 
             }).catch((error) => {
                 reject(error);

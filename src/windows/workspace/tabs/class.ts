@@ -403,7 +403,7 @@ export class NodeClassTab extends WorkspaceTab
             let title = "";
             if (hierarchyEntry.name != null)
             {
-                title += hierarchyEntry.name;
+                title += hierarchyEntry.name + " ";
             }
             title += hierarchyEntry.path;
             data.push({

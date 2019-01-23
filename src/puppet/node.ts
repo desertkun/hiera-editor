@@ -13,6 +13,7 @@ import { Environment } from "./environment"
 import { CompiledHierarchy } from "./hiera"
 import { ClassDump, ResourceDump, NodeDump, ClassInfoDump, DefiledTypeInfoDump, NodeDefinedTypeDump } from "../ipc/objects"
 import { rubyBridge } from "../global"
+import { CERTIFICATE_EXTENSIONS } from "./cert"
 
 const parseDomain = require('domain-name-parser');
 
@@ -89,12 +90,14 @@ export class NodeContext
     private readonly _registeredResources: Dictionary<string, Dictionary<string, PuppetASTResource>>;
     private readonly _hieraIncludes: Dictionary<string, [number, HieraSourceResolveCallback]>;
     private readonly _hieraResources: Dictionary<string, [number, HieraSourceResolveCallback]>;
+    private readonly _extensions: { [key: string]: string };
 
     constructor (certname: string, env: Environment)
     {
         this.name = certname;
         this.env = env;
 
+        this._extensions = {};
         this._facts = {};
         this._compiledClasses = new Dictionary();
         this._compiledDefinedTypes = new Dictionary();
@@ -111,7 +114,8 @@ export class NodeContext
             "authenticated": "local",
             "certname": certname,
             "domain": d.domain,
-            "hostname": d.host
+            "hostname": d.host,
+            "extensions": this._extensions
         };
     }
 
@@ -1157,6 +1161,25 @@ export class NodeContext
         if (facts != null)
         {
             this.setFacts(facts);
+        }
+
+        const cert = this.env.getCertificate(this.name);
+
+        if (cert != null)
+        {
+            for (const ext of cert.extensions)
+            {
+                const id = ext.id;
+                const value: string = ext.value;
+
+                if (CERTIFICATE_EXTENSIONS.hasOwnProperty(id))
+                {
+                    const ext = CERTIFICATE_EXTENSIONS[id];
+                    // cut the fist two characters
+                    // https://puppet.com/docs/puppet/6.0/ssl_attributes_extensions.html#manually-checking-for-extensions-in-csrs-and-certificates
+                    this._extensions[ext] = value.substr(2);
+                }
+            }
         }
 
         this._hierarchy = await this.env.hierarchy.compile(this, this.env);

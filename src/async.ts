@@ -128,6 +128,18 @@ export async function mostRecentFileTime(start: string): Promise<number>
     return lastModifiedTime;
 }
 
+export function makeDirectories(path: string): Promise<boolean>
+{
+    return new Promise<boolean>((resolve, reject) =>
+    {
+        fs.mkdirs(path, (err) =>
+        {
+            resolve(err == null);
+        })
+    });
+}
+
+
 export function makeDirectory(path: string): Promise<boolean>
 {
     return new Promise<boolean>((resolve, reject) =>

@@ -14,6 +14,7 @@ import { WorkspaceError, CompiledPromisesCallback } from "./util"
 import { Folder, File } from "./files"
 import { PuppetHTTP } from "./http";
 import { isArray } from "util";
+import { HIERA_EDITOR_FIELD, HIERA_EDITOR_VALUE } from "./cert"
 
 const PromisePool = require('es6-promise-pool');
 const slash = require('slash');
@@ -222,6 +223,20 @@ export class Workspace
 
         const paths = WorkspaceSettings.GetPaths();
         let output;
+
+        try
+        {
+            await async.makeDirectories(paths.confdir);
+            await async.writeYAML(path.join(paths.confdir, "csr_attributes.yaml"), {
+                "extension_requests": {
+                    HIERA_EDITOR_FIELD: HIERA_EDITOR_VALUE
+                }
+            })
+        }
+        catch (e)
+        {
+            throw new WorkspaceError("Failed to publish CSR", e.toString());
+        }
 
         try
         {

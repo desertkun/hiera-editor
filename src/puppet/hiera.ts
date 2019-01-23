@@ -160,8 +160,8 @@ export class Hierarchy
 
         this._datadir = "data";
         this._hierarchy = [
-            new HierarchyEntry("nodes/%{::trusted.certname}"), 
-            new HierarchyEntry("common")
+            new HierarchyEntry("nodes/%{::trusted.certname}.yaml"), 
+            new HierarchyEntry("common.yaml")
         ];
     }
 
@@ -188,7 +188,7 @@ export class Hierarchy
                 {
                     if (value == null)
                         return "";
-                    const key = path.pop();
+                    const key = path.shift();
                     value = value[key];
                 }
 
@@ -212,7 +212,8 @@ export class Hierarchy
 
         try
         {
-            data = await async.readYAML(this._path);
+            const document = await async.readYAML(this._path);
+            data = document.toJSON();
         }
         catch (e)
         {

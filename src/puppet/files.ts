@@ -55,7 +55,7 @@ export class Folder
             return await dir.createFile(localPath);
         }
 
-        const entryPath = path.join(this._path, File.FilePath(name));
+        const entryPath = path.join(this._path, name);
         const node = await this.acquireFile(this._env, name, entryPath, slash(path.join(this._localPath, name)));
 
         if (node == null)
@@ -120,7 +120,7 @@ export class Folder
         if (node == null)
             return false;
             
-        const entryPath = path.join(this._path, File.FilePath(name));
+        const entryPath = path.join(this._path, name);
 
         if (!await async.remove(entryPath))
         {
@@ -154,7 +154,7 @@ export class Folder
 
         const nodes: any = [];
 
-        for (const node of await this.getNodes())
+        for (const node of await this.getFiles())
         {
             nodes.push({
                 "name": node.name,
@@ -197,7 +197,7 @@ export class Folder
 
     public async getFile(name: string): Promise<File>
     {
-        const entryPath = path.join(this._path, File.FilePath(name));
+        const entryPath = path.join(this._path, name);
 
         if (!await async.isFile(entryPath))
         {
@@ -247,7 +247,7 @@ export class Folder
         return result;
     }
 
-    public async getNodes(): Promise<Array<File>>
+    public async getFiles(): Promise<Array<File>>
     {
         if (!await async.fileExists(this._path))
         {
@@ -261,19 +261,14 @@ export class Folder
 
         const result:Array<File> = [];
 
-        for (const entry of await async.listFiles(this._path))
+        for (const fileName of await async.listFiles(this._path))
         {
-            const nodeName = File.ValidatePath(entry);
-
-            if (nodeName == null)
-                continue;
-
-            const entryPath = path.join(this._path, entry);
+            const entryPath = path.join(this._path, fileName);
 
             if (await async.isFile(entryPath))
             {
                 result.push(await this.acquireFile(
-                    this._env, nodeName, entryPath, slash(path.join(this._localPath, nodeName))));
+                    this._env, fileName, entryPath, slash(path.join(this._localPath, fileName))));
             }
         }
 
@@ -313,19 +308,6 @@ export class File
         this._nodePath = nodePath;
         this._config = {};
         this._parent = parent;
-    }
-
-    static FilePath(name: string): string
-    {
-        return name + ".yaml";
-    }
-
-    static ValidatePath(pathName: string): string
-    {
-        if (!pathName.endsWith(".yaml"))
-            return null;
-
-        return pathName.substr(0, pathName.length - 5);
     }
 
     public async remove(): Promise<boolean>
