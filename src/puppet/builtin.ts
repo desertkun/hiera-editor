@@ -95,7 +95,7 @@ const BuiltInFunctions: any = {
             return hierarchy;
         };
 
-        resolver.resolveHieraSource("hiera_include", key, resolve);
+        await resolver.resolveHieraSource("hiera_include", key, resolve);
     },
     "hiera_resources": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
     {
