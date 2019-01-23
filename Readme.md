@@ -52,4 +52,3 @@ Creative Commons Attribution 4.0 International license.
 
 ## Todo
 * Offline mode when it won't even try to obtain updates from Puppet Server
-* Parse ruby `<module>/lib/puppet/parser/functions` Puppet functions
