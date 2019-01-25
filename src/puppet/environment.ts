@@ -339,11 +339,7 @@ export class Environment
             }
 
             if (!upToDate) {
-                const a = JSON.stringify([
-                    "*/manifests/**/*.pp", "*/functions/**/*.pp", "*/types/**/*.pp", "*/lib/**/*.rb"
-                ]);
-
-                await Ruby.Call("puppet-strings.rb", [a, this.cacheModulesFilePath], this.modulesPath);
+                await Ruby.CallScript("puppet-strings.rb", [this.cacheModulesFilePath], this.modulesPath);
             }
         }
 
@@ -823,7 +819,7 @@ export class Environment
 
             try
             {
-                await Ruby.CallInOut("puppet-parser.rb", [], compilePath, JSON.stringify(files));
+                await Ruby.CallAndSendStdIn("puppet-parser.rb", [], compilePath, JSON.stringify(files));
                 console.log("Compiling done!");
             }
             catch (e)

@@ -145,7 +145,7 @@ export class Workspace
                 env["LIBRARIAN_PUPPET_TMP"] = path.join(path_, ".tmp");
             }
 
-            await Ruby.CallRubyBin("librarian-puppet", ["install", "--verbose"], path_, env, (line: string) => 
+            await Ruby.CallBin("librarian-puppet", ["install", "--verbose"], path_, env, (line: string) => 
             {
                 if (line.length > 80)
                 {
@@ -224,13 +224,17 @@ export class Workspace
         const paths = WorkspaceSettings.GetPaths();
         let output;
 
+        const field = HIERA_EDITOR_FIELD;
+        const value = HIERA_EDITOR_VALUE;
+
+        const requests: any = {};
+        requests[field] = value;
+
         try
         {
             await async.makeDirectories(paths.confdir);
             await async.writeYAML(path.join(paths.confdir, "csr_attributes.yaml"), {
-                "extension_requests": {
-                    HIERA_EDITOR_FIELD: HIERA_EDITOR_VALUE
-                }
+                "extension_requests": requests
             })
         }
         catch (e)
@@ -436,12 +440,7 @@ export class Workspace
         if (!upToDate)
         {
             if (updateProgressCategory) updateProgressCategory("Extracting class info...", false);
-
-            const a = JSON.stringify([
-                "*/manifests/**/*.pp", "*/functions/**/*.pp", "*/types/**/*.pp", "*/lib/**/*.rb"
-            ]);
-
-            await Ruby.Call("puppet-strings.rb", [a, this.cacheModulesFilePath], this.modulesPath);
+            await Ruby.CallScript("puppet-strings.rb", [this.cacheModulesFilePath], this.modulesPath);
         }
 
         const modulesInfo = await this.loadModulesInfo();

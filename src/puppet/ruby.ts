@@ -45,16 +45,19 @@ export class Ruby
     {
         const ruby = require('app-root-path').resolve("ruby");
         const fixed = ruby.replace('app.asar', 'app.asar.unpacked');
-        console.log("Ruby Scripts Path = " + fixed);
         return fixed;
     }
 
     public static async CallBin(script: string, args: string[], cwd: string, env_: any, cb?: async.ExecFileLineCallback): Promise<string>
     {
+        const gemPath = path.join(Ruby.RubyScriptsPath(), "gems", "ruby", "2.3.0");
+        const gemBundlerPath = path.join(Ruby.RubyScriptsPath(), "bundler");
+        const binPath = path.join(Ruby.RubyScriptsPath(), "bin");
+
         const ruby = Ruby.Path();
 
         const argsTotal = [
-            '"' + path.join(ruby.path, script) + '"'
+            '"' + path.join(binPath, script) + '"'
         ];
 
         for (let arg of args)
@@ -66,19 +69,23 @@ export class Ruby
         Object.assign(env, env_);
 
         env["SSL_CERT_FILE"] = path.join(Ruby.RubyScriptsPath(), "cacert.pem");
+        env["GEM_PATH"] = '"' + gemPath + '"' + path.delimiter + '"' + gemBundlerPath + '"';
         env["PATH"] = '"' + ruby.path + '"' + path.delimiter + process.env["PATH"];
     
-        console.log("calling " + argsTotal.join(" "));
-        return await async.execFileReadIn(argsTotal.join(" "), cwd, env, cb);
+        console.log("calling " + ruby.rubyPath + " " + argsTotal.join(" "));
+        return await async.execFileReadIn('"' + ruby.rubyPath + '"', argsTotal, cwd, env, cb);
     }
 
-    public static async CallRubyBin(script: string, args: string[], cwd: string, env_: any, cb?: async.ExecFileLineCallback): Promise<void>
+    public static async CallScript(script: string, args: string[], cwd: string, env_?: any, cb?: async.ExecFileLineCallback): Promise<string>
     {
+        const gemPath = path.join(Ruby.RubyScriptsPath(), "gems", "ruby", "2.3.0");
+        const gemBundlerPath = path.join(Ruby.RubyScriptsPath(), "bundler");
+        const binPath = Ruby.RubyScriptsPath();
+
         const ruby = Ruby.Path();
 
         const argsTotal = [
-            '"' + ruby.rubyPath + '"',
-            '"' + path.join(ruby.path, script) + '"'
+            '"' + path.join(binPath, script) + '"'
         ];
 
         for (let arg of args)
@@ -87,19 +94,25 @@ export class Ruby
         }
 
         const env = Object.assign({}, process.env);
-        Object.assign(env, env_);
+        if (env_ != null)
+            Object.assign(env, env_);
 
         env["SSL_CERT_FILE"] = path.join(Ruby.RubyScriptsPath(), "cacert.pem");
+        env["GEM_PATH"] = '"' + gemPath + '"' + path.delimiter + '"' + gemBundlerPath + '"';
         env["PATH"] = '"' + ruby.path + '"' + path.delimiter + process.env["PATH"];
     
-        console.log("calling " + argsTotal.join(" "));
-        await async.execFileReadIn(argsTotal.join(" "), cwd, env, cb);
+        console.log("calling " + ruby.rubyPath + " " + argsTotal.join(" "));
+        const result = await async.execFileReadIn('"' + ruby.rubyPath + '"', argsTotal, cwd, env, cb);
+        console.log("success!");
+        return result;
     }
-
     
-    public static StreamRuby(script: string, args: string[],  env_: any): 
+    public static Stream(script: string, args: string[], env_?: any): 
         child_process.ChildProcess
     {
+        const gemPath = path.join(Ruby.RubyScriptsPath(), "gems", "ruby", "2.3.0");
+        const gemBundlerPath = path.join(Ruby.RubyScriptsPath(), "bundler");
+
         const ruby = Ruby.Path();
 
         const argsTotal = [
@@ -112,53 +125,30 @@ export class Ruby
         }
 
         const env = Object.assign({}, process.env);
-        Object.assign(env, env_);
+        if (env_ != null)
+            Object.assign(env, env_);
 
         env["SSL_CERT_FILE"] = path.join(Ruby.RubyScriptsPath(), "cacert.pem");
+        env["GEM_PATH"] = '"' + gemPath + '"' + path.delimiter + '"' + gemBundlerPath + '"';
         env["PATH"] = '"' + ruby.path + '"' + path.delimiter + process.env["PATH"];
     
         console.log("path = " + env["PATH"]);
+        console.log("getm path = " + gemPath);
         console.log("calling " + ruby.rubyPath + " args " + argsTotal.join(" "));
             
         const options: child_process.SpawnOptions = {
             'cwd': Ruby.RubyScriptsPath(),
             'env': env,
-            'shell': true
+            'shell': true,
         };
 
         return child_process.spawn('"' + ruby.rubyPath + '"', argsTotal, options);
     }
 
-    public static async Call(script: string, args: Array<string>, cwd: string): Promise<boolean>
+    public static CallAndSendStdIn(script: string, args: Array<string>, cwd: string, data: string): Promise<void>
     {
         const ruby = Ruby.Path();
         const rubyScript = path.join(Ruby.RubyScriptsPath(), script);
-
-        const argsTotal = [];
-
-        argsTotal.push(rubyScript);
-
-        for (let arg of args)
-        {
-            argsTotal.push(arg);
-        }
-    
-        try
-        {
-            await async.execFile(ruby.rubyPath, argsTotal, cwd);
-            return true;
-        }
-        catch (e)
-        {
-            console.log("Failed to execute " + script + ": " + e);
-            return false;
-        }
-    }
-
-    public static CallInOut(script: string, args: Array<string>, cwd: string, data: string): Promise<string>
-    {
-        const rubyScript = path.join(Ruby.RubyScriptsPath(), script);
-
         const argsTotal = [];
 
         argsTotal.push(rubyScript);
@@ -168,6 +158,6 @@ export class Ruby
             argsTotal.push(arg);
         }
 
-        return async.execFileInOut(Ruby.Path().rubyPath, argsTotal, cwd, data);
+        return async.execAndSendStdIn(ruby.rubyPath, argsTotal, cwd, data);
     }
 }

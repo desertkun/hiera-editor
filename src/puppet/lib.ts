@@ -24,7 +24,7 @@ export class PuppetRubyBridge
         const env = {};
 
         this.connected = true;
-        this.process = Ruby.StreamRuby("puppet-compiler.rb", [], env);
+        this.process = Ruby.Stream("puppet-compiler.rb", [], env);
 
         this.process.on("close", (code: number, signal: string) => 
         {

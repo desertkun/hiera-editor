@@ -156,7 +156,7 @@ export class PuppetModulesInfo
 
             try
             {
-                await Ruby.CallInOut("puppet-parser.rb", [], modulesPath, JSON.stringify(files));
+                await Ruby.CallAndSendStdIn("puppet-parser.rb", [], modulesPath, JSON.stringify(files));
                 console.log("Compiling done!");
             }
             catch (e)

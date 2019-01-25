@@ -5,3 +5,7 @@ dist
 /.idea/workspace.xml
 .yardoc
 release-builds
+ruby/gems
+ruby/bin
+ruby/.bundle
+ruby/bundler

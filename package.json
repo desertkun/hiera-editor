@@ -6,9 +6,9 @@
   "scripts": {
     "start": "electron .",
     "postinstall": "npx run-script-os && npx electron-builder install-app-deps",
-    "install:darwin": "./node_modules/rubyjs-darwin/bin/gem install bundler && BUNDLE_GEMFILE=./ruby/Gemfile ./node_modules/rubyjs-darwin/bin/bundle install",
-    "install:linux": "./node_modules/rubyjs-linux/bin/gem install -f bundler && BUNDLE_GEMFILE=./ruby/Gemfile ./node_modules/rubyjs-linux/bin/bundle install",
-    "install:win32": "cmd /C \"set BUNDLE_GEMFILE=ruby\\Gemfile && node_modules\\rubyjs-win32\\bin\\gem install bundler && node_modules\\rubyjs-win32\\bin\\bundle install\"",
+    "install:darwin": "GEM_HOME=./ruby/bundler ./node_modules/rubyjs-darwin/bin/gem install bundler && BUNDLE_GEMFILE=./ruby/Gemfile GEM_HOME=./ruby/bundler ./ruby/bundler/bin/bundle install",
+    "install:linux": "GEM_HOME=./ruby/bundler ./node_modules/rubyjs-linux/bin/gem install -f bundler && BUNDLE_GEMFILE=./ruby/Gemfile GEM_HOME=./ruby/bundler ./ruby/bundler/bin/bundle install",
+    "install:win32": "cmd /C \"set BUNDLE_GEMFILE=ruby\\Gemfile && set GEM_HOME=ruby\\home && node_modules\\rubyjs-win32\\bin\\gem install bundler && ruby\\bundler\\bin\\bundle install",
     "test": "mocha --timeout 15000 dist/tests/**/*.js",
     "compile": "tsc",
     "dist": "npm run compile && npx electron-builder",
@@ -38,7 +38,7 @@
       "asar": true,
       "asarUnpack": [
         "**/app/node_modules/rubyjs-darwin/*",
-        "./ruby/*"
+        "./ruby/**/*"
       ],
       "icon": "build/icons/icon.icns",
       "target": [
@@ -50,7 +50,7 @@
       "asar": true,
       "asarUnpack": [
         "**/app/node_modules/rubyjs-win32/*",
-        "./ruby/*"
+        "./ruby/**/*"
       ],
       "icon": "build/icons/icon.ico"
     },
@@ -58,7 +58,7 @@
       "asar": true,
       "asarUnpack": [
         "**/app/node_modules/rubyjs-linux/*",
-        "./ruby/*"
+        "./ruby/**/*"
       ],
       "icon": "build/icons/icon.png"
     }

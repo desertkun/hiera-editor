@@ -291,26 +291,36 @@ export function execFile(path: string, args: Array<string>, cwd: string, env?: a
 
 export type ExecFileLineCallback = (line: string) => void;
 
-export function execFileReadIn(command: string, cwd: string, env?: any, cb?: ExecFileLineCallback): Promise<string>
+export function execFileReadIn(command: string, args:Array<string>, cwd: string, env?: any, cb?: ExecFileLineCallback): Promise<string>
 {
     return new Promise<string>((resolve, reject) =>
     {
-        const options: child_process.ExecFileOptions = {
+        const options: child_process.SpawnOptions = {
             'cwd': cwd,
-            'maxBuffer': 1024000,
+            'shell': true,
             'env': env
         };
 
-        const process = child_process.exec(command, options, (error: Error, stdout: string, stderr: string) =>
+        const process = child_process.spawn(command, args, options);
+
+        const handler = {
+            stream: "",
+            erorr: ""
+        };
+
+        process.stderr.on("data", (data) => 
         {
-            if (error != null)
-            {
-                reject(stderr);
-            }
-            else
-            {
-                resolve(stdout);
-            }
+            handler.erorr += data.toString();
+        });
+        
+        process.stderr.on("data", (data) => 
+        {
+            console.log(data.toString());
+        });
+
+        process.on("error", (e) => 
+        {
+            reject(e);
         });
 
         if (cb != null)
@@ -331,27 +341,49 @@ export function execFileReadIn(command: string, cwd: string, env?: any, cb?: Exe
                 return true;
             });
         }
-    });
-}
-
-export function execFileInOut(path: string, args: Array<string>, cwd: string, data: string): Promise<string>
-{
-    return new Promise<string>((resolve, reject) =>
-    {
-        const options: child_process.ExecFileOptions = {
-            'cwd': cwd,
-            'maxBuffer': 1024000
-        };
-
-        const process = child_process.execFile(path, args, options, (error: Error, stdout: string, stderr: string) =>
+        else
         {
-            if (error != null)
+            process.stdout.on("data", (data) => 
             {
-                reject(error);
+                handler.stream += data.toString();
+            });
+        }
+
+        process.on("close", (code: number, signal: string) => 
+        {
+            if (code == 0)
+            {
+                resolve(handler.stream);
             }
             else
             {
-                resolve(stdout);
+                reject("Error: " + code + " " + handler.erorr);
+            }
+        });
+    });
+}
+
+export function execAndSendStdIn(path: string, args: Array<string>, cwd: string, data: string, env?: any): Promise<void>
+{
+    return new Promise<void>((resolve, reject) =>
+    {
+        const options: child_process.ExecFileOptions = {
+            'cwd': cwd,
+            'maxBuffer': 1024000,
+            'env': env
+        };
+
+        const process = child_process.execFile(path, args, options);
+
+        process.on("close", (code: number, signal: string) => 
+        {
+            if (code == 0)
+            {
+                resolve();
+            }
+            else
+            {
+                reject("Error: " + code + " " + signal);
             }
         });
 
