@@ -69,8 +69,9 @@ export class Ruby
         Object.assign(env, env_);
 
         env["SSL_CERT_FILE"] = path.join(Ruby.RubyScriptsPath(), "cacert.pem");
-        env["GEM_PATH"] = '"' + gemPath + '"' + path.delimiter + '"' + gemBundlerPath + '"';
-        env["PATH"] = '"' + ruby.path + '"' + path.delimiter + process.env["PATH"];
+        env["GEM_PATH"] = gemPath + path.delimiter + gemBundlerPath;
+        env["GEM_HOME"] = gemPath;
+        env["PATH"] = ruby.path + path.delimiter + process.env["PATH"];
     
         console.log("calling " + ruby.rubyPath + " " + argsTotal.join(" "));
         return await async.execFileReadIn('"' + ruby.rubyPath + '"', argsTotal, cwd, env, cb);
@@ -98,8 +99,9 @@ export class Ruby
             Object.assign(env, env_);
 
         env["SSL_CERT_FILE"] = path.join(Ruby.RubyScriptsPath(), "cacert.pem");
-        env["GEM_PATH"] = '"' + gemPath + '"' + path.delimiter + '"' + gemBundlerPath + '"';
-        env["PATH"] = '"' + ruby.path + '"' + path.delimiter + process.env["PATH"];
+        env["GEM_PATH"] = gemPath + path.delimiter + gemBundlerPath;
+        env["GEM_HOME"] = gemPath;
+        env["PATH"] = ruby.path + path.delimiter + process.env["PATH"];
     
         console.log("calling " + ruby.rubyPath + " " + argsTotal.join(" "));
         const result = await async.execFileReadIn('"' + ruby.rubyPath + '"', argsTotal, cwd, env, cb);
@@ -129,8 +131,9 @@ export class Ruby
             Object.assign(env, env_);
 
         env["SSL_CERT_FILE"] = path.join(Ruby.RubyScriptsPath(), "cacert.pem");
-        env["GEM_PATH"] = '"' + gemPath + '"' + path.delimiter + '"' + gemBundlerPath + '"';
-        env["PATH"] = '"' + ruby.path + '"' + path.delimiter + process.env["PATH"];
+        env["GEM_PATH"] = gemPath + path.delimiter + gemBundlerPath + '"';
+        env["GEM_HOME"] = gemPath;
+        env["PATH"] = ruby.path + path.delimiter + process.env["PATH"];
     
         console.log("path = " + env["PATH"]);
         console.log("getm path = " + gemPath);

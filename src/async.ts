@@ -310,7 +310,9 @@ export function execFileReadIn(command: string, args:Array<string>, cwd: string,
 
         process.stderr.on("data", (data) => 
         {
-            handler.erorr += data.toString();
+            const e = data.toString();
+            console.log(e);
+            handler.erorr += e;
         });
         
         process.stderr.on("data", (data) => 
