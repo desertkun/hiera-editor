@@ -239,6 +239,8 @@ export class NodeClassTab extends WorkspaceTab
     protected renderedProperties: any;
     protected hierarchyLevel: number;
 
+    private _keysImported: boolean;
+
     public constructor(path: Array<string>, buttonNode: any, contentNode: any, renderer: WorkspaceRenderer)
     {
         super(path, buttonNode, contentNode, renderer);
@@ -262,6 +264,8 @@ export class NodeClassTab extends WorkspaceTab
         this.className = this.path[2];
 
         await this.acquireInfo();
+
+        this._keysImported = await ipc.isEYamlKeysImported(this.environment, this.certname, this.hierarchyLevel);
     }
 
     protected async acquireInfo()
@@ -400,15 +404,12 @@ export class NodeClassTab extends WorkspaceTab
 
         for (const hierarchyEntry of this.hierarchy)
         {
-            let title = "";
-            if (hierarchyEntry.name != null)
-            {
-                title += hierarchyEntry.name + " ";
-            }
-            title += hierarchyEntry.path;
+            let title = hierarchyEntry.path;
+
             data.push({
                 "id": _id,
-                "text": title
+                "text": title,
+                "eyaml": hierarchyEntry.eyaml
             });
 
             _id++;
@@ -427,7 +428,8 @@ export class NodeClassTab extends WorkspaceTab
                 return entry.text;
             }
             const _id = parseInt(entry.id);
-            return $('<span class="modified-' + (_id % 12) + '"><i class="fas fa-stop"></i> ' + entry.text + '</span>');
+            const icon = entry.eyaml ? "lock" : "stop";
+            return $('<span class="modified-' + (_id % 12) + '"><i class="fas fa-' + icon + '"></i> ' + entry.text + '</span>');
         }
         
         const hierarchySelector = $('<select class="workspace-selector"></select>').appendTo(pad).select2({
@@ -466,6 +468,15 @@ export class NodeClassTab extends WorkspaceTab
         }
 
         this.renderHierarchySelector();
+
+        if (this.hierarchy[this.hierarchyLevel].eyaml && !this._keysImported)
+        {
+            const pad = $('<div class="container-w-padding"></div>').appendTo(this.contentNode);
+
+            $('<div class="alert alert-info" role="alert" style="margin-bottom: 0;"></div>').appendTo(pad).text(
+                "Haha"
+            );
+        }
 
         const editorHolder = $('<div class="w-100 node-class-properties"></div>').appendTo(this.contentNode);
         this.renderProperties(editorHolder);

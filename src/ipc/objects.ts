@@ -25,6 +25,7 @@ export interface HierarchyEntryDump
 {
     name: string;
     path: string;
+    eyaml: boolean;
 }
 
 export interface ClassDump

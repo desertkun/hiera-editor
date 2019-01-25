@@ -7,6 +7,8 @@ import { NodeContext } from "./node"
 import { PuppetASTVariable } from "./ast"
 import { Environment } from "./environment"
 import { File, Folder } from "./files"
+import { WorkspaceError } from "./util";
+import { HierarchyEntryDump } from "../ipc/objects"
 
 export class CompiledHierarchyEntry
 {
@@ -14,12 +16,14 @@ export class CompiledHierarchyEntry
     public path: string;
 
     private _file: File;
+    private _eyaml: EYaml;
 
     constructor (path: string, entry: HierarchyEntry)
     {
         this.path = path;
         this.entry = entry;
         this._file = null;
+        this._eyaml = entry.eyaml;
     }
 
     public get file(): File
@@ -35,11 +39,12 @@ export class CompiledHierarchyEntry
         return this.file.config.hasOwnProperty(property);
     }
 
-    public dump(): any
+    public dump(): HierarchyEntryDump
     {
         return {
-            "name": this.entry.name,
-            "path": this.path
+            name: this.entry.name,
+            path: this.path,
+            eyaml: this.eyaml != null
         };
     }
 
@@ -76,6 +81,11 @@ export class CompiledHierarchyEntry
             this._file = f;
             return true;
         }
+    }
+
+    public get eyaml(): EYaml
+    {
+        return this._eyaml;
     }
 }
 
@@ -125,26 +135,85 @@ export class HierarchyEntry
     public datadir: string;
     public options: any;
 
-    constructor (path: string, name?: string, options?: any, datadir?: any)
-    {
-        this.path = path;
-        this.name = name;
-        this.options = options;
-        this.datadir = datadir;
-    }
+    private _eyaml: EYaml;
 
-    public getTokens(): Array<string>
+    constructor (hierarchy: Hierarchy, entry: any)
     {
-        const tokens: string[] = [];
-        const regexp = new RegExp(/\%\{\:{0,2}([^\}]+)\}/g);
-
-        let match;
-        while ((match = regexp.exec(this.path)) != null) 
+        if (isString(entry))
         {
-            tokens.push(match[1]);
+            this.path = entry;
+        }
+        else
+        {
+            this.path = entry["path"];
+            this.name = entry["name"];
+            this.options = entry["options"];
+            this.datadir = entry["datadir"];                        
         }
 
-        return tokens;
+        switch (hierarchy.version)
+        {
+            case 5:
+            {
+                if (this.options != null && entry["lookup_key"] == "eyaml_lookup_key")
+                {
+                    this._eyaml = new EYaml(this.options, hierarchy.eyaml);
+                }
+                break;
+            }
+            default:
+            {
+                if (this.path.endsWith(".eyaml"))
+                {
+                    this._eyaml = new EYaml(null, hierarchy.eyaml);
+                }
+                break;
+            }
+        }
+
+        if (this._eyaml == null)
+        {
+            this._eyaml = hierarchy.eyaml;
+        }
+    }
+
+    public get eyaml(): EYaml
+    {
+        return this._eyaml;
+    }
+}
+
+export class EYaml
+{
+    private _pkcs7_public_key: string;
+    private _pkcs7_private_key: string;
+
+    constructor (data: any, parent?: EYaml)
+    {
+        if (parent != null)
+        {
+            this._pkcs7_public_key = parent._pkcs7_public_key;
+            this._pkcs7_private_key = parent._pkcs7_private_key;
+        }
+
+        if (data != null)
+        {
+            if (data.hasOwnProperty("pkcs7_public_key"))
+                this._pkcs7_public_key = data["pkcs7_public_key"];
+                
+            if (data.hasOwnProperty("pkcs7_private_key"))
+                this._pkcs7_private_key = data["pkcs7_private_key"];
+        }
+    }
+
+    public get private_key()
+    {
+        return this._pkcs7_public_key;
+    }
+    
+    public get public_key()
+    {
+        return this._pkcs7_public_key;
     }
 }
 
@@ -152,6 +221,8 @@ export class Hierarchy
 {
     private _hierarchy: Array<HierarchyEntry>;
     private _datadir: string;
+    private _eyaml: EYaml;
+    private _version: number;
     private readonly _path: string;
 
     constructor (_path: string)
@@ -160,8 +231,8 @@ export class Hierarchy
 
         this._datadir = "data";
         this._hierarchy = [
-            new HierarchyEntry("nodes/%{::trusted.certname}.yaml"), 
-            new HierarchyEntry("common.yaml")
+            new HierarchyEntry(this, "nodes/%{::trusted.certname}.yaml"), 
+            new HierarchyEntry(this, "common.yaml")
         ];
     }
 
@@ -203,10 +274,10 @@ export class Hierarchy
         return new CompiledHierarchy(this, c);
     }
 
-    public async load(): Promise<boolean>
+    public async load(): Promise<void>
     {
         if (!await async.isFile(this._path))
-            return false;
+            return;
 
         let data: any = null;
 
@@ -217,16 +288,81 @@ export class Hierarchy
         }
         catch (e)
         {
-            return false;
+            throw new WorkspaceError("Failed to parse hiera.yaml", e.toString());
         }
 
         if (!isObject(data))
-            return false;
+            throw new WorkspaceError("Failed to parse hiera.yaml", "Not an object");
+
+        function fix(obj: any)
+        {
+            const result: any = {};
+
+            for (const key in obj)
+            {
+                let value = obj[key];
+
+                if (isObject(value) && !isArray(value))
+                {
+                    value = fix(value);
+                }
+
+                if (key.startsWith(":"))
+                {
+                    result[key.substr(1)] = value;
+                }
+                else
+                {
+                    result[key] = value;
+                }
+            }
+
+            return result;
+        }
+
+        data = fix(data);
+
+        this._version = data["version"] || 3;
+
+        switch (this._version)
+        {
+            case 5:
+            {
+                const defaults = data["defaults"];
+
+                if (defaults)
+                {
+                    this._datadir = defaults["datadir"] || this._datadir;
+                    const lookup_key = defaults["lookup_key"];
+                    if (lookup_key == "eyaml_lookup_key" && defaults.hasOwnProperty("options"))
+                    {
+                        this._eyaml = new EYaml(defaults["options"])
+                    }
+                }
+                break
+            }
+            default:
+            {
+                const yaml = data["yaml"] || data["eyaml"];
+
+                if (yaml)
+                {
+                    this._datadir = yaml["datadir"];
+                }
+
+                if (data.hasOwnProperty("eyaml"))
+                {
+                    const eyaml = data["eyaml"];
+                    this._eyaml = new EYaml(eyaml);
+                }
+                break
+            }
+        }
 
         const hierarchy = data["hierarchy"];
 
         if (!isArray(hierarchy))
-            return false;
+            throw new WorkspaceError("Failed to parse hiera.yaml", "Hierarchy is not an array");
 
         this._hierarchy = [];
 
@@ -234,24 +370,42 @@ export class Hierarchy
         {
             if (isString(entry))
             {
-                this._hierarchy.push(new HierarchyEntry(entry));
+                this._hierarchy.push(new HierarchyEntry(this, entry));
             }
             if (isObject(entry))
             {
-                this._hierarchy.push(new HierarchyEntry(
-                    entry["path"],
-                    entry["name"],
-                    entry["options"],
-                    entry["datadir"]));
+                if (entry.hasOwnProperty("path"))
+                {
+                    this._hierarchy.push(new HierarchyEntry(this, entry));
+                }
+                else if (entry.hasOwnProperty("paths"))
+                {
+                    const paths: string[] = entry["paths"];
+
+                    for (const path_ of paths)
+                    {
+                        entry["path"] = path_;
+
+                        this._hierarchy.push(new HierarchyEntry(this, entry));
+                    }
+                }
             }
         }
-
-        return true;
     }
 
     public get path(): string
     {
         return this._path;
+    }
+
+    public get version(): number
+    {
+        return this._version;
+    }
+
+    public get eyaml(): EYaml
+    {
+        return this._eyaml;
     }
 
     public get datadir(): string

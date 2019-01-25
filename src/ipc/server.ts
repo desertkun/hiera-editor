@@ -442,6 +442,7 @@ export class IpcServer implements IpcAPI
             hierarchy.push({
                 name: entry.entry.name,
                 path: entry.path,
+                eyaml: entry.eyaml,
                 defined: entry.isPropertyDefined(property)
             })
         }
@@ -871,6 +872,23 @@ export class IpcServer implements IpcAPI
         }
             
         return await workspace.clearNodeIgnoreList();
+    }
+    
+    public async isEYamlKeysImported(environment: string, certname: string, hierarchy: number): Promise<boolean>
+    {
+        const workspace: Workspace = getCurrentWorkspace();
+        if (workspace == null)
+            return false;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
+
+        const node = env.getNode(certname);    
+        if (node == null)
+            return false;
+
+        return await node.isEYamlKeysImported(hierarchy);
     }
 }
 

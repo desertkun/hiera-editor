@@ -353,12 +353,7 @@ class NodeItemRenderer
             {
                 const hierarchy = zis.hierarchy[hierarchyLevel];
 
-                if (hierarchy.name)
-                {
-                    hierarcyName_ += hierarchy.name + " ";
-                }
-
-                hierarcyName_ += hierarchy.path;
+                hierarcyName_ = hierarchy.path;
             }
 
             const hierarcyName = hierarcyName_;
@@ -446,13 +441,7 @@ class NodeItemRenderer
                 if (hierarchyLevel >= 0)
                 {
                     const hierarchy = zis.hierarchy[hierarchyLevel];
-    
-                    if (hierarchy.name)
-                    {
-                        hierarcyName_ += hierarchy.name + " ";
-                    }
-    
-                    hierarcyName_ += hierarchy.path;
+                    hierarcyName_ = hierarchy.path;
                 }
     
                 const hierarcyName = hierarcyName_;

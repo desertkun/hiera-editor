@@ -1185,6 +1185,21 @@ export class NodeContext
         this._hierarchy = await this.env.hierarchy.compile(this, this.env);
         await this.resolveManifests(this.globalResolver());
     }
+    
+    public async isEYamlKeysImported(hierarchy: number): Promise<boolean>
+    {
+        const h = this._hierarchy.get(hierarchy);
+        if (h == null || h.eyaml == null)
+            return false;
+
+        const public_key = h.eyaml.public_key;
+        const keysPath = this.env.keysPath;
+
+        if (!await async.isDirectory(keysPath))
+            return false;
+
+        return async.isFile(path.join(keysPath, public_key));
+    }
 }
 
 export class Node

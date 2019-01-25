@@ -90,6 +90,11 @@ export class Environment
         return path.join(this._cachePath, "facts")
     }
 
+    public get keysPath(): string
+    {
+        return path.join(this._cachePath, "keys")
+    }
+
     public getNode(certname: string): NodeContext
     {
         return this._nodes.get(certname);
@@ -538,8 +543,15 @@ export class Environment
                 throw "Failed to create cache directory";
             }
         }
-
-        await this._hierarchy.load();
+        
+        try
+        {
+            await this._hierarchy.load()
+        }
+        catch (e)
+        {
+            this.addWarning(e);
+        }
 
         if (await async.isFile(path.join(this._path, "Puppetfile")) &&
             !await async.isDirectory(this.modulesPath))
@@ -855,5 +867,4 @@ export class Environment
 
         return result;
     }
-
 }

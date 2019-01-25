@@ -23,6 +23,10 @@ GEM
       gettext (>= 3.0.2)
       locale
     hiera (3.5.0)
+    hiera-eyaml (3.0.0)
+      highline (~> 1.6.19)
+      optimist
+    highline (1.6.21)
     hocon (1.2.5)
     httpclient (2.8.3)
     librarianp (0.6.4)
@@ -31,6 +35,7 @@ GEM
     minitar (0.6.1)
     multi_json (1.13.1)
     multipart-post (2.0.0)
+    optimist (3.0.0)
     puppet (6.1.0)
       facter (> 2.0.1, < 4)
       fast_gettext (~> 1.1.2)
@@ -89,6 +94,7 @@ PLATFORMS
 DEPENDENCIES
   anthill-librarian-puppet
   certified
+  hiera-eyaml
   puppet
   puppet-strings
   rdoc

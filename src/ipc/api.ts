@@ -51,4 +51,5 @@ export interface IpcAPI
     checkAuthentication(): Promise<void>;
     ignoreNode(cername: string): Promise<void>;
     clearIgnoreNodeList(): Promise<boolean>;
+    isEYamlKeysImported(environment: string, certname: string, hierarchy: number): Promise<boolean>;
 }

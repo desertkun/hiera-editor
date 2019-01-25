@@ -1,6 +1,7 @@
 
 import { IPC } from "../../ipc/client";
 import { ipcRenderer } from 'electron';
+import { HierarchyEntryDump } from "../../ipc/objects"
 
 const $ = require("jquery");
 const ellipsis = require('text-ellipsis');
@@ -72,17 +73,12 @@ class ManagePropertyHierarchyRenderer
         {
             const hierarchy = this.hierarchy[level];
             const level_ = level;
-
-            let text = "";
-            if (hierarchy.name)
-            {
-                text += hierarchy.name + " ";
-            }
-            text += hierarchy.path;
+            const text = hierarchy.path;
+            const icon = hierarchy.eyaml ? "lock" : "stop";
 
             const node = $('<div class="hierarchy-entry"></div>').appendTo(levels);
 
-            $('<span class="modified-' + (level % 12) + '"><i class="fas fa-stop"></i> ' + text + '</span>').appendTo(node);
+            $('<span class="modified-' + (level % 12) + '"><i class="fas fa-' + icon + '"></i> ' + text + '</span>').appendTo(node);
             const buttons = $('<span class="float-right"></span>').appendTo(node);
 
             const remove = $('<span class="btn btn-sm btn-success" title="Click To Undefine" style="display: none;">Defined</span>').appendTo(buttons);
