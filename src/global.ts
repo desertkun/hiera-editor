@@ -65,10 +65,19 @@ function initMenu()
     Menu.setApplicationMenu(projects_menu);
 }
 
-export async function init(cwd: string)
+export async function init()
 {
     initMenu();
-    rubyBridge.start(cwd);
+
+    try
+    {
+        rubyBridge.start();
+    }
+    catch (e)
+    {
+        console.log("Failed to start Ruby Bridge: " + e.toString());
+    }
+
     await projects_list.load();
 }
 

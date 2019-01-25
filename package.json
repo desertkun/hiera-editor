@@ -1,6 +1,6 @@
 {
   "name": "hiera-editor",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A GUI tool to manage your Puppet/Hiera for you",
   "main": "dist/main.js",
   "scripts": {
@@ -25,7 +25,8 @@
       "./css/**/*",
       "./js/**/*",
       "./images/**/*",
-      "./fonts/**/*"
+      "./fonts/**/*",
+      "./ruby/**/*"
     ],
     "directories": {
       "output": "release-builds"
@@ -36,7 +37,8 @@
     "mac": {
       "asar": true,
       "asarUnpack": [
-        "**/app/node_modules/rubyjs-darwin/*"
+        "**/app/node_modules/rubyjs-darwin/*",
+        "./ruby/*"
       ],
       "icon": "build/icons/icon.icns",
       "target": [
@@ -47,14 +49,16 @@
     "win": {
       "asar": true,
       "asarUnpack": [
-        "**/app/node_modules/rubyjs-win32/*"
+        "**/app/node_modules/rubyjs-win32/*",
+        "./ruby/*"
       ],
       "icon": "build/icons/icon.ico"
     },
     "linux": {
       "asar": true,
       "asarUnpack": [
-        "**/app/node_modules/rubyjs-linux/*"
+        "**/app/node_modules/rubyjs-linux/*",
+        "./ruby/*"
       ],
       "icon": "build/icons/icon.png"
     }

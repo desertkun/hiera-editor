@@ -168,7 +168,7 @@ async function testSimpleWorkspace(test: WorkspaceTest): Promise<NodeContext>
 
 describe('Workspaces', () =>
 {
-    rubyBridge.start(".");
+    rubyBridge.start();
 
     it('missing directory', () =>
     {

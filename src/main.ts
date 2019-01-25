@@ -7,7 +7,7 @@ const { autoUpdater } = require("electron-updater")
 async function initialize() 
 {
     autoUpdater.checkForUpdatesAndNotify();
-    await init(app.getAppPath());
+    await init();
     projects_window.show();
 }
 

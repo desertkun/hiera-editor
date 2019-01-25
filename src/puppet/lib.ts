@@ -18,13 +18,13 @@ export class PuppetRubyBridge
         this.stream = "";
     }
 
-    public start(cwd: string)
+    public start()
     {
         const zis = this;
         const env = {};
 
         this.connected = true;
-        this.process = Ruby.StreamRuby("puppet-compiler.rb", [], cwd, env);
+        this.process = Ruby.StreamRuby("puppet-compiler.rb", [], env);
 
         this.process.on("close", (code: number, signal: string) => 
         {
