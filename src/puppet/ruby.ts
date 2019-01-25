@@ -148,12 +148,24 @@ export class Ruby
         return child_process.spawn('"' + ruby.rubyPath + '"', argsTotal, options);
     }
 
-    public static CallAndSendStdIn(script: string, args: Array<string>, cwd: string, data: string): Promise<void>
+    public static CallAndSendStdIn(script: string, args: Array<string>, cwd: string, data: string, env_?: any): Promise<void>
     {
+        const gemPath = path.join(Ruby.RubyScriptsPath(), "gems", "ruby", "2.3.0");
+        const gemBundlerPath = path.join(Ruby.RubyScriptsPath(), "bundler");
+
         const ruby = Ruby.Path();
         const rubyScript = path.join(Ruby.RubyScriptsPath(), script);
         const argsTotal = [];
 
+        const env = Object.assign({}, process.env);
+        if (env_ != null)
+            Object.assign(env, env_);
+
+        env["SSL_CERT_FILE"] = path.join(Ruby.RubyScriptsPath(), "cacert.pem");
+        env["GEM_PATH"] = gemPath + path.delimiter + gemBundlerPath + '"';
+        env["GEM_HOME"] = gemPath;
+        env["PATH"] = ruby.path + path.delimiter + process.env["PATH"];
+    
         argsTotal.push(rubyScript);
 
         for (let arg of args)
@@ -161,6 +173,6 @@ export class Ruby
             argsTotal.push(arg);
         }
 
-        return async.execAndSendStdIn(ruby.rubyPath, argsTotal, cwd, data);
+        return async.execAndSendStdIn(ruby.rubyPath, argsTotal, cwd, data, env);
     }
 }

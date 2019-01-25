@@ -377,6 +377,11 @@ export function execAndSendStdIn(path: string, args: Array<string>, cwd: string,
 
         const process = child_process.execFile(path, args, options);
 
+        process.stderr.on("data", (data) => 
+        {
+            console.log(data.toString());
+        });
+        
         process.on("close", (code: number, signal: string) => 
         {
             if (code == 0)

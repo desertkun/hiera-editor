@@ -6,9 +6,9 @@
   "scripts": {
     "start": "electron .",
     "postinstall": "npx run-script-os && npx electron-builder install-app-deps",
-    "install:darwin": "GEM_HOME=./ruby/bundler ./node_modules/rubyjs-darwin/bin/gem install bundler && BUNDLE_GEMFILE=./ruby/Gemfile GEM_HOME=./ruby/bundler ./ruby/bundler/bin/bundle install",
-    "install:linux": "GEM_HOME=./ruby/bundler ./node_modules/rubyjs-linux/bin/gem install -f bundler && BUNDLE_GEMFILE=./ruby/Gemfile GEM_HOME=./ruby/bundler ./ruby/bundler/bin/bundle install",
-    "install:win32": "cmd /C \"set BUNDLE_GEMFILE=ruby\\Gemfile && set GEM_HOME=ruby\\home && node_modules\\rubyjs-win32\\bin\\gem install bundler && ruby\\bundler\\bin\\bundle install",
+    "install:darwin": "GEM_HOME=./ruby/bundler ./node_modules/rubyjs-darwin/bin/gem install bundler && BUNDLE_GEMFILE=./ruby/Gemfile GEM_HOME=./ruby/bundler ./ruby/bundler/bin/bundle install --path=../ruby/gems --binstubs=../ruby/bin",
+    "install:linux": "GEM_HOME=./ruby/bundler ./node_modules/rubyjs-linux/bin/gem install bundler && BUNDLE_GEMFILE=./ruby/Gemfile GEM_HOME=./ruby/bundler ./ruby/bundler/bin/bundle install --path=../ruby/gems --binstubs=../ruby/bin",
+    "install:win32": "cmd /C \"node_modules\\rubyjs-win32\\bin\\gem install bundler --install-dir=%CD%\\ruby\\bundler && ruby\\bundler\\bin\\bundle.bat install --gemfile=%CD%\\ruby\\Gemfile --path=..\\ruby\\gems --binstubs=..\\ruby\\bin\"",
     "test": "mocha --timeout 15000 dist/tests/**/*.js",
     "compile": "tsc",
     "dist": "npm run compile && npx electron-builder",
