@@ -126,7 +126,7 @@ export class Ruby
             'shell': true
         };
 
-        return child_process.spawn("ruby", argsTotal, options);
+        return child_process.spawn('"' + ruby.rubyPath + '"', argsTotal, options);
     }
 
     public static async Call(script: string, args: Array<string>, cwd: string): Promise<boolean>
