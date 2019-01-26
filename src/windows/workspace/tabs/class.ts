@@ -275,7 +275,7 @@ export class NodeClassTab extends WorkspaceTab
     {
         super(path, buttonNode, contentNode, renderer);
 
-        this.hierarchyLevel = 0;
+        this.hierarchyLevel = -1;
         this.renderedProperties = {};
     }
     
@@ -294,6 +294,23 @@ export class NodeClassTab extends WorkspaceTab
         this.className = this.path[2];
 
         await this.acquireInfo();
+
+        // highest hierarchy level that modified by default
+        if (this.hierarchyLevel == -1)
+        {
+            this.hierarchyLevel = this.hierarchy.length - 1;
+
+            const classFields = this.getProperties();
+            for (const propertyName of classFields)
+            {
+                const modifiedHierarchy = this.isValueModified(propertyName);
+
+                if (modifiedHierarchy >= 0 && this.hierarchyLevel > modifiedHierarchy)
+                {
+                    this.hierarchyLevel = modifiedHierarchy;
+                }
+            }
+        }
 
         this._keysImported = await ipc.isEYamlKeysImported(this.environment, this.certname, this.hierarchyLevel);
     }
