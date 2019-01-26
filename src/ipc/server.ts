@@ -7,6 +7,8 @@ import { CreateEnvironmentWindow } from "../windows/create_environment/window"
 import { CreateProjectWindow } from "../windows/create_project/window"
 import { ProgressWindow } from "../windows/progress/window"
 import { ManagePropertyHierarchyWindow } from "../windows/manage_property_hierarchy/window"
+import { ManageEYamlWindow } from "../windows/manage_eyaml/window"
+import { EnterPasswordWindow } from "../windows/enter_password/window"
 import { ProjectModel } from "../projects"
 import { isDirectory, listFiles } from "../async"
 import { Workspace } from "../puppet/workspace";
@@ -65,7 +67,7 @@ export class IpcServer implements IpcAPI
             throw new Error("Failed to create a new project");
         }
 
-        await this.openProject(path);
+        await this.openProject(path, false);
     }
 
     public async getProjectList(): Promise<any> 
@@ -194,6 +196,23 @@ export class IpcServer implements IpcAPI
             return null;
     
         return await node.setProperty(hierarchy, property, value);
+    }
+
+    public async encryptNodeClassProperty(environment: string, certname: string, hierarchy: number, className: string, propertyName: string): Promise<boolean>
+    {
+        const workspace: Workspace = getCurrentWorkspace();
+        if (workspace == null)
+            return null;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return null;
+
+        const node = env.getNode(certname);    
+        if (node == null)
+            return null;
+    
+        return await node.encryptNodeProperty(hierarchy, className, propertyName);
     }
 
     public async setNodeClassProperty(
@@ -893,7 +912,34 @@ export class IpcServer implements IpcAPI
         if (node == null)
             return false;
 
-        return await node.isEYamlKeysImported(hierarchy);
+        return node.isEYamlKeysImported(hierarchy);
+    }
+
+    public async manageEYamlKeys(environment: string, certname: string, hierarchy: number): Promise<boolean>
+    {
+        const workspace: Workspace = getCurrentWorkspace();
+        if (workspace == null)
+            return false;
+
+        const env = await workspace.getEnvironment(environment);
+        if (env == null)
+            return false;
+
+        const node = env.getNode(certname);    
+        if (node == null)
+            return false;
+
+        const hasPublicKey = node.hasEYamlPublickKey(hierarchy);
+        const publicKey = hasPublicKey ? node.getEYamlPublicKey(hierarchy) : null;
+        const window = new ManageEYamlWindow(publicKey, hasPublicKey);
+        const updatedPublicKey = await window.show()
+
+        if (updatedPublicKey != null)
+        {
+            return await node.updateEYamlKeys(hierarchy, updatedPublicKey);
+        }
+
+        return false;
     }
 }
 

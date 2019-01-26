@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Manage Hierarchy of a Property</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src * 'self' data: https:;">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-grid.min.css">
+    <link rel="stylesheet" href="../css/bootstrap-reboot.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/font-awesome.min.css">
+    <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
+    <link rel="stylesheet" href="../css/modified.css">
+    <script type="text/javascript">
+      window.$ = window.jQuery = require('jquery');
+    </script>
+    <script src="../js/tether.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+  </head>
+  <body>
+    <div class="container-w-padding flex-column flex-container w-100 h-100">
+      <span style="padding: 4px;">
+        Please enter the <b>Public Key</b>. Usually a file named public_key.pkcs7.pem.<br>
+        Used only to encrypt values, but never to decrypt.
+      </span>
+      <textarea class="w-100 flex-item form-control" id="public-key-value" style="resize: none;"></textarea>
+      
+      <div class="w-100 d-flex justify-content-end bottom-buttons" style="padding-top: 8px;">
+          <input type="button" id="apply" class="btn btn-sm btn-primary" value="Apply">
+      </div>
+    </div>
+
+    <script>
+      require('../dist/windows/manage_eyaml/renderer.js')
+    </script>
+  </body>
+</html>

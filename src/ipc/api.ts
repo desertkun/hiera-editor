@@ -14,6 +14,7 @@ export interface IpcAPI
     hasNodeClassProperty(environment: string, certname: string, className: string, propertyName: string): Promise<boolean>;
     setNodeClassProperty(environment: string, certname: string, hierarchy: number, className: string, propertyName: string, value: any): Promise<any>;
     setNodeProperty(environment: string, certname: string, hierarchy: number, property: string, value: any): Promise<any>;
+    encryptNodeClassProperty(environment: string, certname: string, hierarchy: number, className: string, propertyName: string): Promise<boolean>;
     removeNodeProperty(environment: string, certname: string, hierarchy: number, propertyName: string): Promise<any>;
     removeNodeClassProperty(environment: string, certname: string, hierarchy: number, className: string, propertyName: string): Promise<any>;
     removeNodeClassProperties(environment: string, certname: string, className: string): Promise<any>;
@@ -52,4 +53,5 @@ export interface IpcAPI
     ignoreNode(cername: string): Promise<void>;
     clearIgnoreNodeList(): Promise<boolean>;
     isEYamlKeysImported(environment: string, certname: string, hierarchy: number): Promise<boolean>;
+    manageEYamlKeys(environment: string, certname: string, hierarchy: number): Promise<boolean>;
 }

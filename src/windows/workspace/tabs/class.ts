@@ -2,7 +2,8 @@ import { IPC } from "../../../ipc/client";
 import { WorkspaceTab } from "./tab";
 import { WorkspaceRenderer } from "../renderer";
 import { ClassDump, HierarchyEntryDump } from "../../../ipc/objects"
-import { isNumber, isObject, isBoolean } from "util";
+import { isNumber, isObject, isBoolean, isString } from "util";
+import { EncryptedVariable } from "../../../puppet/ast";
 
 const ipc = IPC();
 
@@ -228,6 +229,35 @@ class BooleanPropertyRenderer implements PropertyRenderer
     }
 }
 
+class EncryptedPropertyRenderer implements PropertyRenderer
+{
+    public render(group: any, propertyId: string, value: any, changed: PropertyChangedCallback): RenderedProperty
+    {
+        const textField = $('<input type="text" class="form-control form-control-sm" id="' + propertyId + '" readonly>')
+            .appendTo(group)
+            .val(value);
+
+        if (value)
+        {
+            $(textField).attr('placeholder', value);
+        }
+
+        return {
+            value(): any
+            {
+                return textField.val();
+            },
+            set(value: any): void
+            {
+            },
+            modified(value: boolean): void
+            {
+
+            }
+        };
+    }
+}
+
 export class NodeClassTab extends WorkspaceTab
 {
     private info: ClassDump;
@@ -417,9 +447,11 @@ export class NodeClassTab extends WorkspaceTab
 
         const pad = $('<div class="container-grayed d-flex flex-row"></div>').appendTo(this.contentNode);
 
-        const title = $('<span class="text-muted" style="padding: 6px 10px 6px 10px;"></span>').appendTo(pad);
-        $('<i class="fas fa-project-diagram" title="This selector affects at what level of hierarchy the edits are made" ' +
-            'data-toggle="tooltip" data-placement="bottom"></i>').tooltip().appendTo(title);
+        {
+            const title = $('<span class="text-muted" style="padding: 6px 10px 6px 10px;"></span>').appendTo(pad);
+            $('<i class="fas fa-project-diagram" title="This selector affects at what level of hierarchy the edits are made" ' +
+                'data-toggle="tooltip" data-placement="bottom"></i>').tooltip().appendTo(title);
+        }
 
         function format(entry: any) 
         {
@@ -438,6 +470,40 @@ export class NodeClassTab extends WorkspaceTab
             "templateSelection": format,
             "templateResult": format
         });
+
+        if (this.hierarchy[this.hierarchyLevel].eyaml)
+        {
+            let e;
+
+            if (this._keysImported)
+            {
+                const title = $('<span class="text-success" style="padding: 6px 10px 6px 10px;"></span>').appendTo(pad);
+                e = $('<i class="fas fa-key" title="click here to configure eyaml keys" ' +
+                    'data-toggle="tooltip" data-placement="bottom"></i>').tooltip().appendTo(title);
+            }
+            else
+            {
+                const title = $('<span class="text-warning" style="padding: 6px 10px 6px 10px;"></span>').appendTo(pad);
+                e = $('<i class="fas fa-exclamation-triangle" title="eyaml is not configured, click to configure" ' +
+                    'data-toggle="tooltip" data-placement="bottom"></i>').tooltip().appendTo(title);
+            }
+
+            const eyaml = e;
+
+            eyaml.click(async () => 
+            {
+                $(eyaml).tooltip('hide');
+                
+                if (await ipc.manageEYamlKeys(this.environment, this.certname, this.hierarchyLevel))
+                {
+                    zis.refresh();
+                }
+                else
+                {
+                    dialogs.alert("Failed to update eyaml keys.")
+                }
+            });
+        }
 
         hierarchySelector.val(zis.hierarchyLevel).trigger("change");
 
@@ -468,15 +534,6 @@ export class NodeClassTab extends WorkspaceTab
         }
 
         this.renderHierarchySelector();
-
-        if (this.hierarchy[this.hierarchyLevel].eyaml && !this._keysImported)
-        {
-            const pad = $('<div class="container-w-padding"></div>').appendTo(this.contentNode);
-
-            $('<div class="alert alert-info" role="alert" style="margin-bottom: 0;"></div>').appendTo(pad).text(
-                "Haha"
-            );
-        }
 
         const editorHolder = $('<div class="w-100 node-class-properties"></div>').appendTo(this.contentNode);
         this.renderProperties(editorHolder);
@@ -534,14 +591,74 @@ export class NodeClassTab extends WorkspaceTab
         });
 
         const modifiedHierarchy = this.isValueModified(propertyName);
-        const value = this.getPropertyValue(propertyName);
+        const encrypted = this.isPropertyEncrypted(propertyName);
+        let value = this.getPropertyValue(propertyName);
 
         const label = $('<span class="text-small"></span>').appendTo(node);
-        
-        const modified = $('<a class="class-property-action" style="display: none;" title="Reset to default value">' + 
-            '<i class="fas fa-trash"></i></a>').appendTo(label);
-        const l = $('<label for="' + propertyId + '">' + humanName + '</label>').appendTo(label);
 
+        // show the modified marker is the class if there is any value to it (including null)
+        if (modifiedHierarchy >= 0)
+        {
+            const modified = $('<a class="class-property-action">' + 
+                '<i class="fas fa-' + (encrypted ? 'lock' : 'trash') + '"></i></a>').appendTo(label);
+
+            if (encrypted)
+            {
+                modified.attr("title", "Encrypted, click to remove encryption and reset to default value")
+            }
+            else
+            {
+                modified.attr("title", "Reset to default value")
+
+                if (this.hierarchy[this.hierarchyLevel].eyaml && modifiedHierarchy == this.hierarchyLevel)
+                {
+                    const encrypt = $('<a class="class-property-action" title="Click to encrypt the value">' + 
+                        '<i class="fas fa-key"></i></a>').tooltip().appendTo(label);
+
+                    encrypt.click(async () => 
+                    {
+                        await ipc.encryptNodeClassProperty(zis.environment, zis.certname, 
+                            modifiedHierarchy, zis.className, propertyName);
+                        await ipc.invalidateNodeClass(zis.environment, zis.certname, zis.className);
+                        await zis.refresh();
+                    });
+                }
+            }
+
+            modified.click(async () => 
+            {
+                await zis.removeProperty(propertyName, modifiedHierarchy);
+                await zis.refresh();
+            }).tooltip();
+
+            $(label).addClass("modified").addClass("modified-" + modifiedHierarchy);
+            $(node).addClass("modified").addClass("modified-" + modifiedHierarchy);
+        }
+
+        const group = $('<div class="input-group"></div>').appendTo(node);
+
+        let renderer;
+
+        if (this.isPropertyEncrypted(propertyName))
+        {
+            renderer = new EncryptedPropertyRenderer();
+            value = this.getEncryptedPropertyRaw(propertyName);
+        }
+        else
+        {
+            const typeInfo = this.getPropertyTypeInfo(propertyName);
+
+            if (typeInfo != null)
+            {
+                renderer = this.getPropertyRenderer(typeInfo, value);
+            }
+            else
+            {
+                renderer = this.getDefaultPropertyRenderer(value);
+            }
+        }
+
+        const l = $('<label for="' + propertyId + '">' + humanName + '</label>').appendTo(label);
         const description = this.getTag("param", propertyName);
 
         if (description != null && description != "")
@@ -553,43 +670,13 @@ export class NodeClassTab extends WorkspaceTab
         {
             $(l).css('font-weight', "bold");
         }
-
-        // show the modified marker is the class if there is any value to it (including null)
-        if (modifiedHierarchy >= 0)
-        {
-            modified.show();
-
-            $(label).addClass("modified").addClass("modified-" + modifiedHierarchy);
-            $(node).addClass("modified").addClass("modified-" + modifiedHierarchy);
-        }
-
-        const group = $('<div class="input-group"></div>').appendTo(node);
-
-        let renderer;
-
-        const typeInfo = this.getPropertyTypeInfo(propertyName);
-
-        if (typeInfo != null)
-        {
-            renderer = this.getPropertyRenderer(typeInfo, value);
-        }
-        else
-        {
-            renderer = this.getDefaultPropertyRenderer(value);
-        }
-
+        
         const renderedProperty = this.renderedProperties[propertyName] = 
             renderer.render(group, propertyId, value, async function(value: any)
         {
             await zis.setProperty(propertyName, value);
             await zis.refresh();
         });
-        
-        modified.click(async () => {
-            modified.tooltip('hide');
-            await zis.removeProperty(propertyName, modifiedHierarchy);
-            await zis.refresh();
-        }).tooltip();
         
         const error = this.getPropertyErrorInfo(propertyName);
         if (error != null)
@@ -708,6 +795,16 @@ export class NodeClassTab extends WorkspaceTab
     protected getPropertyValue(propertyName: string): any
     {
         return this.values[propertyName];
+    }
+
+    protected isPropertyEncrypted(propertyName: string): boolean
+    {
+        return this.info.encrypted.indexOf(propertyName) >= 0;
+    }
+
+    protected getEncryptedPropertyRaw(propertyName: string): string
+    {
+        return (<EncryptedVariable>this.getPropertyValue(propertyName)).raw;
     }
 
     protected isValueModified(propertyName: string): number

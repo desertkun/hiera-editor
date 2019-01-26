@@ -1,21 +1,25 @@
 
 import * as async from "../async"
 import * as path from "path"
+import * as crypto from "crypto"
 
 import { Dictionary } from "../dictionary"
 import { PuppetASTParser, PuppetASTClass, PuppetASTFunction, Resolver,
     PuppetASTDefinedType, PuppetASTEnvironment, PuppetASTResource, HieraSourceResolveCallback,
     ResolvedFunction, PuppetASTContainerContext,
-    PuppetASTObject} from "./ast"
+    PuppetASTObject,
+    EncryptedVariable } from "./ast"
 
 import { GlobalVariableResolver, GlobalVariableResolverResults, CompilationError } from "./util"
 import { Environment } from "./environment"
-import { CompiledHierarchy } from "./hiera"
+import { CompiledHierarchy, EYamlKeyPair, EYaml } from "./hiera"
 import { ClassDump, ResourceDump, NodeDump, ClassInfoDump, DefiledTypeInfoDump, NodeDefinedTypeDump } from "../ipc/objects"
 import { rubyBridge } from "../global"
 import { CERTIFICATE_EXTENSIONS } from "./cert"
+import { isString } from "util";
 
 const parseDomain = require('domain-name-parser');
+const ENC_PATTERN = /ENC\[\s*([A-Z0-9]+)\s*,\s*(.+)\s*\]/;
 
 class NodeContextResolver implements Resolver
 {
@@ -58,7 +62,7 @@ class NodeContextResolver implements Resolver
         this.context.registerResource(resource);
     }
 
-    public getGlobalVariable(name: string): string
+    public getGlobalVariable(name: string): any
     {
         return this.global.get(name);
     }
@@ -204,6 +208,7 @@ export class NodeContext
         const hints: any = {};
         const fields: string[] = [];
         const requiredFields: string[] = [];
+        const encrypted: string[] = [];
         const values: any = {};
         const modified: any = {};
         const classHints: any = compiled.hints;
@@ -229,6 +234,11 @@ export class NodeContext
             if (property.hasValue)
             {
                 values[name] = property.value;
+
+                if (property.value instanceof EncryptedVariable)
+                {
+                    encrypted.push(name);
+                }
             }
 
             if (property.hasError)
@@ -257,6 +267,7 @@ export class NodeContext
             "propertyHints": hints,
             "hints": classHints,
             "fields": fields,
+            "encrypted": encrypted,
             "requiredFields": requiredFields,
             "hierarchy": this.hierarchy.dump()
         }
@@ -360,6 +371,7 @@ export class NodeContext
             "errors": errors,
             "options": options,
             "hierarchyLevel": compiled.hierarchy,
+            "encrypted": [],
             "propertyHints": hints,
             "fields": fields,
             "modified": modified,
@@ -432,6 +444,47 @@ export class NodeContext
 
         await file.save();
         await this.invalidateResources(key);
+    }
+
+    public async encryptNodeProperty(hierarchy: number, className: string, propertyName: string): Promise<boolean>
+    {
+        const hierarchyEntry = this.hierarchy.get(hierarchy);
+        if (hierarchyEntry == null)
+            return;
+
+        const file = hierarchyEntry.file;
+        if (file == null)
+            return false;
+
+        const eyaml = hierarchyEntry.eyaml;
+        if (eyaml == null)
+            return false;
+
+        const publicKey = this.env.workspace.getEYamlPublicKey(eyaml);
+        if (publicKey == null)
+            return false;
+
+        const propertyPath = this.compilePropertyPath(className, propertyName);
+
+        if (!file.config.hasOwnProperty(propertyPath))
+            return false;
+
+        const oldValue = file.config[propertyPath];
+
+        let encrypted;
+
+        try
+        {
+            encrypted = eyaml.encrypt(oldValue, publicKey);
+        }
+        catch (e)
+        {
+            return false;
+        }
+
+        file.config[propertyPath] = encrypted
+        await file.save();
+        return true;
     }
 
     public async setProperty(hierarchy: number, property: string, value: any): Promise<any>
@@ -872,7 +925,23 @@ export class NodeContext
                 continue;
 
             if (f.has(key))
-                return f.get(key);
+            {
+                const value = f.get(key);
+
+                if (isString(value))
+                {
+                    const m = value.match(ENC_PATTERN);
+                    if (m != null)
+                    {
+                        const kind = m[1];
+                        const data = m[2];
+
+                        return new EncryptedVariable(value, data, kind);
+                    }
+                }
+                
+                return value;
+            };
         }
 
         return null;
@@ -1186,19 +1255,49 @@ export class NodeContext
         await this.resolveManifests(this.globalResolver());
     }
     
-    public async isEYamlKeysImported(hierarchy: number): Promise<boolean>
+    public isEYamlKeysImported(hierarchy: number): boolean
     {
         const h = this._hierarchy.get(hierarchy);
         if (h == null || h.eyaml == null)
             return false;
 
-        const public_key = h.eyaml.public_key;
-        const keysPath = this.env.keysPath;
+        return this.env.workspace.isEYamlKeysImported(h.eyaml);
+    }
 
-        if (!await async.isDirectory(keysPath))
+    public hasEYamlPublickKey(hierarchy: number): boolean
+    {
+        const h = this._hierarchy.get(hierarchy);
+        if (h == null || h.eyaml == null)
             return false;
 
-        return async.isFile(path.join(keysPath, public_key));
+        return this.env.workspace.hasEYamlPublickKey(h.eyaml);
+    }
+
+    public getEYaml(hierarchy: number): EYaml
+    {
+        const h = this._hierarchy.get(hierarchy);
+        if (h == null)
+            return null;
+
+        return h.eyaml;
+    }
+
+    public getEYamlPublicKey(hierarchy: number): string
+    {
+        const h = this._hierarchy.get(hierarchy);
+        if (h == null || h.eyaml == null)
+            return null;
+
+        return this.env.workspace.getEYamlPublicKey(h.eyaml);
+    }
+
+    public async updateEYamlKeys(hierarchy: number, updatedPublicKey: string): Promise<boolean>
+    {
+        const h = this._hierarchy.get(hierarchy);
+        if (h == null || h.eyaml == null)
+            return false;
+
+        return await this.env.workspace.updateEYamlKeys(h.eyaml, updatedPublicKey);
     }
 }
 

@@ -90,11 +90,6 @@ export class Environment
         return path.join(this._cachePath, "facts")
     }
 
-    public get keysPath(): string
-    {
-        return path.join(this._cachePath, "keys")
-    }
-
     public getNode(certname: string): NodeContext
     {
         return this._nodes.get(certname);

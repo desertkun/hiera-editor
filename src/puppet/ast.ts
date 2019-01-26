@@ -10,6 +10,20 @@ export type HieraSourceResolveCallback = () => Promise<number>;
 
 export type ResolvedFunction = (args: PuppetASTObject[]) => Promise<any>;
 
+export class EncryptedVariable
+{
+    public raw: string;
+    public data: string;
+    public algorithm: string;
+
+    constructor(raw: string, data: string, algorithm: string)
+    {
+        this.raw = raw;
+        this.data = data;
+        this.algorithm = algorithm;
+    }
+}
+
 export interface Resolver
 {
     resolveClass(className: string, public_: boolean): Promise<PuppetASTClass>;
@@ -2427,6 +2441,14 @@ export class PuppetASTVariable extends PuppetASTObject
             if (property)
             {
                 this.carryHints(property.hints);
+
+                if (property.value instanceof EncryptedVariable)
+                {
+                    // encrypted variables cannot be resolved, because decryption of those
+                    // would require a private key, using it posesses a security risk
+                    return "";
+                }
+
                 return property.value;
             }
             else if (isRoot)

@@ -39,6 +39,16 @@ export class NodeResourceTab extends NodeClassTab
     {
         this.resourceInfo = await ipc.acquireNodeResource(this.environment, this.certname, this.className, this.title);
     }
+
+    protected isPropertyEncrypted(propertyName: string): boolean
+    {
+        return false;
+    }
+
+    protected getEncryptedPropertyRaw(propertyName: string): string
+    {
+        return null;
+    }
     
     protected renderHierarchySelector()
     {

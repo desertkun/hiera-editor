@@ -61,6 +61,7 @@ export abstract class WorkspaceTab
 
     public async refresh(): Promise<void>
     {
+        $(".tooltip").tooltip("dispose");
         const scroll = $(this.contentNode).parent().scrollTop();
         $(this.contentNode).html('');
         await this.release();

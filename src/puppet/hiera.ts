@@ -10,6 +10,8 @@ import { File, Folder } from "./files"
 import { WorkspaceError } from "./util";
 import { HierarchyEntryDump } from "../ipc/objects"
 
+const forge = require('node-forge');
+
 export class CompiledHierarchyEntry
 {
     public entry: HierarchyEntry;
@@ -183,6 +185,13 @@ export class HierarchyEntry
     }
 }
 
+export type EYamlKeyPair = [string?, string?];
+
+export class ErrorPrivateKeyIsNotProtected extends Error
+{
+
+}
+
 export class EYaml
 {
     private _pkcs7_public_key: string;
@@ -206,9 +215,22 @@ export class EYaml
         }
     }
 
+    public encrypt(value: string, publicKey: string): any
+    {
+        const cert = forge.pki.certificateFromPem(publicKey);
+        const p7 = forge.pkcs7.createEnvelopedData();
+        p7.addRecipient(cert);
+        p7.content = forge.util.createBuffer();
+        p7.content.putString(value);
+        p7.encrypt();
+        const bytes = forge.asn1.toDer(p7.toAsn1()).getBytes();
+        const raw = forge.util.encode64(bytes);
+        return "ENC[PKCS7," + raw + "]";
+    }
+
     public get private_key()
     {
-        return this._pkcs7_public_key;
+        return this._pkcs7_private_key;
     }
     
     public get public_key()

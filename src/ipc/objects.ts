@@ -39,6 +39,7 @@ export interface ClassDump
     hints: any[];
     propertyHints: any;
     fields: string[];
+    encrypted: string[];
     requiredFields: string[];
     hierarchy: HierarchyEntryDump[];
 }
@@ -55,6 +56,7 @@ export interface ResourceDump
     hints: any[];
     propertyHints: any;
     fields: string[];
+    encrypted: string[];
     requiredFields: string[];
     hierarchyLevel: number;
     hierarchy: HierarchyEntryDump[];

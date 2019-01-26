@@ -2,9 +2,9 @@
 import * as path from "path";
 import * as async from "../async";
 import * as os from "os";
+import * as crypto from "crypto";
 
 import { SetupWorkspaceWindow } from "../windows/setup_workspace/window"
-
 import { WorkspaceSettings } from "./workspace_settings"
 import { PuppetModulesInfo } from "./modules_info"
 import { Dictionary } from "../dictionary";
@@ -15,6 +15,7 @@ import { Folder, File } from "./files"
 import { PuppetHTTP } from "./http";
 import { isArray } from "util";
 import { HIERA_EDITOR_FIELD, HIERA_EDITOR_VALUE } from "./cert"
+import { EYaml, EYamlKeyPair, ErrorPrivateKeyIsNotProtected } from "./hiera"
 
 const PromisePool = require('es6-promise-pool');
 const slash = require('slash');
@@ -31,6 +32,7 @@ export class Workspace
     private readonly _cachePath: string;
     private readonly _global: Dictionary<string, string>;
     private _nodeIgnoreList: Array<string>;
+    private _keys: Dictionary<string, string>;
 
     constructor(workspacePath: string, cachePath: string = null, offline: boolean = false)
     {
@@ -39,6 +41,7 @@ export class Workspace
         this._cachePath = cachePath || path.join(this._path, ".pe-cache");
         this._global = new Dictionary();
         this._offline = offline;
+        this._keys = new Dictionary();
         this._nodeIgnoreList = [];
     }
 
@@ -55,6 +58,11 @@ export class Workspace
     public get cachePath(): string
     {
         return this._cachePath;
+    }
+
+    public get keysPath(): string
+    {
+        return path.join(this._cachePath, "keys")
     }
 
     public get nodeIgnoreLustPath(): string
@@ -397,6 +405,8 @@ export class Workspace
             }
         }
 
+        await this.initKeys();
+
         if (!await async.isDirectory(this.cachePath))
         {
             if (!await async.makeDirectory(this.cachePath))
@@ -685,5 +695,142 @@ export class Workspace
         return {
             "name": this._name
         }
+    }
+
+    private async initKeys()
+    {
+        if (!await async.isDirectory(this.keysPath))
+        {
+            if (!await async.makeDirectory(this.keysPath))
+            {
+                throw new WorkspaceError("Failed to create keys directory", this.keysPath);
+            }
+        }
+
+        const keys: string[] = await async.listFiles(this.keysPath);
+
+        for (const key of keys)
+        {
+            if (!key.endsWith(".pem"))
+                continue;
+            
+            try
+            {
+                const value = await async.readFile(path.join(this.keysPath, key));
+                this._keys.put(key, value);
+            }
+            catch (e)
+            {
+                console.log("Failed to load key " + key + ": " + e.toString());
+            }
+        }
+    }
+
+    private getEYamlPublicKeyName(eyaml: EYaml): string
+    {
+        const public_key = eyaml.public_key;
+        if (public_key == null)
+            return null;
+        const hash = crypto.createHash("sha1").update(public_key).digest("hex");
+        return hash + ".pem";
+    }
+
+    private getEYamlPrivateKeyName(eyaml: EYaml): string
+    {
+        const private_key = eyaml.private_key;
+        if (private_key == null)
+            return null;
+        const hash = crypto.createHash("sha1").update(private_key).digest("hex");
+        return hash + ".pem";
+    }
+
+    public isEYamlKeysImported(eyaml: EYaml): boolean
+    {
+        const key = this.getEYamlPublicKeyName(eyaml);
+        if (key == null)
+            return false;
+        return this._keys.has(key);
+    }
+
+    public whatEYamlKeysAreThere(eyaml: EYaml): [boolean, boolean]
+    {
+        const publicKeyName = this.getEYamlPublicKeyName(eyaml);
+        const privateKeyName = this.getEYamlPrivateKeyName(eyaml);
+        return [publicKeyName != null, privateKeyName != null]
+    }
+
+    public getEYamlPrivateKey(eyaml: EYaml): string
+    {
+        const privateKeyName = this.getEYamlPrivateKeyName(eyaml);
+        return privateKeyName != null ? this._keys.get(privateKeyName) : null;
+    }
+
+    public hasEYamlPublickKey(eyaml: EYaml): boolean
+    {
+        const publicKeyName = this.getEYamlPublicKeyName(eyaml);
+        return publicKeyName != null;
+    }
+
+    public getEYamlPublicKey(eyaml: EYaml): string
+    {
+        const publicKeyName = this.getEYamlPublicKeyName(eyaml);
+        return publicKeyName != null ? this._keys.get(publicKeyName) : null
+    }
+    
+    public getEYamlKeys(eyaml: EYaml): EYamlKeyPair
+    {
+        const publicKeyName = this.getEYamlPublicKeyName(eyaml);
+        const privateKeyName = this.getEYamlPrivateKeyName(eyaml);
+
+        return [
+            publicKeyName != null ? this._keys.get(publicKeyName) : null, 
+            privateKeyName != null ? this._keys.get(privateKeyName) : null
+        ];
+    }
+
+    private async managePublicKey(keyName: string, updated?: string): Promise<boolean>
+    {
+        if (keyName != null)
+        {
+            if (updated != null && updated != "" && this._keys.get(keyName) != updated)
+            {
+                try
+                {
+                    await async.writeFile(path.join(this.keysPath, keyName), updated);
+                }
+                catch (e)
+                {
+                    return false;
+                }
+
+                this._keys.put(keyName, updated);
+            }
+
+            if ((updated == null || updated == "") && this._keys.has(keyName))
+            {
+                try
+                {
+                    await async.remove(path.join(this.keysPath, keyName));
+                }
+                catch (e)
+                {
+                    return false;
+                }
+
+                this._keys.remove(keyName);
+            }
+        }
+
+        return true;
+    }
+
+    public async updateEYamlKeys(eyaml: EYaml, updatedPublicKey: string): Promise<boolean>
+    {
+        const publicKeyName = this.getEYamlPublicKeyName(eyaml);
+
+        if (!await this.managePublicKey(publicKeyName, updatedPublicKey))
+            return false;
+
+        return true;
     }
 }

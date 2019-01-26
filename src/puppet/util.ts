@@ -39,7 +39,7 @@ export class GlobalVariableResolverResults
 
 export interface GlobalVariableResolver
 {
-    get (key: string): string;
+    get (key: string): any;
     /*
     This method should return:
        GlobalVariableResolverResults.MISSING when global cannot be found
