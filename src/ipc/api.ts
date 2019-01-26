@@ -4,7 +4,7 @@ import { ClassDump, ResourceDump, EnvironmentTreeDump } from "./objects"
 export interface IpcAPI
 {
     addProject(path: string): Promise<boolean>;
-    openProject(path: string): Promise<void>;
+    openProject(path: string, offline: boolean): Promise<void>;
     createProject(): Promise<void>;
     getProjectList(): Promise<any>;
     getEnvironmentList(): Promise<string[]>;

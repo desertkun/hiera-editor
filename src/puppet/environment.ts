@@ -571,13 +571,29 @@ export class Environment
 
         let nodeList: string[];
 
-        if (this._offline)
+        if (await async.isFile(this.certListCachePath))
         {
-            nodeList = [];
-        }
-        else
-        {
-            if (await async.isFile(this.certListCachePath))
+            if (this._offline)
+            {
+                nodeList = await async.readJSON(this.certListCachePath);
+
+                if (!isArray(nodeList))
+                {
+                    nodeList = [];
+                    await async.writeJSON(this.certListCachePath, nodeList);
+                }
+
+                try
+                {
+                    await this.loadCertificates(updateProgressCategory, nodeList, settings);
+                }
+                catch (e)
+                {
+                    this.addWarning(new WorkspaceError("Failed to load certificates in Offline Mode",
+                        e.toString()));
+                }
+            }
+            else
             {
                 try
                 {
@@ -587,14 +603,31 @@ export class Environment
                 {
                     this.addWarning(e);
                     nodeList = await async.readJSON(this.certListCachePath);
-    
+
                     if (!isArray(nodeList))
                     {
                         nodeList = [];
                         await async.writeJSON(this.certListCachePath, nodeList);
                         throw e;
                     }
+
+                    try
+                    {
+                        await this.loadCertificates(updateProgressCategory, nodeList, settings);
+                    }
+                    catch (e)
+                    {
+                        this.addWarning(new WorkspaceError("Failed to load backup certificates",
+                            e.toString()));
+                    }
                 }
+            }
+        }
+        else
+        {
+            if (this._offline)
+            {
+                nodeList = [];
             }
             else
             {
@@ -603,6 +636,7 @@ export class Environment
         }
 
         const nodeIgnoreList = this.workspace.getNodeIgnoreList();
+
         nodeList = nodeList.filter((certname: string) => 
         {
             if (nodeIgnoreList.indexOf(certname) >= 0)
@@ -623,34 +657,32 @@ export class Environment
 
             return true;
         });
+
         this._nodeFacts.clear();
 
-        if (!this._offline)
+        if (!await async.isDirectory(this.certNodeFactsPath))
+            await async.makeDirectory(this.certNodeFactsPath);
+
+        const count = {
+            c: 0,
+            total: nodeList.length
+        };
+
+        const queries = [];
+
+        for (const certName of nodeList)
         {
-            if (!await async.isDirectory(this.certNodeFactsPath))
-                await async.makeDirectory(this.certNodeFactsPath);
-
-            const count = {
-                c: 0,
-                total: nodeList.length
-            };
-
-            const queries = [];
-
-            for (const certName of nodeList)
-            {
-                queries.push(this.fetchNodeFacts(certName, count, progressCallback, settings));
-            }
-
-            if (queries.length > 0)
-            {
-                if (updateProgressCategory) updateProgressCategory("[" + this.name + "] Fetching node facts...", true);
-        
-                await Promise.all(queries);
-            }
-
-            if (updateProgressCategory) updateProgressCategory("[" + this.name + "] Resolving nodes...", true);
+            queries.push(this.fetchNodeFacts(certName, count, progressCallback, settings, this._offline));
         }
+
+        if (queries.length > 0)
+        {
+            if (updateProgressCategory) updateProgressCategory("[" + this.name + "] Fetching node facts...", true);
+    
+            await Promise.all(queries);
+        }
+
+        if (updateProgressCategory) updateProgressCategory("[" + this.name + "] Resolving nodes...", true);
 
         this._nodes.clear();
 
@@ -662,21 +694,15 @@ export class Environment
         }
     }
 
-    private async fetchNodeFacts(certname: string, count: any, progressCallback: any, settings: WorkspaceSettings)
+    private async fetchNodeFacts(certname: string, count: any, progressCallback: any, 
+        settings: WorkspaceSettings, offline: boolean)
     {
         const p = this.getNodeFactsPath(certname);
 
         let facts;
 
-        try
+        if (offline)
         {
-            facts = await PuppetHTTP.GetNodeFacts(this.name, certname, settings);
-            await async.writeJSON(p, facts);
-        }
-        catch (e)
-        {
-            this.addWarning(new WorkspaceError("Failed to fetch facts for node '" + certname + '"', e.toString()));
-            
             if (await async.isFile(p))
             {
                 try
@@ -685,19 +711,49 @@ export class Environment
                 }
                 catch (e)
                 {
+                    //
+                }
+            }
+            else
+            {
+                this.addWarning(new WorkspaceError("Missing facts for node '" + certname + '"', 
+                    "Please restart with Offline Mode disabled to fetch those."));
+            }
+        }
+        else
+        {
+            try
+            {
+                facts = await PuppetHTTP.GetNodeFacts(this.name, certname, settings);
+                await async.writeJSON(p, facts);
+            }
+            catch (e)
+            {
+                this.addWarning(new WorkspaceError("Failed to fetch facts for node '" + certname + '"', e.toString()));
+                
+                if (await async.isFile(p))
+                {
                     try
                     {
-                        await async.remove(p);
+                        facts = await async.readJSON(p);
                     }
                     catch (e)
                     {
-                        //
-                    }
+                        try
+                        {
+                            await async.remove(p);
+                        }
+                        catch (e)
+                        {
+                            //
+                        }
 
-                    this.addWarning(new WorkspaceError("Failed to fetch back up facts for node '" + certname + '"', e.toString()));
+                        this.addWarning(new WorkspaceError("Failed to fetch back up facts for node '" + certname + '"', e.toString()));
+                    }
                 }
             }
         }
+        
 
         this._nodeFacts.put(certname, facts);
         

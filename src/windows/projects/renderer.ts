@@ -19,9 +19,11 @@ class ProjectsRenderer
 
     private init()
     {
+        $('[data-toggle="tooltip"]').tooltip();
+
         const zis = this;
 
-        $('#btn-open-project').click(async () => 
+        $('#btn-open-project').click(async (e: any) => 
         {
             const path: string = await ipc.showOpenDirectoryDialog();
 
@@ -41,7 +43,7 @@ class ProjectsRenderer
                 return;
             }
 
-            zis.openProject(path);
+            zis.openProject(path, e.shiftKey);
         });
         
         $('#btn-new-project').click(async () => 
@@ -57,9 +59,9 @@ class ProjectsRenderer
         });
     }
 
-    private openProject(path: string)
+    private openProject(path: string, offline: boolean)
     {
-        ipc.openProject(path);
+        ipc.openProject(path, offline);
     }
 
     private renderProjectsList()
@@ -81,8 +83,8 @@ class ProjectsRenderer
                     const projectPath = project.path;
                     const shortenedPath = ellipsis(project.path, 40, { side: 'start'});
                     const node = $('<tr><td>' + project.name + '<br><span class="text text-muted"><small>' + shortenedPath + '</small></span></td></tr>').appendTo(projectsListNode);
-                    node.click(() => {
-                        zis.openProject(projectPath);
+                    node.click((e: any) => {
+                        zis.openProject(projectPath, e.shiftKey);
                     });
                 }
             }

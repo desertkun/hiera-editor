@@ -69,6 +69,18 @@ class ManagePropertyHierarchyRenderer
         const levels = $('#hierarchy-levels');
         const zis = this;
 
+        $('#save').click(() => {
+            window.close();
+        });
+
+        document.addEventListener('keydown', event => 
+        {
+            if (event.key === 'Escape' || event.keyCode === 27) 
+            {
+                window.close();
+            }
+        });
+
         for (let level = 0, t = this.hierarchy.length; level < t; level++)
         {
             const hierarchy = this.hierarchy[level];

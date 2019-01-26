@@ -48,21 +48,24 @@ export class Folder
     {
         if (localPath.length > 1)
         {
-            const dir = await this.getFolder(localPath[0]);
+            let dir = await this.getFolder(localPath[0]);
             if (dir == null)
-                return null;
+            {
+                dir = await this.createFolder(localPath[0]);
+            }
             localPath.splice(0, 1);
             return await dir.createFile(localPath);
         }
 
+        const name = localPath[0];
         const entryPath = path.join(this._path, name);
-        const node = await this.acquireFile(this._env, name, entryPath, slash(path.join(this._localPath, name)));
+        const file = await this.acquireFile(this._env, name, entryPath, slash(path.join(this._localPath, name)));
 
-        if (node == null)
+        if (file == null)
             return null;
 
-        await node.save();
-        return node;
+        await file.save();
+        return file;
     }
 
     public async createFolder(name: string): Promise<Folder>

@@ -230,7 +230,7 @@ export function createDirectory(path: string): Promise<boolean>
 {
     return new Promise<boolean>((resolve, reject) =>
     {
-        fs.mkdir(path, 777, (err) =>
+        fs.mkdir(path, "0777", (err) =>
         {
             resolve(err == null);
         });

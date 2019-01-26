@@ -26,7 +26,7 @@ export class Workspace
     private _name: string;
     private _environments: Dictionary<string, Environment>;
     private _modulesInfo: PuppetModulesInfo;
-    private readonly _offline: boolean;
+    private _offline: boolean;
 
     private readonly _cachePath: string;
     private readonly _global: Dictionary<string, string>;
@@ -40,6 +40,11 @@ export class Workspace
         this._global = new Dictionary();
         this._offline = offline;
         this._nodeIgnoreList = [];
+    }
+
+    public setOfflineMode()
+    {
+        this._offline = true;
     }
 
     public get global()

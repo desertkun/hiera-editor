@@ -25,12 +25,17 @@ export class IpcServer implements IpcAPI
         return await projects_list.addProject(path);
     }
 
-    public async openProject(path: string): Promise<void> 
+    public async openProject(path: string, offline: boolean): Promise<void> 
     {
         const project: ProjectModel = projects_list.getProject(path);
 
         if (project == null)
             throw new Error("No such project: " + path);
+
+        if (offline)
+        {
+            project.workspace.setOfflineMode();
+        }
 
         setCurrentWorkspace(project.workspace);
         workspace_window.show(path);
