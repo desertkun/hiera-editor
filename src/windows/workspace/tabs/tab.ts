@@ -57,17 +57,28 @@ export abstract class WorkspaceTab
     
     public async focusIn(): Promise<void>
     {
+        
+    }
+
+    protected scrollBefore(): any
+    {
+        return $(this.contentNode).parent().scrollTop();
+    }
+
+    protected scrollAfter(before: any): void
+    {
+        $(this.contentNode).parent().scrollTop(before);
     }
 
     public async refresh(): Promise<void>
     {
         $(".tooltip").tooltip("dispose");
-        const scroll = $(this.contentNode).parent().scrollTop();
+        const scroll = this.scrollBefore();
         $(this.contentNode).html('');
         await this.release();
         await this.init();
         this.render();
-        $(this.contentNode).parent().scrollTop(scroll);
+        this.scrollAfter(scroll);
     }
 
     public abstract async init(): Promise<any>;

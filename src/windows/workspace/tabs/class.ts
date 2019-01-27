@@ -286,6 +286,8 @@ export class NodeClassTab extends WorkspaceTab
     protected editor: any;
     protected renderedProperties: any;
     protected hierarchyLevel: number;
+    protected flex: any;
+    protected editorHolder: any;
 
     private _keysImported: boolean;
 
@@ -460,7 +462,7 @@ export class NodeClassTab extends WorkspaceTab
         return "This object does not seem to be recognized, because of compilation issues."
     }
 
-    protected renderHierarchySelector()
+    protected renderHierarchySelector(parent: any)
     {
         const zis = this;
 
@@ -480,7 +482,7 @@ export class NodeClassTab extends WorkspaceTab
             _id++;
         }
 
-        const pad = $('<div class="container-grayed d-flex flex-row"></div>').appendTo(this.contentNode);
+        const pad = $('<div class="container-grayed d-flex flex-row" style="flex-shrink: 0"></div>').appendTo(parent);
 
         {
             const title = $('<span class="text-muted" style="padding: 6px 10px 6px 10px;"></span>').appendTo(pad);
@@ -549,34 +551,47 @@ export class NodeClassTab extends WorkspaceTab
             setTimeout(() => zis.refresh(), 1);
         })
     }
+    
+    protected scrollBefore(): any
+    {
+        return $(this.editorHolder).scrollTop();
+    }
+
+    protected scrollAfter(before: any): void
+    {
+        $(this.editorHolder).scrollTop(before);
+    }
 
     public render(): any
     {
+        this.flex = $('<div class="w-100 h-100" style="display: flex;flex-direction: column;"></div>').appendTo(this.contentNode);
+
+        this.renderHierarchySelector(this.flex);
+
+        this.editorHolder = $('<div class="w-100 node-class-properties" style="flex-grow: 1; overflow-y: auto;"></div>').appendTo(this.flex);
+
         if (this.classInfo() == null)
         {
-            const pad = $('<div class="container-w-padding"></div>').appendTo(this.contentNode);
-            $('<div class="alert alert-danger" role="alert" style="margin-bottom: 0;"></div>').appendTo(pad).html(this.noClassInfoText());
+            const pad = $('<div class="container-w-padding d-flex" style="flex-shrink: 0"></div>').appendTo(this.editorHolder);
+            $('<div class="alert alert-danger w-100" role="alert" style="margin-bottom: 0;"></div>').appendTo(pad).html(this.noClassInfoText());
         }
 
         if (this.hasHints())
         {
-            const pad = $('<div class="container-w-padding"></div>').appendTo(this.contentNode);
+            const pad = $('<div class="container-w-padding d-flex" style="flex-shrink: 0"></div>').appendTo(this.editorHolder);
 
             for (const hint of this.getHints())
             {
-                $('<div class="alert alert-warning" role="alert" style="margin-bottom: 0;"></div>').appendTo(pad).html(hint.message);
+                $('<div class="alert alert-warning w-100" role="alert" style="margin-bottom: 0;"></div>').appendTo(pad).html(hint.message);
             }
         }
-
-        this.renderHierarchySelector();
-
-        const editorHolder = $('<div class="w-100 node-class-properties"></div>').appendTo(this.contentNode);
-        this.renderProperties(editorHolder);
+        
+        this.renderProperties(this.editorHolder);
         
         const description = this.getDescription();
         if (description != null && description != "")
         {
-            const pad = $('<div class="container-w-padding-x2"></div>').appendTo(this.contentNode);
+            const pad = $('<div class="container-w-padding-x2"></div>').appendTo(this.editorHolder);
             const i = $('<i class="fas fa-question" title="Click to show documentation">').tooltip().appendTo(pad);
 
             const documentation = $('<pre></pre>').html(description).css("display", "none").appendTo(pad);

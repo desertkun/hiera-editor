@@ -1074,7 +1074,7 @@ export class WorkspaceRenderer
             'flex-direction: column;"></div>').appendTo(root);
 
         this.n_editorTabs = $('<ul class="nav nav-tabs compact" role="tablist"></ul>').appendTo(contents);
-        this.n_editorContent = $('<div class="tab-content w-100 h-100" style="overflow-y: auto;"></div>').appendTo(contents);
+        this.n_editorContent = $('<div class="tab-content w-100 h-100 d-flex"></div>').appendTo(contents);
     }
 
     private async checkEmpty()
@@ -1118,7 +1118,7 @@ export class WorkspaceRenderer
             'role="tab" aria-controls="' + fixedPath + '" aria-selected="false"></a>' +
             '</li>').appendTo(this.n_editorTabs);
 
-        const tabContents = $('<div class="tab-pane h-100" id="' + fixedPath +
+        const tabContents = $('<div class="tab-pane w-100 h-100" id="' + fixedPath +
             '" role="tabpanel" aria-labelledby="' + fixedPath + '-tab">' +
             '</div>').appendTo(this.n_editorContent);
 
