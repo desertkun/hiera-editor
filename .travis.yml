@@ -1,0 +1,27 @@
+env:
+  global:
+    - secure: "LNODsMx9v4loGu0vJ0sjp6IMpO/HO1MX6iUO13ZUd0N4Tc/Q387CtTFcUfSekpXKbZqT0uWCHGZnK2ffPre3MuH+FneOB77OtLD6/Jtp9BXvLY8dOk5hS07o3siAaC18xc12TYa1Oid8ZisPojPGf9zrCU+jgAXhyQXXgj/G/JzlSswWfmM6GzwGzI9Turymn9q3TwKsouP0EQXFMEIZKZCzK+1vj+a+ycMG6fAhP+Dg5Jn07uiU5Q3/zDtWwKGaxRsNghEjBT4MVB+4tIT2Yyi7OnYAdlhytJ7TyUDuFHBgj7it67Ka6bbjIuZKRfszHDsXYPesaQNquXeBBr3Fjh+XCBmBEIM2SbjEm7cnhtzg93nYu4x1PC8nilxwzR+ZR/gvn/LFyOiL/5Dv9nEkfsa9OizN1sUVojqwJVyZnR/xPMEXW6wzMVhz4wrUO4HGKyMHnFIIJV+SIkDYi7Z+FkDc4WwCYghS5NRC0DSa80E0Pb42sFCUGVMnGAKMwnl0O+SK0Enf744/TnD2wl6f3A4buzFP5crwuZ9bDSXnp14eTa4AD6tHeqKftDpNQX51MMi/mBBuh8TNWvcj7+V2SSaUbT3FF2qt8DLzDgM17lPTWkLkwXPwgDWuZ4/YG1PF2dzh/DWRhuVPQfoyiNOW20t/QfQo2b0biB9JrkLQDB8="
+  include:
+    - os: osx
+      osx_image: xcode9.4
+      language: node_js
+      node_js: "10"
+      env:
+        - ELECTRON_CACHE=$HOME/.cache/electron
+        - ELECTRON_BUILDER_CACHE=$HOME/.cache/electron-builder
+
+    - os: linux
+
+cache:
+  directories:
+    - node_modules
+    - $HOME/.cache/electron
+    - $HOME/.cache/electron-builder
+
+script:
+  - npm install
+  - npm run publish
+
+branches:
+  except:
+    - "/^v\\d+\\.\\d+\\.\\d+$/"

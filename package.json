@@ -1,6 +1,6 @@
 {
   "name": "hiera-editor",
-  "version": "0.1.5",
+  "version": "0.1.6-rc.1",
   "description": "A GUI tool to manage your Puppet/Hiera for you",
   "main": "dist/main.js",
   "scripts": {
