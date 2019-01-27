@@ -70,14 +70,32 @@ class HashPropertyRenderer implements PropertyRenderer
 
         group.parent().css('width', '100%');
 
+        const buttons = $('<div class="w-100 hash-editor-buttons" style="display: none;"></div>').appendTo(group);
+
         const div = $('<div class="hash-editor" id="' + propertyId + '"></div>')
             .appendTo(group);
+    
+            const revert = $('<button type="button" class="btn btn-sm btn-outline-danger float-right">Revert</button>').appendTo(buttons);
+        const apply = $('<button type="button" class="btn btn-sm btn-outline-primary btn-space float-right">Apply</button>').appendTo(buttons);
+
+        apply.click(() => 
+        {
+            changed(editor.get());
+        });
+
+        revert.click(() => 
+        {
+            editor.set(value);
+            buttons.hide();
+        });
 
         const editor = new JSONEditor(div[0], {
             modes: ['code', 'tree'],
+            mainMenuBar: false,
+            statusBar: false,
             onChange: () => 
             {
-                changed(editor.get());
+                buttons.show();
             }
         });
 
@@ -625,21 +643,7 @@ export class NodeClassTab extends WorkspaceTab
             }
             else
             {
-                modified.attr("title", "Reset to default value")
-
-                if (this.hierarchy[this.hierarchyLevel].eyaml && modifiedHierarchy == this.hierarchyLevel)
-                {
-                    const encrypt = $('<a class="class-property-action" title="Click to encrypt the value">' + 
-                        '<i class="fas fa-key"></i></a>').tooltip().appendTo(label);
-
-                    encrypt.click(async () => 
-                    {
-                        await ipc.encryptNodeClassProperty(zis.environment, zis.certname, 
-                            modifiedHierarchy, zis.className, propertyName);
-                        await ipc.invalidateNodeClass(zis.environment, zis.certname, zis.className);
-                        await zis.refresh();
-                    });
-                }
+                modified.attr("title", "Reset to default value");
             }
 
             modified.click(async () => 
@@ -674,6 +678,28 @@ export class NodeClassTab extends WorkspaceTab
                 renderer = this.getDefaultPropertyRenderer(value);
             }
         }
+        
+        const renderedProperty = this.renderedProperties[propertyName] = 
+            renderer.render(group, propertyId, value, async function(value: any)
+        {
+            await zis.setProperty(propertyName, value);
+            await zis.refresh();
+        });
+
+        if (!encrypted && isString(value) &&
+            this.hierarchy[this.hierarchyLevel].eyaml && modifiedHierarchy == this.hierarchyLevel)
+        {
+            const encrypt = $('<a class="class-property-action" title="Click to encrypt the value">' + 
+                '<i class="fas fa-key"></i></a>').tooltip().appendTo(label);
+
+            encrypt.click(async () => 
+            {
+                await ipc.encryptNodeClassProperty(zis.environment, zis.certname, 
+                    modifiedHierarchy, zis.className, propertyName);
+                await ipc.invalidateNodeClass(zis.environment, zis.certname, zis.className);
+                await zis.refresh();
+            });
+        }
 
         const l = $('<label for="' + propertyId + '">' + humanName + '</label>').appendTo(label);
         const description = this.getTag("param", propertyName);
@@ -687,13 +713,6 @@ export class NodeClassTab extends WorkspaceTab
         {
             $(l).css('font-weight', "bold");
         }
-        
-        const renderedProperty = this.renderedProperties[propertyName] = 
-            renderer.render(group, propertyId, value, async function(value: any)
-        {
-            await zis.setProperty(propertyName, value);
-            await zis.refresh();
-        });
         
         const error = this.getPropertyErrorInfo(propertyName);
         if (error != null)

@@ -50,3 +50,13 @@ body {
 .workspace-node-select {
     flex-grow: 1;
 }
+
+.hash-editor-buttons {
+    position: relative;
+    top: -30px;
+    margin-bottom: -31px;
+}
+
+.hash-editor-buttons .btn {
+    padding: 2px 10px;
+}
