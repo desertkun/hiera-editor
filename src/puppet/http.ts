@@ -13,7 +13,10 @@ export class PuppetHTTP
         const response = await this.RequestJSON(
             "/puppet-ca/v1/certificate_statuses/statuses?environment=" + environment,
             "GET",
-            settings
+            settings,
+            {
+                "Accept": "application/json, text/pson"
+            }
         );
         
         const result: string[] = [];
@@ -35,7 +38,9 @@ export class PuppetHTTP
             "/puppet-ca/v1/certificate/" + certname + "?environment=" + environment,
             "GET",
             settings,
-            {}
+            {
+                "Accept": "text/plain"
+            }
         );
         
         return response;
@@ -46,7 +51,10 @@ export class PuppetHTTP
         const response = await this.RequestJSON(
             "/puppet/v3/node/" + certname + "?environment=" + environment,
             "GET",
-            settings
+            settings,
+            {
+                "Accept": "application/json, text/pson"
+            }
         );
         const facts = response["parameters"] 
         if (!facts)
@@ -54,11 +62,9 @@ export class PuppetHTTP
         return facts;
     }
 
-    private static async RequestJSON(path_: string, method: string, settings: WorkspaceSettings): Promise<any>
+    private static async RequestJSON(path_: string, method: string, settings: WorkspaceSettings, headers: any): Promise<any>
     {
-        const data = await this.Request(path_, method, settings, {
-            "Accept": "application/json"
-        });
+        const data = await this.Request(path_, method, settings, headers);
         return JSON.parse(data);
     }
 
