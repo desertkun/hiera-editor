@@ -2,6 +2,18 @@
 import { Ruby } from "./ruby"
 import * as child_process from "child_process";
 
+export class PuppetRubyBridgeException
+{
+    message: string;
+    code: number;
+
+    constructor(message: string, code: number)
+    {
+        this.message = message;
+        this.code = code;
+    }
+}
+
 export class PuppetRubyBridge
 {
     private nextId: number;
@@ -95,7 +107,7 @@ export class PuppetRubyBridge
         }
         else
         {
-            r.reject(data["error"]);
+            r.reject(new PuppetRubyBridgeException(data["error"], data["code"]));
         }
     }
 

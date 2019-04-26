@@ -1528,9 +1528,24 @@ export class PuppetASTCall extends PuppetASTObject
         }
 
         const function_ = await resolver.resolveFunction(context, resolver, functorName);
+
         if (function_ != null)
         {
-            return await function_(this.functorArgs.entries);
+            try
+            {
+                return await function_(this.functorArgs.entries);
+            }
+            catch (e)
+            {
+                if (e.code == 404)
+                {
+                    this.hint(new PuppetHintFunctionNotFound(functorName));
+                    return null;
+                }
+                
+                this.hint(new PuppetHintVariableNotFound(functorName));
+                return null;
+            }
         }
         
         this.hint(new PuppetHintFunctionNotFound(functorName));

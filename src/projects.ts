@@ -145,9 +145,6 @@ export class ProjectsModel
 
     public async createProject(projectPath: string, env: string)
     {
-        if (this.hasProject(projectPath))
-            return false;
-            
         if (!await async.isDirectory(projectPath))
             return false;
 
@@ -164,6 +161,9 @@ export class ProjectsModel
         if (!await async.createDirectory(path.join(envPath, "data")))
             return false;
         
+        if (!await async.writeFile(path.join(envPath, "data", "common.yaml"), "classes: []"))
+            return false;
+
         if (!await async.createDirectory(path.join(envPath, "manifests")))
             return false;
         
@@ -172,6 +172,12 @@ export class ProjectsModel
     
         if (!await async.writeFile(path.join(envPath, "environment.conf"), "modulepath = modules:../../modules"))
             return false;
+
+        if (!await async.writeFile(path.join(envPath, "Puppetfile"), 
+            "forge \"https://forgeapi.puppetlabs.com\"\n\nmod 'desertkun-hieraresources',\n    :git => 'https://github.com/desertkun/hieraresources.git'"))
+        {
+            return false;
+        }
 
         if (!await async.writeYAML(path.join(envPath, "hiera.yaml"), {
             "version": 5,

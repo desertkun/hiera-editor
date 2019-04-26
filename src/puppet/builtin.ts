@@ -43,6 +43,13 @@ const BuiltInFunctions: any = {
         const def = await obj.resolve(context, resolver);
         return <boolean>(def);
     },
+    "fact": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    {
+        const obj: PuppetASTObject = args[0];
+        const factName = await obj.resolve(context, resolver);
+        const facts = resolver.getGlobalVariable("facts");
+        return facts[factName];
+    },
     "template": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
     {
         // can't do much
@@ -351,7 +358,7 @@ const BuiltInFunctions: any = {
     {
         //not implemented
     },
-    " next": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
+    "next": async function(caller: PuppetASTObject, context: PuppetASTContainerContext, resolver: Resolver, args: any[])
     {
         //not implemented
     },
