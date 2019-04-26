@@ -1232,8 +1232,14 @@ export class WorkspaceRenderer
         return true;
     }
 
+    private static Sleep(ms: number) 
+    {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }      
+
     public async refreshWorkspace()
     {
+        await WorkspaceRenderer.Sleep(50);
         await this.disable();
         
         WorkspaceRenderer.OpenLoading();
