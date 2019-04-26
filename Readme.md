@@ -49,6 +49,3 @@ MIT
 
 This project uses icons from Font Awesome (https://fontawesome.com/license) under the
 Creative Commons Attribution 4.0 International license.
-
-## Todo
-* Offline mode when it won't even try to obtain updates from Puppet Server
