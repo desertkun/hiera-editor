@@ -879,6 +879,42 @@ export class PuppetASTIf extends PuppetASTObject
     }
 }
 
+export class PuppetASTUnless extends PuppetASTObject
+{
+    public readonly test: PuppetASTObject;
+    public readonly then: PuppetASTObject;
+    public readonly else: PuppetASTObject;
+
+    constructor(args: Array<PuppetASTObject>)
+    {
+        super();
+
+        const obj: OrderedDictionary = <OrderedDictionary>args[0];
+
+        this.test = obj.get("test");
+        this.then = obj.get("then");
+        this.else = obj.get("else");
+    }
+
+    protected async _resolve(context: PuppetASTContainerContext, resolver: Resolver): Promise<any>
+    {
+        const v = await this.test.resolve(context, resolver);
+
+        if (v)
+        {
+            return await this.then.resolve(context, resolver);
+        }
+
+        if (this.else)
+            return await this.else.resolve(context, resolver);
+    }
+
+    public static Create(args: Array<PuppetASTObject>): PuppetASTObject
+    {
+        return new PuppetASTUnless(args);
+    }
+}
+
 export class PuppetASTDefault extends PuppetASTObject
 {
     constructor(args: Array<PuppetASTObject>)
@@ -2609,6 +2645,7 @@ export class PuppetASTParser
             "or": PuppetASTOrCondition.Create,
             "paren": PuppetASTParenthesis.Create,
             "if": PuppetASTIf.Create,
+            "unless": PuppetASTUnless.Create,
             "function": PuppetASTFunction.Create,
             "call": PuppetASTCall.Create,
             "exported-query": PuppetASTIgnored.Create("exported-query"),
