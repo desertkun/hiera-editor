@@ -838,7 +838,7 @@ export class IpcServer implements IpcAPI
         }
     }
     
-    public async publishCSR(server: string, certname: string): Promise<string>
+    public async publishCSR(server: string, certname: string): Promise<[string, string]>
     {
         const workspace: Workspace = getCurrentWorkspace();
 

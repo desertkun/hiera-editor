@@ -5,6 +5,7 @@ import { ipcRenderer, ipcMain } from 'electron';
 const $ = require("jquery");
 const electron = require('electron');
 const shell = electron.shell;
+const semver = require('semver');
 
 const ipc = IPC();
 
@@ -64,7 +65,7 @@ abstract class SetupStep
         $('#btn-configuration-close').show();
     }
 
-    public async retry(): Promise<SetupStep>
+    public async processRetry(): Promise<SetupStep>
     {
         $('#setup-step-title').text(this.name).removeClass("text-danger");
         $('#' + this.elementId).removeClass("text-danger");
@@ -79,6 +80,11 @@ abstract class SetupStep
         $('#btn-configuration-next').show();
         $('#setup-error').hide();
 
+        return await this.retry();
+    }
+
+    protected async retry(): Promise<SetupStep>
+    {
         await this.init();
         return await this.next();
     }
@@ -215,26 +221,44 @@ class CSRStep extends SetupStep
     {
         return null;
     }
+
+    public async retry(): Promise<SetupStep>
+    {
+        return new ConfigurationStep(this.server, this.certname);
+    }
     
     public async init(): Promise<void>
     {
         await super.init();
         this.enableNext(false);
 
-        let fingerprint;
+        let fingerprint, version;
 
         try
         {
-            fingerprint = await ipc.publishCSR(this.server, this.certname);
+            [fingerprint, version] = await ipc.publishCSR(this.server, this.certname);
         }
         catch (e)
         {
+            const version = e.version;
+
             const text = e.toString();
             if (text.includes("Bad Request"))
             {
+                let revokeCommand;
+
+                if (semver.gte(version, "6.0.0"))
+                {
+                    revokeCommand = "/opt/puppetlabs/bin/puppetserver ca clean --certname " + this.certname;
+                }
+                else
+                {
+                    revokeCommand = "/opt/puppetlabs/puppet/bin/puppet cert clean " + this.certname;
+                }
+
                 this.fail("Cannot upload certificate signing request. Please make sure there is no such certificate already requested. " + 
                 "If so, pick another name or remove previous certificate request. <br><br>You can do this by calling <br>" + 
-                "<code>/opt/puppetlabs/puppet/bin/puppet cert clean " + this.certname + "</code><br>on the Puppet Server.");
+                "<code>" + revokeCommand + "</code><br>on the Puppet Server.");
             }
             else if (text.includes("Forbidden"))
             {
@@ -250,7 +274,7 @@ class CSRStep extends SetupStep
         }
 
         this.success();
-        renderer.setStep(new SignRequestStep(this.server, this.certname, fingerprint));
+        renderer.setStep(new SignRequestStep(this.server, this.certname, fingerprint, version));
     }
 }
 
@@ -259,30 +283,45 @@ class SignRequestStep extends SetupStep
     private server: string;
     private certname: string;
     private fingerprint: string;
+    private version: string;
 
-    constructor(server: string, certname: string, fingerprint: string)
+    constructor(server: string, certname: string, fingerprint: string, version: string)
     {
         super("Step 3. Sign Requested Certificate", "setup-step-3", false);
 
         this.server = server;
         this.certname = certname;
         this.fingerprint = fingerprint;
+        this.version = version;
     }
 
     public async next(): Promise<SetupStep>
     {
-        return new DownloadCertificateStep(this.server, this.certname);
+        return new DownloadCertificateStep(this.server, this.certname, this.version);
     }
     
     public async init(): Promise<void>
     {
         await super.init();
 
-        $('#crs-sign-example').text("/opt/puppetlabs/puppet/bin/puppet cert sign " + this.certname);
+        let signText, checkText;
+
+        if (semver.gte(this.version, "6.0.0"))
+        {
+            signText = "/opt/puppetlabs/bin/puppetserver ca sign --certname " + this.certname;
+            checkText = "/opt/puppetlabs/bin/puppetserver ca list";
+        }
+        else
+        {
+            signText = "/opt/puppetlabs/puppet/bin/puppet cert sign " + this.certname;
+            checkText = "/opt/puppetlabs/puppet/bin/puppet cert list " + this.certname;
+        }
+
+        $('#crs-sign-example').text(signText);
 
         if (this.fingerprint)
         {
-            $('#crs-fingerprint-check').text("/opt/puppetlabs/puppet/bin/puppet cert list " + this.certname);
+            $('#crs-fingerprint-check').text(checkText);
             $('#crs-fingerprint-value').text(this.fingerprint);
             $('#crs-fingerprint').show();
         }
@@ -295,13 +334,15 @@ class DownloadCertificateStep extends SetupStep
 {
     private server: string;
     private certname: string;
+    private version: string;
 
-    constructor(server: string, certname: string)
+    constructor(server: string, certname: string, version: string)
     {
         super("Step 4. Downloading Signed Certificate", "setup-step-4", false);
 
         this.server = server;
         this.certname = certname;
+        this.version = version;
     }
 
     public async next(): Promise<SetupStep>
@@ -326,7 +367,7 @@ class DownloadCertificateStep extends SetupStep
         }
 
         this.success();
-        renderer.setStep(new AuthStep(this.server, this.certname));
+        renderer.setStep(new AuthStep(this.server, this.certname, this.version));
     }
 }
 
@@ -334,18 +375,20 @@ class AuthStep extends SetupStep
 {
     private server: string;
     private certname: string;
+    private version: string;
 
-    constructor(server: string, certname: string)
+    constructor(server: string, certname: string, version: string)
     {
         super("Step 5. Authenticate Hiera Editor", "setup-step-5", false);
 
         this.server = server;
         this.certname = certname;
+        this.version = version;
     }
 
     public async next(): Promise<SetupStep>
     {
-        return new GetCertListStep(this.server, this.certname);
+        return new GetCertListStep(this.server, this.certname, this.version);
     }
     
     public async init(): Promise<void>
@@ -367,13 +410,15 @@ class GetCertListStep extends SetupStep
 {
     private server: string;
     private certname: string;
+    private version: string;
 
-    constructor(server: string, certname: string)
+    constructor(server: string, certname: string, version: string)
     {
         super("Step 6. Checking Authenthication", "setup-step-6", false);
 
         this.server = server;
         this.certname = certname;
+        this.version = version;
     }
 
     public async next(): Promise<SetupStep>
@@ -478,7 +523,7 @@ class SetupWorkspaceRenderer
 
             try
             {
-                next = await current.retry();
+                next = await current.processRetry();
             }
             catch (e)
             {

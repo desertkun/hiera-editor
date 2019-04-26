@@ -47,7 +47,7 @@ export interface IpcAPI
     getEnvironmentModules(env: string): Promise<any>;
     createEnvironment(): Promise<boolean>;
     installModules(): Promise<void>;
-    publishCSR(server: string, certname: string): Promise<string>;
+    publishCSR(server: string, certname: string): Promise<[string, string]>;
     downloadSignedCertificate(): Promise<void>;
     checkAuthentication(): Promise<void>;
     ignoreNode(cername: string): Promise<void>;

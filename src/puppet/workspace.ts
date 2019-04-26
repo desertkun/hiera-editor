@@ -20,6 +20,18 @@ import { EYaml, EYamlKeyPair, ErrorPrivateKeyIsNotProtected } from "./hiera"
 const PromisePool = require('es6-promise-pool');
 const slash = require('slash');
 
+export class CSRPublishError extends WorkspaceError
+{
+    public version: string;
+
+    constructor (title: string, message: string, version: string)
+    {
+        super(title, message);
+
+        this.version = version;
+    }
+}
+
 export class Workspace
 {
     private _workspaceSettings: WorkspaceSettings;
@@ -225,12 +237,28 @@ export class Workspace
         }
     }
 
-    public async publishCSR(server: string, certname: string): Promise<string>
+    public async publishCSR(server: string, certname: string): Promise<[string, string]>
     {
         const settings = await this.getSettings();
 
         settings.server = server;
         settings.certname = certname;
+
+        settings.write();
+
+        let version;
+
+        try
+        {
+            version = await PuppetHTTP.GetServerVersion(settings);
+        }
+        catch(e)
+        {
+            // we have successfully issued a CSR but failed to obtain version information
+            throw new WorkspaceError("Failed to obtain server version", e.toString());
+        }
+
+        settings.version = version;
 
         settings.write();
 
@@ -252,7 +280,7 @@ export class Workspace
         }
         catch (e)
         {
-            throw new WorkspaceError("Failed to publish CSR", e.toString());
+            throw new CSRPublishError("Failed to publish CSR", e.toString(), version);
         }
 
         try
@@ -270,16 +298,22 @@ export class Workspace
         }   
         catch (e)
         {
-            throw new WorkspaceError("Failed to publish CSR", e.toString());
+            throw new CSRPublishError("Failed to publish CSR", e.toString(), version);
         }
 
         const m = output.match(/Certificate Request fingerprint \(.+\): ([A-F0-9:]+)/);
+        let fingerprint;
+
         if (m)
         {
-            return m[1];
+            fingerprint = m[1];
+        }
+        else
+        {
+            fingerprint = null;
         }
 
-        return null;
+        return [fingerprint, version];
     }
 
     public async createEnvironment(name: string): Promise<boolean>
@@ -405,8 +439,6 @@ export class Workspace
             }
         }
 
-        await this.initKeys();
-
         if (!await async.isDirectory(this.cachePath))
         {
             if (!await async.makeDirectory(this.cachePath))
@@ -414,6 +446,8 @@ export class Workspace
                 throw new WorkspaceError("Failed to create cache directory", this.cachePath);
             }
         }
+
+        await this.initKeys();
 
         const settings = await this.getSettings();
 

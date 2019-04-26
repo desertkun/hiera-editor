@@ -20,6 +20,7 @@ export class WorkspaceSettings
 {
     public certname: string;
     public server: string;
+    public version: string;
 
     private readonly filePath: string;
     private readonly codePath: string;
@@ -109,6 +110,7 @@ export class WorkspaceSettings
     {
         this.certname = null;
         this.server = null;
+        this.version = null;
     }
 
     private load(data: any): boolean
@@ -116,6 +118,9 @@ export class WorkspaceSettings
         const main = data["main"] || {};
         this.certname = main["certname"];
         this.server = main["server"];
+
+        this.version = data["version"];
+
         return true;
     }
 
@@ -128,13 +133,20 @@ export class WorkspaceSettings
 
     private dump(): any
     {
-        return {
+        const res: any = {
             "main": {
                 "environment": "production",
                 "codedir": this.codePath,
                 "certname": this.certname,
                 "server": this.server
             }
+        };
+
+        if (this.version)
+        {
+            res["version"] = this.version;
         }
+
+        return res;
     }
 }

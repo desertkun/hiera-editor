@@ -16,7 +16,7 @@ export class PuppetHTTP
             settings,
             {
                 "Accept": "application/json, text/pson"
-            }
+            }, true
         );
         
         const result: string[] = [];
@@ -31,6 +31,20 @@ export class PuppetHTTP
 
         return result;
     }
+
+    public static async GetServerVersion(settings: WorkspaceSettings): Promise<string>
+    {
+        const response = await this.RequestJSON(
+            "/puppet/v3/status/whatever?environment=production",
+            "GET",
+            settings,
+            {
+                "Accept": "application/json, text/pson"
+            }, false
+        );
+
+        return response["version"];
+    }
     
     public static async GetCertificate(certname: string, environment: string, settings: WorkspaceSettings): Promise<any>
     {
@@ -40,7 +54,7 @@ export class PuppetHTTP
             settings,
             {
                 "Accept": "text/plain"
-            }
+            }, true
         );
         
         return response;
@@ -54,7 +68,7 @@ export class PuppetHTTP
             settings,
             {
                 "Accept": "application/json, text/pson"
-            }
+            }, true
         );
         const facts = response["parameters"] 
         if (!facts)
@@ -62,13 +76,20 @@ export class PuppetHTTP
         return facts;
     }
 
-    private static async RequestJSON(path_: string, method: string, settings: WorkspaceSettings, headers: any): Promise<any>
+    private static async RequestJSON(path_: string, method: string, settings: WorkspaceSettings, headers: any, ssl: boolean): Promise<any>
     {
-        const data = await this.Request(path_, method, settings, headers);
-        return JSON.parse(data);
+        const data = await this.Request(path_, method, settings, headers, ssl);
+        try
+        {
+            return JSON.parse(data);
+        }
+        catch (e)
+        {
+            throw new Error(data);
+        }
     }
 
-    private static Request(path_: string, method: string, settings: WorkspaceSettings, headers: any): Promise<string>
+    private static Request(path_: string, method: string, settings: WorkspaceSettings, headers: any, ssl: boolean): Promise<string>
     {
         return new Promise<string>((resolve, reject) => 
         {
@@ -85,22 +106,48 @@ export class PuppetHTTP
                 port = 8140;
             }
 
+            const requestPath = "https://" + hostname + ":" + port + path_;
+
             const paths = WorkspaceSettings.GetPaths();
-            const ssldir = paths.ssldir;
-
-            const key_ = async.readFile(path.join(ssldir, "private_keys", settings.certname + ".pem"))
-            const cert_ = async.readFile(path.join(ssldir, "certs", settings.certname + ".pem"))
-            const ca_ = async.readFile(path.join(ssldir, "certs", "ca.pem"))
-
-            Promise.all([key_, cert_, ca_]).then((out: string[]) => 
+            if (ssl)
             {
-                const requestPath = "https://" + hostname + ":" + port + path_;
+                const ssldir = paths.ssldir;
 
+                const key_ = async.readFile(path.join(ssldir, "private_keys", settings.certname + ".pem"))
+                const cert_ = async.readFile(path.join(ssldir, "certs", settings.certname + ".pem"))
+                const ca_ = async.readFile(path.join(ssldir, "certs", "ca.pem"))
+
+                Promise.all([key_, cert_, ca_]).then((out: string[]) => 
+                {
+                    const options = {
+                        method: method,
+                        key: Buffer.alloc(out[0].length, out[0]),
+                        cert:Buffer.alloc(out[1].length, out[1]),
+                        ca: Buffer.alloc(out[2].length, out[2]),
+                        headers: headers
+                    }
+
+                    const req = request(requestPath, options, (error: any, response: request.Response, body: any) => 
+                    {
+                        if (error)
+                        {
+                            reject(error);
+                        }
+                        else
+                        {
+                            resolve(body);
+                        }
+                    });
+
+                }).catch((error) => {
+                    reject(error);
+                });
+            }
+            else
+            {
                 const options = {
                     method: method,
-                    key: Buffer.alloc(out[0].length, out[0]),
-                    cert:Buffer.alloc(out[1].length, out[1]),
-                    ca: Buffer.alloc(out[2].length, out[2]),
+                    rejectUnauthorized: false,
                     headers: headers
                 }
 
@@ -115,10 +162,8 @@ export class PuppetHTTP
                         resolve(body);
                     }
                 });
-
-            }).catch((error) => {
-                reject(error);
-            });
+            }
+            
         })
     }
 }

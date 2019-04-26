@@ -4,6 +4,7 @@ import { IPC } from "../../ipc/client";
 const $ = require("jquery");
 const ellipsis = require('text-ellipsis');
 const remote = require('electron').remote;
+const {dialog} = require('electron').remote
 
 const ipc = IPC();
 
@@ -39,7 +40,8 @@ class ProjectsRenderer
             }
             catch (e)
             {
-                alert(e.message);
+                const dialogOptions = {type: 'error', buttons: ['OK'], message: e.message}
+                dialog.showMessageBox(dialogOptions, i => console.log(i))
                 return;
             }
 
@@ -54,7 +56,9 @@ class ProjectsRenderer
             }
             catch (e)
             {
-                alert (e.message);
+                const dialogOptions = {type: 'error', buttons: ['OK'], message: e.message}
+                dialog.showMessageBox(dialogOptions, i => console.log(i))
+                return;
             }
         });
     }
