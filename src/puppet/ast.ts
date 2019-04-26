@@ -1839,6 +1839,7 @@ export class PuppetASTClass extends PuppetASTObject implements PuppetASTContaine
             const pp = new PuppetASTResolvedProperty();
             pp.value = this.name;
             this.resolvedLocals.put("title", pp);
+            this.resolvedLocals.put("name", pp);
         }
 
         for (const paramName of this.params.keys)
@@ -2067,8 +2068,8 @@ export class PuppetASTResource extends PuppetASTObject implements PuppetASTConta
             pp.value = this._resolvedTitle;
             pp.type = "string";
 
-            const paramName = "title";
-            this.setProperty("local", paramName, pp);
+            this.setProperty("local", "title", pp);
+            this.setProperty("local", "name", pp);
         }
 
         console.log("Defined type has been resolved");
